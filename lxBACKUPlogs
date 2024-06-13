@@ -1,0 +1,437 @@
+#!/bin/bash
+
+
+datei=${0//*\//}
+titel="Logdateien aufräumen und sichern!"
+benutzung="|- Benutzung: \\n|- '$datei [OPTION]...' \\n|-"
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+# -Sonderfälle UPDATE und AUFRUF_INTERN
+if ( [[ "$flag_update" != "true" ]] && [[ "$flag_aufruf_intern" != "true" ]] && [[ "$1" != -*q* ]] && [[ "$1" != -*h* ]] )
+then
+    # -Die Sicherheitsfrage:
+    # --1. Argument: die Vorbelegung: WEITER oder ABBRECHEN
+    # --2. Argument: die Datei die gestartet werden soll
+    # --3. Argument: der Titel der Datei die gestartet werden soll
+    flagSICHERHEITSFRAGE=`/home/lx21/bin/zz_inc_sicherheitsfrage.sh "WEITER" "$datei" "$titel"`
+    flagSICHERHEITSFRAGE=$?
+    # -Wenn der Rückgabewert nicht 0 ist, wurde entweder abgebrochen oder es gab einen Fehler!
+    if ( [[ "$flagSICHERHEITSFRAGE" != "0" ]] )
+    then
+        # -Die Sicherheitsfrage beendet das Skript!
+        #echo -e "--- Sicherheitsfrage: $flagSICHERHEITSFRAGE"
+        exit 0;
+    fi
+fi
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+# flag fuer den Quiet-Modus definieren:
+flagQUIETmode=false
+
+nutzer=`ps --pid $$ -o user=`
+
+# -quelle: die original Logdatei
+# -ziel: die Sicherung der Logdatei
+# -zeit: nach wievielen Minuten soll neue Sicherung erstellt werden
+quelle[1]="/aa_daten/bak/log/minidlna/minidlna.log"
+ziel[1]="/aa_daten/bak/log/minidlna/minidlna.log.1"
+zeit[1]=1440
+
+quelle[2]="/aa_daten/bak/log/cronjobs.log"
+ziel[2]="/aa_daten/bak/log/cronjobs.log.1"
+zeit[2]=1440
+
+quelle[3]="/aa_daten/bak/log/RAMminuetlich.log"
+ziel[3]="/aa_daten/bak/log/RAMminuetlich.log.1"
+zeit[3]=1440
+
+quelle[4]="/aa_daten/bak/log/RAM5minuetlich.log"
+ziel[4]="/aa_daten/bak/log/RAM5minuetlich.log.1"
+zeit[4]=1440
+
+quelle[5]="/aa_daten/bak/log/RAM15minuetlich.log"
+ziel[5]="/aa_daten/bak/log/RAM15minuetlich.log.1"
+zeit[5]=1440
+
+quelle[6]="/aa_daten/bak/log/lxBACKUP.archiv.log"
+ziel[6]="/aa_daten/bak/log/lxBACKUP.archiv.log.1"
+zeit[6]=10080
+
+
+typeset -i x=1
+
+txtLOGcron=" - START: Benutzer"
+
+maxKOPIEN=7
+flagDONE="false"
+
+
+
+
+# -Zeitpunkt für die Sicherung festlegen:
+# -WICHTIG: die Zeit muss mit dem Start des Cronjobs übereinstimmen! Dabei muss nur die Stunde passen,
+#  da der Cronjob immer zur gleichen Minute gestartet wird.
+intZEITCHECKstunden="00"
+intMINUTEN=`date '+%M'`
+#intZEITCHECKminuten="15"
+intZEITCHECKminuten="$intMINUTEN"
+#echo -e "--- DEBUG: Zeit Check (h:m): \"$intZEITCHECKstunden:$intZEITCHECKminuten\""
+#exit 0;
+
+
+
+
+
+if [[ "$1" != -*q* ]]
+then
+    # wird (fast) immer angezeigt:
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $datei -| $titel"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- "`date`
+    echo -e "|-"
+    # version, GPL, autor...
+
+    if ( [ "$1" == "-h" ] ) 
+    then
+        echo -e $benutzung
+        echo -e "|-"
+        echo -e "|- Manche Programme haben Probleme Ihre Logdateien in regelmäßigen Abständen aufzuteilen"
+        echo -e "|- und zu sichern. Deshalb bietet dieses Skript die Möglichkeit die jeweils aktuelle Logdatei unter"
+        echo -e "|- einem neuen Namen zu speichern und eine neue leere Logdatei anzulegen."
+        echo -e "|-"
+        echo -e "|- Optionen:"
+        echo -e "|- -h     Diesen Hilfetext anzeigen."
+        echo -e "|- -q     Keine Kopfzeilen oder sonstige Hinweise des Programms anzeigen."
+        echo -e "|-        HINWEIS: Fehlermeldungen werden immer angezeigt."
+        echo -e "|- Manche Optionen können miteinander kombiniert werden."
+        echo -e "|-"
+        echo -e "|- Befehlsvarianten:"
+        echo -e "|- -BEFEHL (ohne Argumente):"
+        echo -e "|- -Alle Logdateien aufteilen und bei Bedarf sichern. Erfordert teilweise root Rechte!"
+        echo -e "|-"
+        echo -e "|- Die aktuelle Sicherungsdatei ist immer die unter \"\$ziel\" angegebene. Zusätzlich wird"
+        echo -e "|- eine Kopie unter \"\$ziel\"_fortlaufendeNUMMER gespeichert.  Die maximale Anzahl an"
+        echo -e "|- Sicherungen ($maxKOPIEN) ist im Skript festgelegt. Eine neue Sicherung wird nach Ablauf"
+        echo -e "|- des unter \"\$zeit\" angegebenen Zeitraums angelegt."
+        echo -e "|-"
+        exit 0;
+    else
+        if ( [ "$1" == "-s" ] ) 
+        then
+            echo -e "|- Sonder- und Leerzeichen müssen teilweise maskiert werden! Nähere Infos dazu finden Sie"
+            echo -e "|- in der Hilfe (-h) unter dem Punkt 'Tipps zur Suche'."
+            echo -e "|-"
+            if ( [ "$2" == "" ] ) 
+            then
+                echo -e "|- FEHLER: Die Suchoption wurde gesetzt (-s), aber kein Suchbegriff eingegeben!"
+                echo -e "|-         Nähere Infos finden Sie in der Hilfe. (-h)"
+                echo -e "|-"
+                exit 0;
+            fi
+        fi
+    fi
+
+    echo -e $benutzung
+else
+    # $1 enthält -q
+    # d.h. der Quiet-Modus wurde gesetzt!
+    flagQUIETmode=true
+    if [[ "$1" == -*h* ]]
+    then
+        echo -e $benutzung
+        echo -e "|- FEHLER: Im Quiet-Modus (-q) kann die Hilfe nicht angezeigt werden!"
+        echo -e "|-         Nähere Infos finden Sie in der Hilfe. (-h)"
+        exit 0;
+    fi
+    nix=0
+fi
+
+
+
+
+
+
+# \b-.*q.*
+#if ( [[ "$1" == -[q|s][q|.] ]] ) 
+# \b-.*q.*
+# DEBUG-INFOS:
+#echo $1
+#if ( [[ "$1" == \b-.*q.?q. ]] ) 
+#if [[ "$1" == \b-.*q. ]]
+if [[ "$1" == -*q* ]]
+then
+    nix=0
+    #echo -e "|- $datei - QUIET-MODE"
+fi
+
+#exit 0;
+
+
+
+
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# ----- START neue Version -------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+# -die 1. Sicherheitskopie wird unter dem normalen Ziel Pfad gespeichert
+# --diese Datei wird bei jedem Aufruf einfach überschrieben
+#
+# -die 2. Sicherheitskopie wird mit einer fortlaufenden Nummer am Ende gespeichert
+# --wenn $maxKOPIEN erreicht ist kann leider nicht einfach so wieder bei 01 begonnen werden, da die
+#   aktuelle Nummer nicht anhand der vorhandenen Dateien ermittelt werden kann, wird jetzt mittels
+#   ls -ltr $ziel_?? die jeweils älteste der Sicherheitskopien ermittelt und überschrieben!
+#
+
+# -Zeit auslesen: Stunden und Minuten
+intSTUNDEN=`date '+%H'`
+intMINUTEN=`date '+%M'`
+
+#while ( [[ -f "${ziel[$x]}" ]] )
+while ( [[ "${quelle[$x]}" != "" ]] )
+do
+    # -cronjob und Zeit Kontrolle:
+    # --wird die datei von hand gestartet soll die Sicherung auf jeden Fall erfolgen! deshalb
+    #   hier Cron Check:
+    if [[ "$1" == "-cronSTART-" ]]
+    then
+        # -txtLOGcron darf nur beim 1. Durchlauf gesetzt werden, denn am Ende der while Schleife
+        #  wird txtLOGcron mit der gesicherten Datei gefüllt:
+        if ( [[ $x -eq 1 ]] )
+        then
+            txtLOGcron=" - START: Cron"
+        fi
+        if ( [[ -f "${ziel[$x]}" ]] )
+        then
+            # -wenn Ziel Sicherung älter als ${zeit[$x]} UND es 00:05 ist wird neu gesichert:
+            checkZEIT=`find ${ziel[$x]} -mmin +${zeit[$x]}`
+            if ( [[ $checkZEIT == "" ]] || [[ "$intSTUNDEN" != "$intZEITCHECKstunden" ]] || [[ "$intMINUTEN" != "$intZEITCHECKminuten" ]] )
+            then
+                # -Ziel Datei ist nicht alt genug, ABBRUCH
+                #exit 0;
+                x=x+1
+                continue
+            fi
+        fi
+        #echo -e "--- alt ---"
+    fi
+    flagDONE="true"
+    echo -e "--- --- Datei zum Sichern: ${quelle[$x]}"
+    # -die 1. Sicherheitskopie speichern: unter Zieldatei
+    cp -r ${quelle[$x]} ${ziel[$x]}
+    sleep 2
+    typeset -i z=1
+    zz="01"
+    #while ( [[ -f "${ziel[$x]}_$zz" ]] && [[ $z -lt $maxKOPIEN ]] || [[ $z -eq $maxKOPIEN ]] )
+    while ( [[ -f "${ziel[$x]}_$zz" ]] ) && ( [[ $z -lt $maxKOPIEN ]] || [[ $z -eq $maxKOPIEN ]] )
+    do
+        echo -e "--- datei vorhanden: ${ziel[$x]}_$zz"
+        z=z+1
+        if [[ $z -lt 10 ]]
+        then
+            zz=0$z
+        else
+            zz=$z
+        fi
+        #iTEST=${iTEST//*\./_$zz\.}
+    done
+    # -da $z in der schleife schon erhöht wurde, muss $maxKOPIEN auch um 1 erhöht werden:
+    #if ( [[ $z -gt $[maxKOPIEN+1] ]] )
+    if ( [[ $z -gt $maxKOPIEN ]] )
+    then
+        # die vorhandenen Sicherheitskopien nach Zeit sortieren, älteste zuerst
+        # und diese wird dann überschrieben: ls -ltr ${ziel[$x]}_??
+        echo -e "--- z: $z --- maxKOPIEN ($maxKOPIEN) erreicht"
+        # die 2. Sicherheitskopie: älteste überschreiben
+        for i in $(ls -tr1 ${ziel[$x]}_??)
+        do
+            echo -e "--- älteste überschreiben --- $i"
+            cp -r ${quelle[$x]} $i
+            break
+        done
+    else
+        echo -e "--- 2.SIK anlegen --- zz: $zz"
+        # die 2. Sicherheitskopie: mit fortlaufender nummer
+        cp -r ${quelle[$x]} ${ziel[$x]}"_$zz"
+        #exit 0;
+    fi
+    # die Quelldatei löschen, als leere Datei wieder anlegen und Rechte Korrigieren:
+    rm ${quelle[$x]}
+    touch ${quelle[$x]}
+    chmod a+w ${quelle[$x]}
+    txtLOGcron=$txtLOGcron" - ${quelle[$x]}"
+    x=x+1
+    #echo -e "x: $x"
+done
+# ---------------------------------------------------------------------------------------------------------------------
+# ----- ENDE neue Version --------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+
+
+
+
+txtZEITSTEMPEL=`date '+%F %T:%N'`
+txtLOGinfo="$txtZEITSTEMPEL - $datei"
+
+if ( [[ "$flagDONE" == "true" ]] )
+then
+    # allgemeine Cron Daten loggen:
+    #txtLOGcron=" - minütlich: true - 5 minütlich: $flagLOGGEN5 - 15 minütlich: $flagLOGGEN15"
+    echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
+    beep -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100
+else
+    # allgemeine Cron Daten loggen:
+    txtLOGcron=" - Beendet. - Sicherungen der Logdateien sind alle aktuell."
+    echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
+    echo -e "|- Nichts zu tun. Ende!"
+fi
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#beep -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 700 -f 392 -D 100 
+
+
+if ( [ "$1" == "" ] ) 
+then
+	# $1 leer
+	# -alles sichern: update
+	typeset -i x=1
+	#DEBUG#echo -e "${quelle[$x]}  ---> ${ziel[$x]}"
+	#DEBUG#`echo ${quelle[$x]} --- ${ziel[$x]}`
+	typeset -i fehler=0
+	while [[ ${quelle[$x]} != "" ]]
+	do
+        ziel_verzeichnis=${quelle[$x]//*\//}
+        echo -e "|- $x.:"
+        echo -e "|- Sichere Logdatei ${quelle[$x]}"
+        echo -e "|- cp -r ${quelle[$x]} ${ziel[$x]}"
+        echo -e "|- ...Vorgang läuft..."
+        # -damit mehrere dateien angelegt werden können, wird ans ende der sicherungsdatei
+        #  der monat (1-12) und eine fortlaufende nummer angehangen,  bei jedem start des Skripts
+        #  wird geprüft ob noch dateien aus dem vorletzten monat vorhanden sind, falls ja werden diese
+        #  gelöscht!
+        # -BEISPIEL: angelegte dateien:
+        #  ...03_01 ...03_02 ...03_03 ...03_04 ...03_05
+        #  ...04_01 ...04_02 ...04_03 ...04_04 ...04_05 ...04_06
+        #  monatLOESCHEN=(date +\%m)-2 --- wenn der wert kleiner als 1 ist, wird 12 addiert!!!
+        #  if [[ -f datei.$monatLOESCHEN_?? ]] ; then rm datei.$monatLOESCHEN_??
+        cp -r ${quelle[$x]} ${ziel[$x]}
+        
+        cp -r ${quelle[$x]} ${ziel[$x]}"."$monatAKTUELL"_"$fortlaufendeNUMMER
+        #rm ${quelle[$x]}
+        #touch ${quelle[$x]}
+        # datei kontrolle:
+        if [[ -f ${quelle[$x]} ]]
+        then
+            fehler=0
+        else
+            fehler=fehler+1
+            echo -e "|- FEHLER: ${quelle[$x]} konnte nicht neu angelegt werden. Bitte kontrollieren Sie die"
+            echo -e "|-         Rechtevergabe im entsprechenden Verzeichnis."
+        fi
+        #echo -e "|- Korrigiere Eigentümer ${ziel[$x]}$ziel_verzeichnis"
+        #echo -e "|- chown -R $nutzer ${ziel[$x]}$ziel_verzeichnis"
+        #`chown -R $nutzer ${ziel[$x]}$ziel_verzeichnis`
+        x=x+1
+        echo -e "|-"
+    done
+	#echo -e "cp -r bin/bak/* bin/bak2/"
+else
+    if ( [ "$1" == "-k" ] ) 
+    then
+        # $1 -k
+        # -alles sichern: komplett
+        
+        echo -e "|- BÖSER HACK: Diese Option ist nicht erlaubt! \"Skript-Panik!\""
+        echo -e "|- Exit!"
+        exit 0;
+        
+        typeset -i x=1
+        #DEBUG#echo -e "${quelle[$x]}  ---> ${ziel[$x]}"
+        #DEBUG#`echo ${quelle[$x]} --- ${ziel[$x]}`
+        while [[ ${quelle[$x]} != "" ]]
+        do
+            ziel_verzeichnis=${quelle[$x]//*\//}
+            echo -e "|- $x.:"
+            echo -e "|- Sichere (Komplett) ${quelle[$x]}"
+            echo -e "|- cp -r ${quelle[$x]} ${ziel[$x]}"
+            echo -e "|- ...Vorgang läuft..."
+            cp -r ${quelle[$x]} ${ziel[$x]}
+            echo -e "|- Korrigiere Eigentümer ${ziel[$x]}$ziel_verzeichnis"
+            echo -e "|- chown -R $nutzer ${ziel[$x]}$ziel_verzeichnis"
+            `chown -R $nutzer ${ziel[$x]}$ziel_verzeichnis`
+            x=x+1
+            echo -e "|-"
+        done
+    fi
+    if [[ "$1" == -*l* ]]
+    then
+        # $1 -l
+        # -nur die quellen auflisten
+        
+        echo -e "|- BÖSER HACK: Diese Option ist nicht erlaubt! \"Skript-Panik!\""
+        echo -e "|- Exit!"
+        exit 0;
+        
+        echo -e "|- Folgende Verzeichnisse werden gesichert:"
+        typeset -i x=1
+        #DEBUG#echo -e "${quelle[$x]}  ---> ${ziel[$x]}"
+        #DEBUG#`echo ${quelle[$x]} --- ${ziel[$x]}`
+        while [[ ${quelle[$x]} != "" ]]
+        do
+            echo -e "|- $x.: ${quelle[$x]}"
+            x=x+1
+        done
+        if [[ "$flagQUIETmode" == "false" ]]
+        then
+            echo -e "|-"
+            echo -e "|- HINWEIS: Es wurde nur diese Liste ausgegeben und noch keine Sicherung erstellt!"
+            echo -e "|-          Nähere Infos finden Sie in der Hilfe. (-h)"
+            echo -e "|-"
+        fi
+    fi
+fi
+
+
+if [[ $fehler -gt 0 ]]
+then
+    echo -e "|- $datei - Bei der Ausführung sind Fehler aufgetreten. Bitte beachten Sie die Ausgabe des"
+    echo -e "|- Skripts! Meistens handelt es sich um einen fehlerhaften Pfad oder ungenügende Benutzerrechte."
+    echo -e "|- Bitte starten Sie das Skript dann erneut, um die Sicherung abzuschliessen!"
+else
+    echo -e "|- $datei - Erfolgreich abgeschlossen!"
+fi
+echo -e "|--------------------------------------------------------------------------------"
+
+exit 0;
+
+
+
+

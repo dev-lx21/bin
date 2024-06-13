@@ -1,0 +1,936 @@
+#!/bin/bash 
+# skript von -lx-
+
+
+
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVERSION=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiVERSIONkomplett=${iaLSarray[0]}
+    # -Bis zum letzten Slash abschneiden:
+    dateiVERSIONkomplett=${dateiVERSIONkomplett//*\//}
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVERSIONkomplett=${dateiVERSIONkomplett//`echo -e $datei`_/}
+    # -Unterstrich bis zum Ende abschneiden:
+    dateiVERSIONkomplett=${dateiVERSIONkomplett//_*/}
+    dateiVERSION="($dateiVERSIONkomplett)"
+}
+[ -z $dateiVERSION ] && fncAUSLESENversion
+
+
+strIPAdresseEigene=""
+strIPAdresseGateway=""
+function fncAuslesenIPAdressen {
+    # -Zum Auslesen der eigenen und der Gateway IP Adresse!
+    txtHostnameI="`hostname -I`"
+    strIPAdresseEigene=${txtHostnameI// */}
+    strIPAdresseEigene4von4=${strIPAdresseEigene//*\./}
+    strIPAdresseEigene123von4=${strIPAdresseEigene:0: -${#strIPAdresseEigene4von4}}
+    strIPAdresseGateway="$strIPAdresseEigene123von4""1"
+}
+fncAuslesenIPAdressen
+
+
+
+
+
+
+zRELOAD=1
+function autoRELOAD {
+    # -Werte für Zeitvergleich übernehmen:
+    # -$1: Muster für Minuten
+    # -$2: Muster für Sekunden
+    if ( [[ "$1" == "" ]] )
+    then
+        musterMINUTEN=$musterNormMINUTEN
+    else
+        musterMINUTEN=$1
+    fi
+    if ( [[ "$2" == "" ]] )
+    then
+        #musterSEKUNDEN="*7"
+        musterSEKUNDEN=$musterNormSEKUNDEN
+    else
+        musterSEKUNDEN=$2
+    fi
+    intMINUTEN=`date '+%M'`
+    intSEKUNDEN=`date '+%S'`
+    # -DEBUG-INFO:
+    #echo -e "$zRELOAD - $intMINUTEN $musterMINUTEN - $intSEKUNDEN $musterSEKUNDEN"
+    zRELOAD=`expr $zRELOAD + 1`
+    if ( [[ "$intMINUTEN" == $musterMINUTEN ]] && [[ "$intSEKUNDEN" == $musterSEKUNDEN ]] )
+    then
+        eingabeTASTE="aRELOAD"
+    fi
+}
+
+txtPINGtestKOMPLETT=""
+# -------------------------------------------------------------------------------------------------
+# ----- START while actionGOTO -----------------------------------------------------------
+actionGOTO="START"
+while ( [[ "$actionGOTO" == "START" ]] || [[ "$actionGOTO" == "STARTping" ]] )
+do
+# -------------------------------------------------------------------------------------------------
+    # -Zähler für DEBUG-INFO des automatischen Reload nullen:
+    zRELOAD=1
+    if ( [[ "$actionGOTO" == "STARTping" ]] )
+    then
+        # -Weiterleitung zum Ping Test:
+        eingabeTASTE="t"
+    else
+        eingabeTASTE=""
+    fi
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Standard Parameter setzen ----------------------------------------------
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+fmtRESET=`tput sgr0`
+
+datei=${0//*\//}
+txtTITEL="Netzwerkverbindungen verwalten!"
+
+pauseABBRECHEN="0.5"
+pauseSTATUS="1"
+# -pauseSTATUSaktualisieren muss ein ganzzahliger Wert sein!
+pauseSTATUSaktualisieren="1"
+
+
+musterNormMINUTEN="*"
+musterNormSEKUNDEN="*"`expr 60 - $pauseSTATUSaktualisieren`
+#txtAKTUALISIERUNG="alle 10 Minuten automatisch"
+txtAKTUALISIERUNG="minütlich"
+
+if ( [[ "$1" == "" ]] )
+then
+    musterMINUTEN="*"
+else
+    musterMINUTEN=$1
+fi
+if ( [[ "$2" == "" ]] )
+then
+    #musterSEKUNDEN="*7"
+    musterSEKUNDEN="*"`expr 10 - $pauseSTATUSaktualisieren`
+else
+    musterSEKUNDEN=$2
+fi
+
+
+txtKOPF=\
+"|--------------------------------------------------------------------------------|"\\n\
+"|- $datei $dateiVERSION -| $txtTITEL"\\n\
+"|--------------------------------------------------------------------------------|"\\n\
+"|- "`date`\\n\
+"|-"
+
+txtBENUTZUNG=\\n\
+"|- Benutzung:"\\n\
+"|- '$datei [OPTION]...'"\\n\
+"|- Skript zum einfachen Verwalten von Netzwerkverbindungen. Verfügbare Schnittstellen anzeigen,"\\n\
+"|- Status ändern, Netzwerk testen und ggf. Neustarten. (Erfordert teilweise Root Rechte!)"\\n\
+"|-"
+
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Optionen:"\\n\
+"|- -h\\tDiesen Hilfetext anzeigen."\\n\
+"|-"
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tKein zulässiges Argument übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+
+# -Für die Ping Tests erforderlich:
+strPINGadresseLAN="192.168.178.1"
+strPINGadresseWAN="heise.de"
+[ -n $strIPAdresseGateway ] && strPINGadresseLAN="$strIPAdresseGateway"
+# ----- ENDE Standard Parameter setzen -----------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+fncClearX
+
+
+echo -e $txtKOPF
+
+#echo -e "|- Bitte wählen Sie die zu bearbeitende Schnittstelle durch Eingabe der ID aus!"
+#echo -e "|-"
+echo -e "|- -Wenn Sie eine aktive Schnittstelle wählen, so wird diese deaktiviert."
+echo -e "|- -Wenn Sie eine inaktive Schnittstelle wählen, so wird diese aktiviert."
+echo -e "|- -Hotplug Schnittstellen (z.Bsp. USB) werden nur angezeigt, wenn etwas"
+echo -e "|-  daran angeschlossen ist"
+echo -e "|- -Die Anzeige wird $txtAKTUALISIERUNG aktualisiert."
+echo -e "|-"
+
+
+# +++++ START Netzwerk Status auslesen
+while read txtNETWORKstatus
+do
+    #nix=1
+    if ( [[ "$txtNETWORKstatus" == Active:* ]] )
+    then
+        txtNETWORKstatus=${txtNETWORKstatus//Active: /}
+        #echo $archivORIGINAL
+        break
+    fi
+done <<EOFpipe
+`systemctl status networking`
+EOFpipe
+# +++++ ENDE Netzwerk Status auslesen
+echo -e "|- Netzwerk Status:"
+echo -e "|- $txtNETWORKstatus"
+echo -e "|-"
+
+
+echo -e "|- Die verfügbaren Schnittstellen:"
+echo -e "|- \\tID:\\tName:\\t\\tStatus:"
+# +++++ START IP-LINK auslesen
+typeset -i zz=0
+typeset -i zzAKTIV=0
+interfaceAKTIV=""
+interfaceAKTIVid=""
+interfaceAKTIVids=""
+#pipeIPLINK=${`ip link | grep " state "`}
+#echo $pipeIPLINK
+while read txtNETWORK[$zz]
+do
+    #nix=1
+    arrNETWORK=(${txtNETWORK[$zz]})
+    txtNETWORKinterface=${arrNETWORK[1]//:*/}
+    #if ( [[ "$txtNETWORK" == *state" "UP* ]] )
+    # <BROADCAST,MULTICAST,UP
+    if ( [[ "${txtNETWORK[$zz]}" == *\<BROADCAST,MULTICAST,UP* ]] )
+    then
+        interfaceAKTIV=$txtNETWORKinterface
+        interfaceAKTIVarray[$zzAKTIV]=$txtNETWORKinterface
+        # -interfaceAKTIVid muss $zz sein, denn die Nummerierung in IP-LINK kann
+        #  fehlerhaft sein!
+        # -$zz vor der Erhöhung entspricht genau dem Feldindex!!!
+        interfaceAKTIVid=$zz
+        interfaceAKTIVids=$interfaceAKTIVids$zz","
+        #interfaceAKTIVid=${arrNETWORK[0]//:*/}
+        #export interfaceAKTIV
+        zz=zz+1
+        echo -e "|- \\t$zz\\t$txtNETWORKinterface\\t-AKTIV-"
+        zzAKTIV=zzAKTIV+1
+    else
+        zz=zz+1
+        echo -e "|- \\t$zz\\t$txtNETWORKinterface"
+    fi
+done <<EOFpipe
+`ip link | grep " state "`
+EOFpipe
+# +++++ ENDE IP-LINK auslesen
+# -DEBUG-INFO:
+#echo -e "--- zz: $zz --- interfaceAKTIV: $interfaceAKTIV --- txtNETWORKinterface: $txtNETWORKinterface"
+echo -e "|-"
+
+
+echo -e "|--------------------------------------------------------------------------------|"
+if ( [[ "$actionGOTO" != "STARTping" ]] )
+then
+    #txtPINGtestKOMPLETT=""
+    echo -e "|- Schnittstelle wählen: \"${fmtFETT}ID${fmtRESET}\"\t-|- Aktualisieren: \"${fmtFETT}a${fmtRESET}\"\t-|- Beenden: \"${fmtFETT}q${fmtRESET}\"\t-|"
+    echo -e "|- Netzwerk Neustarten: \"${fmtFETT}n${fmtRESET}\"\t-|- Ping Test: \"${fmtFETT}t${fmtRESET}\"\t-|-\t\t\t-|"
+    echo -e "|--------------------------------------------------------------------------------|"
+    echo -e "|- Test Ergebnis: $txtPINGtestKOMPLETT"
+    echo -e "|-"
+    echo -en "|- Ihre Eingabe: "
+    #sleep 10 && beep -l 200 -f 160 -r 2 -D 100 && continue &
+    while ( [[ "$eingabeTASTE" != "a" ]] && [[ "$eingabeTASTE" != "q" ]] && [[ "$eingabeTASTE" != "n" ]] && [[ "$eingabeTASTE" != "t" ]] && [[ "$eingabeTASTE" != [1-$zz] ]] )
+    do
+        read -n 1 -t 1 eingabeTASTE
+        intFEHLER=$?
+        #echo $intFEHLER
+        if ( [[ "$intFEHLER" == "0" ]] && [[ "$eingabeTASTE" == "" ]] )
+        then
+            #echo -en " - FEHLER: $intFEHLER"
+            tput cub 1
+        fi
+        #echo -en " - Erfolgreich!"
+        #autoRELOAD "*" "57"
+        autoRELOAD
+        if ( [[ "$eingabeTASTE" != "" ]] && [[ "$eingabeTASTE" != "aRELOAD" ]] )
+        #if ( [[ "$eingabeTASTE" != "aRELOAD" ]] )
+        then
+            tput cub 1
+            echo -n " "
+            tput cub 1
+        fi
+        if ( [[ "$eingabeTASTE" == "aRELOAD" ]] )
+        then
+            eingabeTASTE="a"
+        fi
+    done
+fi
+if ( [[ "$actionGOTO" != "STARTping" ]] && [[ "$eingabeTASTE" != "t" ]] )
+then
+    echo -e $eingabeTASTE
+    echo -e "|-"
+elif ( [[ "$actionGOTO" != "STARTping" ]] )
+then
+    echo -e ""
+    if ( [[ "$interfaceAKTIVid" != "" ]] )
+    then
+        echo -e ""
+    else
+        echo -e "|-"
+    fi
+fi
+
+#echo -e "|--------------------------------------------------------------------------------"\\n"|-"
+
+
+
+function weiterBELIEBIGEtaste {
+    echo -e "|-"
+    echo -e "|- Weiter mit beliebiger Taste!"
+    if ( [[ "$intFEHLER" != "0" ]] )
+    then
+        # -FEHLER Sound:
+        beep -l 200 -f 200 -r 2 -D 100 --new -l 600 -f 160 -D 100
+    else
+        # -Erfolgreich Sound:
+        beep -l 200 -f 400 -r 2 -D 100 --new -l 600 -f 600 -D 100
+    fi
+    eingabeTASTE=""
+    while ( [[ "$eingabeTASTE" == "" ]] )
+    do
+        #read -n 1 eingabeTASTE
+#         stty raw -echo
+#         #eingabeTASTE=`dd bs=1 count=1 2>/dev/null`
+#         eingabeTASTE=`dd bs=1 count=1 2>/dev/null` &
+#         stty -raw echo
+#         autoRELOAD
+        
+        read -n 1 -t 1 eingabeTASTE
+        intFEHLERfnc=$?
+        #echo $intFEHLER
+        if ( [[ "$intFEHLERfnc" == "0" ]] && [[ "$eingabeTASTE" == "" ]] )
+        then
+            #echo -en " - FEHLER: $intFEHLER"
+            tput cub 1
+            eingabeTASTE="aRELOAD"
+        fi
+        #echo -en " - Erfolgreich!"
+        #autoRELOAD "*" "57"
+        autoRELOAD
+        if ( [[ "$eingabeTASTE" != "" ]] && [[ "$eingabeTASTE" != "aRELOAD" ]] )
+        #if ( [[ "$eingabeTASTE" != "aRELOAD" ]] )
+        then
+            tput cub 1
+            echo -n " "
+            tput cub 1
+        fi
+        if ( [[ "$eingabeTASTE" == "aRELOAD" ]] )
+        then
+            eingabeTASTE="a"
+            #echo -e $eingabeTASTE
+            echo -e "|-"
+            echo -en "|- Wird aktualisiert..."
+            sleep $pauseSTATUSaktualisieren
+        fi
+    done
+}
+
+
+# -------------------------------------------------------------------------------------------------
+# -aktive Schnittstelle immer deaktivieren, entweder wurde sie selbst gewählt (also deaktivieren)
+#  oder eine andere Schnittstelle (also auch deaktivieren)
+# -Eingabe (minus 1) als Feldindex für Schnittstellen Array nutzen
+# -------------------------------------------------------------------------------------------------
+
+
+# -------------------------------------------------------------------------------------------------
+# -Aktualisieren Option:
+if ( [[ "$eingabeTASTE" == "a" ]] )
+then
+    echo -en "|- Wird aktualisiert..."
+    sleep $pauseSTATUSaktualisieren
+    actionGOTO="START"
+    continue
+fi
+
+
+# -------------------------------------------------------------------------------------------------
+# -Quit Option:
+if ( [[ "$eingabeTASTE" == "q" ]] )
+then
+    actionGOTO="EXIT"
+    exit 0;
+fi
+
+
+# -------------------------------------------------------------------------------------------------
+# -Neustarten Option:
+if ( [[ "$eingabeTASTE" == "n" ]] )
+then
+    echo -en "|- Netzwerk Neustarten!"
+    systemctl stop networking >/dev/null 2>&1
+    ifdown -a >/dev/null 2>&1
+    while ( [[ "$zzAKTIV" -gt "0" ]] )
+    do
+        ip address flush dev $interfaceAKTIVarray[$zzAKTIV] >/dev/null 2>&1
+        #echo -en " flush dev $interfaceAKTIVarray[$zzAKTIV]"
+        zzAKTIV=zzAKTIV-1
+    done
+    systemctl start networking >/dev/null 2>&1
+    intFEHLER=$?
+    if ( [[ "$intFEHLER" != "0" ]] )
+    then
+        echo -en " - FEHLER: $intFEHLER"
+        sleep $pauseSTATUS
+        echo -en " - Wird aktualisiert...!"
+        sleep $pauseSTATUSaktualisieren
+        actionGOTO="START"
+        continue
+    fi
+    echo -en " - Erfolgreich!"
+    sleep $pauseSTATUS
+    echo -en " - Wird aktualisiert..."
+    sleep $pauseSTATUSaktualisieren
+    actionGOTO="START"
+    continue
+fi
+
+
+# -------------------------------------------------------------------------------------------------
+# -Test Option:
+if ( [[ "$eingabeTASTE" == "t" ]] )
+then
+    # -aktive Schnittstellen prüfen:
+    if ( [[ "$interfaceAKTIVid" == "" ]] )
+    then
+        echo -e "|- FEHLER: Keine aktive Netzwerkverbindung vorhanden! Bitte wählen Sie durch"
+        echo -e "|-         Eingabe der ID eine Schnittstelle aus."
+        intFEHLER=1
+        weiterBELIEBIGEtaste
+        actionGOTO="START"
+        continue
+    fi
+
+    if ( [[ "$actionGOTO" != "STARTping" ]] )
+    then
+        # ----- START Cursor Position ermitteln --------------------------------------------
+        # -positionieren: tput cup Zeile Spalte
+        typeset -i cursorZEILE=0
+        typeset -i cursorZEILEminusZ=0
+        typeset -i cursorZEILEplusZZZ=0
+        typeset -i z=0
+        typeset -i zz=0
+        typeset -i zzz=0
+        function getCPos { 
+            local v=() t=$(stty -g)
+            stty -echo
+            printf "\033[6n"
+            IFS='[;' read -ra v -d R
+            stty $t
+            CPos=(${v[@]:1})
+        }
+        getCPos
+        cursorZEILE=$CPos
+        #########################################
+        # -Die z Variablen:
+        # --z: wieviele Zeilen zurück zur Löschposition
+        # --zz: wieviele Zeilen sollen gelöscht werden
+        # --zzz: wieviele Zeilen wurden eingefügt
+        # --cursorZEILEminusZ: Löschposition und Cursorposition für Ausgabe neuer Zeilen
+        # --cursorZEILEplusZZZ: Cursorposition ab der nochmal Standard Ausgabe erfolgt
+        z=8
+        zz=4
+        zzz=4
+        zeileDELETE=`tput dl1`
+        zeileINSERT=`tput il1`
+        intPAUSEzeilen="0.10"
+        cursorZEILEminusZ=$cursorZEILE-$z
+        cursorZEILEplusZZZ=$cursorZEILEminusZ+$zzz
+        #########################################
+        # -Zeitzeile aktualisieren:
+        tput cup 3 0
+        echo -e "|- "`date`
+        #########################################
+        # -Zeilen löschen:
+        while ( [[ "$zz" -gt 0 ]] )
+        do
+            tput cup $cursorZEILEminusZ 0
+            echo $zeileDELETE
+            sleep $intPAUSEzeilen
+            zz=$zz-1
+        done
+        #########################################
+        sleep $intPAUSEzeilen
+        # -Neue Zeilen ausgeben:
+        tput cup $cursorZEILEminusZ 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEminusZ 0
+        echo -e "|- Test Ergebnis: $txtPINGtestKOMPLETT"
+        sleep $intPAUSEzeilen
+        tput cup $cursorZEILEminusZ 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEminusZ 0
+        echo -e "|--------------------------------------------------------------------------------|"
+        sleep $intPAUSEzeilen
+        tput cup $cursorZEILEminusZ 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEminusZ 0
+        echo -e "|- Ping LAN: \"${fmtFETT}l${fmtRESET}\"\t\t-|- Ping WAN: \"${fmtFETT}w${fmtRESET}\"\t-|- Test abbrechen: \"${fmtFETT}t${fmtRESET}\"\t-|"
+        sleep $intPAUSEzeilen
+        tput cup $cursorZEILEminusZ 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEminusZ 0
+        echo -e "|- \t\t\t\t-|- \t\t\t-|- Beenden: \"${fmtFETT}q${fmtRESET}\"\t-|"
+        sleep $intPAUSEzeilen
+        #########################################
+        # -Standard Zeilen nochmals ausgeben um Cursor korrekt zu positionieren
+        # -VORSICHT: $cursorZEILEplusZZZ wird jetzt benutzt:
+        tput cup $cursorZEILEplusZZZ 0
+        echo -e "|-"
+        sleep $intPAUSEzeilen
+        echo -en "|- Ihre Eingabe: "
+    else
+        echo -e "|- \t\t\t\t-|- \t\t\t-|- Beenden: \"${fmtFETT}q${fmtRESET}\"\t-|"
+        echo -e "|- Ping LAN: \"${fmtFETT}l${fmtRESET}\"\t\t-|- Ping WAN: \"${fmtFETT}w${fmtRESET}\"\t-|- Test abbrechen: \"${fmtFETT}t${fmtRESET}\"\t-|"
+        echo -e "|--------------------------------------------------------------------------------|"
+        echo -e "|- Test Ergebnis: $txtPINGtestKOMPLETT"
+        echo -e "|-"
+        echo -en "|- Ihre Eingabe: "
+    fi
+    eingabeTASTE=""
+    while ( [[ "$eingabeTASTE" != "l" ]] && [[ "$eingabeTASTE" != "w" ]] && [[ "$eingabeTASTE" != "t" ]] && [[ "$eingabeTASTE" != "q" ]] )
+    do
+#         read -n 1 -t 1 eingabeTASTE
+#         #autoRELOAD "*" "57"
+#         autoRELOAD
+#         if ( [[ "$eingabeTASTE" != "" ]] && [[ "$eingabeTASTE" != "aRELOAD" ]] )
+#         then
+#             tput cub 1
+#             echo -n " "
+#             tput cub 1
+#         fi
+        
+        read -n 1 -t 1 eingabeTASTE
+        intFEHLER=$?
+        #echo $intFEHLER
+        if ( [[ "$intFEHLER" == "0" ]] && [[ "$eingabeTASTE" == "" ]] )
+        then
+            #echo -en " - FEHLER: $intFEHLER"
+            tput cub 1
+        fi
+        #echo -en " - Erfolgreich!"
+        #autoRELOAD "*" "57"
+        autoRELOAD
+        if ( [[ "$eingabeTASTE" != "" ]] && [[ "$eingabeTASTE" != "aRELOAD" ]] )
+        #if ( [[ "$eingabeTASTE" != "aRELOAD" ]] )
+        then
+            tput cub 1
+            echo -n " "
+            tput cub 1
+        fi
+        
+        if ( [[ "$eingabeTASTE" == "aRELOAD" ]] )
+        then
+            eingabeTASTE="a"
+            break
+        fi
+    done
+    echo -e $eingabeTASTE
+    echo -e "|-"
+    # -Aktualisieren Option:
+    if ( [[ "$eingabeTASTE" == "a" ]] )
+    then
+        echo -en "|- Wird aktualisiert..."
+        sleep $pauseSTATUSaktualisieren
+        actionGOTO="STARTping"
+        continue
+    fi
+    # -Quit Option:
+    if ( [[ "$eingabeTASTE" == "q" ]] )
+    then
+        actionGOTO="EXIT"
+        exit 0;
+    fi
+    # -Test abbrechen Option:
+    if ( [[ "$eingabeTASTE" == "t" ]] )
+    then
+        echo -en "|- Test wird abgebrochen..."
+        sleep $pauseABBRECHEN
+        actionGOTO="START"
+        continue
+    fi
+    txtZEIT="["`date '+%T'`"]"
+    txtPINGtestINFO="$txtZEIT[$interfaceAKTIV]"
+    # -Ping LAN Option:
+    if ( [[ "$eingabeTASTE" == "l" ]] )
+    then
+        echo -e "|- Ping LAN wird ausgeführt..."
+        ping -c 4 $strPINGadresseLAN
+        intFEHLER=$?
+        if ( [[ "$intFEHLER" != "0" ]] )
+        then
+            echo -e "|-"\\n"|- FEHLER: $intFEHLER"
+            weiterBELIEBIGEtaste
+            txtPINGtestKOMPLETT="$txtPINGtestINFO LAN Ping: FEHLER! Status: $intFEHLER"
+            actionGOTO="STARTping"
+            continue
+        fi
+        echo -e "|-"\\n"|- Erfolgreich!"
+        weiterBELIEBIGEtaste
+        txtPINGtestKOMPLETT="$txtPINGtestINFO LAN Ping: Erfolgreich!"
+        actionGOTO="STARTping"
+        continue
+    fi
+    # -Ping WAN Option:
+    if ( [[ "$eingabeTASTE" == "w" ]] )
+    then
+        echo -e "|- Ping WAN wird ausgeführt..."
+        ping -c 4 $strPINGadresseWAN
+        intFEHLER=$?
+        if ( [[ "$intFEHLER" != "0" ]] )
+        then
+            echo -e "|-"\\n"|- FEHLER: $intFEHLER"
+            weiterBELIEBIGEtaste
+            txtPINGtestKOMPLETT="$txtPINGtestINFO WAN Ping: FEHLER! Status: $intFEHLER"
+            actionGOTO="STARTping"
+            continue
+        fi
+        echo -e "|-"\\n"|- Erfolgreich!"
+        weiterBELIEBIGEtaste
+        txtPINGtestKOMPLETT="$txtPINGtestINFO WAN Ping: Erfolgreich!"
+        actionGOTO="STARTping"
+        continue
+    fi
+fi
+
+
+
+
+zzEINGABE=""
+zzEINGABE=$[eingabeTASTE-1]
+#echo -e "|- Taste: $eingabeTASTE --- zzEINGABE: $zzEINGABE --- AKTIVid: $interfaceAKTIVid"
+
+
+# -------------------------------------------------------------------------------------------------
+# -Eingabe ist aktive Schnittstelle, also deaktivieren und dann aktualisieren:
+if ( [[ "$interfaceAKTIVids" == *$zzEINGABE* ]] )
+then
+    arrNETWORK=(${txtNETWORK[$zzEINGABE]})
+    NETWORKinterfaceNAME=${arrNETWORK[1]//:*/}
+    echo -en "|- ...Deaktivieren von $NETWORKinterfaceNAME!"
+    #ip address flush dev $NETWORKinterfaceNAME >/dev/null 2>&1
+    ifdown $NETWORKinterfaceNAME >/dev/null 2>&1
+    intFEHLER=$?
+    ip address flush dev $NETWORKinterfaceNAME >/dev/null 2>&1
+    #ip link set $NETWORKinterfaceNAME down >/dev/null 2>&1
+    if ( [[ "$intFEHLER" != "0" ]] )
+    then
+        echo -en " - FEHLER: $intFEHLER"
+        sleep $pauseSTATUS
+        echo -en " - Wird aktualisiert...!"
+        sleep $pauseSTATUSaktualisieren
+        actionGOTO="START"
+        continue
+    fi
+    echo -en " - Erfolgreich!"
+    sleep $pauseSTATUS
+    echo -en " - Wird aktualisiert..."
+    sleep $pauseSTATUSaktualisieren
+    actionGOTO="START"
+    continue
+# -------------------------------------------------------------------------------------------------
+# -Eingabe ist deaktivierte Schnittstelle, also aktivieren und dann aktualisieren:
+else
+    arrNETWORK=(${txtNETWORK[$zzEINGABE]})
+    NETWORKinterfaceNAME=${arrNETWORK[1]//:*/}
+    echo -en "|- ...Aktivieren von $NETWORKinterfaceNAME!"
+    #ip address flush dev $NETWORKinterfaceNAME >/dev/null 2>&1
+    ifup $NETWORKinterfaceNAME >/dev/null 2>&1
+    intFEHLER=$?
+    #ip address flush dev $NETWORKinterfaceNAME >/dev/null 2>&1
+    #ip link set $NETWORKinterfaceNAME up >/dev/null 2>&1
+    if ( [[ "$intFEHLER" != "0" ]] )
+    then
+        echo -en " - FEHLER: $intFEHLER"
+        sleep $pauseSTATUS
+        echo -en " - Wird aktualisiert...!"
+        sleep $pauseSTATUSaktualisieren
+        actionGOTO="START"
+        continue
+    fi
+    echo -en " - Erfolgreich!"
+    sleep $pauseSTATUS
+    echo -en " - Wird aktualisiert..."
+    sleep $pauseSTATUSaktualisieren
+    actionGOTO="START"
+    continue
+fi
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- ENDE while actionGOTO ------------------------------------------------------------
+done
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# --------------------------------------------------------------------------------------
+# ----- START Cronjob Kontrolle -------------------------------------------------
+# -Display testen:
+if [[ `tty` == *dev* ]]
+then
+    #echo -e "kein Cronjob, weil Display"
+    echo -e $txtKOPF$txtBENUTZUNG
+    echo -e "|- FEHLER: Skript Aufruf nicht mittels eines Cronjobs erfolgt. Rufen Sie"
+    echo -e "|-         \"man crontab\" auf um mehr über Cronjobs zu erfahren. Das Skript"
+    echo -e "|-         wird beendet."
+    echo -e "|-"
+    exit 0;
+fi
+# ----- ENDE Cronjob Kontrolle --------------------------------------------------
+# --------------------------------------------------------------------------------------
+
+
+# -Pause um ggf die Ausführung des Aufräum Cronjobs abzuwarten
+sleep 14 
+
+# -jetzt erst die Zeitdaten für den Logeintrag ermitteln:
+txtZEITSTEMPEL=`date '+%F %T:%N'`
+txtLOGinfo="$txtZEITSTEMPEL - $datei"
+# ----- ENDE  Standard Parameter setzen ----------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Wert visualisieren -----------------------------------------------------------
+function wertVISUALISIEREN {
+    RAMfreiVISUELL=${RAMfrei//M/}
+    RAMfreiVISUELL=`expr $RAMfreiVISUELL \/ 10`
+    RAMfreiVISUELL=`expr $RAMfreiVISUELL \/ 2`
+    RAMfreiVISUELLz=$RAMfreiVISUELL
+    RAMbalken=""
+    while ( [[ $RAMfreiVISUELLz -gt 0 ]] )
+    do
+        RAMbalken=$RAMbalken"_"
+        RAMfreiVISUELLz=`expr $RAMfreiVISUELLz - 1`
+    done
+    #echo -e "wert $RAMfrei $RAMfreiVISUELL $RAMbalken"
+}
+# ----- ENDE Wert visualisieren ------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+#arrWERTE=(`free -m`)
+#RAMfrei=${arrWERTE[9]}
+#wertVISUALISIEREN
+
+
+# -Zeit auslesen: Stunden und Minuten
+intSTUNDEN=`date '+%H'`
+intMINUTEN=`date '+%M'`
+
+
+# 24 Uhr Test
+if ( [[ "$intSTUNDEN" == "00" ]] && [[ "$intMINUTEN" == "00" ]] )
+then
+    # -die Logdateien kopieren und die Originale löschen:
+    # -wird inzwischen von der lxBACKUPlogs geregelt, daher:
+    nix=1
+    #cp $dateiLOGminuetlich $dateiLOGminuetlich".1"
+    #rm $dateiLOGminuetlich
+    #cp $dateiLOG5minuetlich $dateiLOG5minuetlich".1"
+    #rm $dateiLOG5minuetlich
+    #cp $dateiLOG15minuetlich $dateiLOG15minuetlich".1"
+    #rm $dateiLOG15minuetlich
+fi
+
+
+
+
+# 5 Minuten Test
+intMINUTEN5=`echo -e "scale=2 ; $intMINUTEN/5" | bc`
+intMINUTEN5=${intMINUTEN5//*\./}
+if ( [[ "$intMINUTEN5" == "00" ]] )
+then
+    #echo -e "5 min flag"
+    flagLOGGEN5="true"
+fi
+
+# 15 Minuten Test
+intMINUTEN15=`echo -e "scale=2 ; $intMINUTEN/15" | bc`
+intMINUTEN15=${intMINUTEN15//*\./}
+if ( [[ "$intMINUTEN15" == "00" ]] )
+then
+    #echo -e "15 min flag"
+    flagLOGGEN15="true"
+fi
+
+# volle Stunde Test
+if ( [[ "$intMINUTEN" == "00" ]] )
+then
+    flagLOGGEN5="true"
+    flagLOGGEN15="true"
+fi
+
+
+
+
+# -kein Display, also Cronjob, also loggen!
+arrWERTE=(`free -m`)
+txtLOGram=" - ${arrWERTE[0]}: ${arrWERTE[7]} ${arrWERTE[2]}: ${arrWERTE[9]}"
+RAMfrei=${arrWERTE[9]}
+wertVISUALISIEREN
+txtLOGram=$txtLOGram" \t"$RAMbalken
+# -Infos in die Logdatei schreiben: minütlich
+echo -e $txtLOGinfo$txtLOGram >> $dateiLOGminuetlich
+txtLOGcron=" - minütlich: true"
+
+if ( [[ "$flagLOGGEN5" == "true" ]] )
+then
+    # -Infos in die Logdatei schreiben: 5 minütlich
+    echo -e $txtLOGinfo$txtLOGram >> $dateiLOG5minuetlich
+    txtLOGcron=$txtLOGcron" - 5 minütlich: $flagLOGGEN5"
+fi
+
+if ( [[ "$flagLOGGEN15" == "true" ]] )
+then
+    # -Infos in die Logdatei schreiben: 15 minütlich
+    echo -e $txtLOGinfo$txtLOGram >> $dateiLOG15minuetlich
+    txtLOGcron=$txtLOGcron" - 15 minütlich: $flagLOGGEN15"
+fi
+
+txtLOGcron=$txtLOGcron"\t-- $RAMfrei"
+# allgemeine Cron Daten loggen:
+echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
+
+
+exit 0;
+
+# -----------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+echo -e "|-------------------------------------------------------------" 
+echo -e "|- $txtZEITSTEMPEL --- "`tty`
+
+
+if ( [ "$1" == "" ] ) 
+    then
+    echo -e "|- HD Belegung:"
+    df -m
+    echo -e "|- RAM Auslastung:"
+    free -m
+    echo -e "|- RAM aufräumen:"
+	echo -e "sync ; sync ; sync ; echo 3 > /proc/sys/vm/drop_caches"
+	sync ; sync ; sync ; echo 3 > /proc/sys/vm/drop_caches	
+    echo -e "|- RAM Auslastung:"
+    free -m
+
+elif ( [ "$1" == "-s" ] ) 
+    then
+    echo -e "|- HD Belegung:"
+    df -m
+    echo -e "|- RAM Auslastung:"
+    free -m
+elif ( [ "$1" == "-h" ] ) 
+    then
+    echo -e $txtKOPF
+	echo -e $txtHILFE	
+else
+	echo -e $txtFEHLERargument 
+fi 
+
+
+exit 0;
+
+
+
+

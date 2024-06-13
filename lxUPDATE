@@ -1,0 +1,698 @@
+#!/bin/bash
+# skript von -lx-
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+#
+# ----- DONE:
+#
+# ----- Bugs:
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+    
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+    
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+    
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+    
+    # -Nur den Infotext ausschneiden: 
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+    
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+    
+}
+[ -z $dateiVersionInfoNr ] && fncAUSLESENversion
+
+
+
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+
+zeitSTARTutc=`date '+%s'`
+zeitSTART=`date -d @$zeitSTARTutc`
+zeitSTARTdateiname=`date -d @$zeitSTARTutc '+%F_%T'`
+zeitSTARTdateiname=${zeitSTARTdateiname//\-/}
+zeitSTARTdateiname=${zeitSTARTdateiname//:/}
+zeitSTARTdateiname=${zeitSTARTdateiname//_/\-}
+
+
+datei=${0//*\//}
+txtTITEL="Software aktualisieren und verwalten!"
+benutzung="|- Benutzung: \\n|- '$datei [OPTION]... [PAKETNAME(N)]...' \\n|-"
+txtEingabe="|- Eingabe: '$datei' \\n|-"
+[[ -n $* ]] && txtEingabe="|- Eingabe: '$datei $*' \\n|-"
+#nutzer=`ps --pid $$ -o user=`
+
+dateiAUSGABEspeichern=/home/$nutzer/Dokumente/$datei"_Systeminfos_"$zeitSTARTdateiname".txt"
+dateiTMPBefehlAusgabe=/tmp/$datei"_ausgabe_"$$".tmp"
+dateiTMPBefehlFehler=/tmp/$datei"_fehler_"$$".tmp"
+
+txtCheckPaketAusgabe=""
+stsCheckPaketAusgabe=""
+stsCheckPaketExitcode=""
+
+flagInfoPopup="true"
+
+layoutAusgabeAnfang="|- "
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+
+
+
+
+
+
+function fncCheckPaketInstalliertVar {
+    # -Überprüfen ob ein bestimmtes Paket installiert ist. Erfordert mindestens einen
+    #  Paketnamen als Argument.
+    # -Übergabe der Informationen mittels zweier Variablen:
+    #  $stsCheckPaketAusgabe: Paket installiert: true oder false
+    #  $stsCheckPaketExitcode: Ausgabestatus der Funktion
+    # -Wird $2 übergeben und enthält "stsCheckPaketAusgabe", wird $stsCheckPaketAusgabe mittels echo
+    #  ausgegeben. Somit kann die Funktion direkt in einem Vergleich genutzt werden!
+    #[ ! "$1" ] && stsCheckPaketAusgabe="FEHLER" && stsCheckPaketExitcode="1" && return
+    [[ -z "$1" ]] && stsCheckPaketExitcode="$?" && stsCheckPaketAusgabe="FEHLER: Keine Argumente übergeben!"
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+    
+    #[[ `apt list $1 --installed 2>/dev/null` == *$1* ]] && stsCheckPaketAusgabe="true" || stsCheckPaketAusgabe="false"
+    tmpCheckPaket="`apt list $1 --installed 2>/dev/null`"
+    stsCheckPaketExitcode="$?"
+    [[ "$tmpCheckPaket" == *$1* ]] && stsCheckPaketAusgabe="true" || stsCheckPaketAusgabe="false"
+    #stsCheckPaketExitcode="$?"
+    
+    [[ "$2" ]] && [[ "$2" == "stsCheckPaketAusgabe" ]] && echo -en "$stsCheckPaketAusgabe"
+}
+
+function fncTXTPaketInstalliert {
+    # -Die fncCheckPaketInstalliertVar mit dem stsCheckPaketAusgabe Flag starten und
+    #  das Ergebnis direkt auswerten:
+    [[ `fncCheckPaketInstalliertVar "$1" "stsCheckPaketAusgabe"` == "true" ]] && txtCheckPaketAusgabe="$1 ist installiert." && echo -e "(ist installiert)"
+    [[ `fncCheckPaketInstalliertVar "$1" "stsCheckPaketAusgabe"` == "false" ]] && txtCheckPaketAusgabe="$1 ist nicht installiert." && echo -e "(ist NICHT installiert)"
+}
+
+
+
+
+
+
+
+#if ( [ "$1" != "-q" ] && [ "$1" != "-qs" ] && [ "$1" != "-sq" ] ) 
+if [[ "$1" != -*q* ]]
+then
+    # wird (fast) immer angezeigt:
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $datei -| $txtTITEL"
+    #echo -e "|- $datei -|"
+    #echo -e "|- $txtTITEL"
+    #echo -e "|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt) -|"
+    echo -e "|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt)"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- "`date`
+    echo -e "|-"
+    # version, GPL, autor...
+
+    if ( [[ "$1" == "-h" ]] ) 
+    then
+        echo -e $benutzung
+        echo -e "|- Optionen:"
+        echo -e "|- -h     Diesen Hilfetext anzeigen. Die Option muss alleine stehen."
+        echo -e "|- -i     Informationen über das installierte System anzeigen. Die Option muss alleine stehen."
+        echo -e "|- -I     Die aktuellen Systeminfos abspeichern: $dateiAUSGABEspeichern"
+        echo -e "|- -s     Nach Paketen suchen (mittels Aptitude). Erfordert ein Argument als Suchbegriff."
+        echo -e "|- -y     Automatisch die Nachfragen mit 'Ja' beantworten. Nur erlaubt bei Aktualisierungen"
+        echo -e "|-        und Neuinstallation von Paketen."
+        echo -e "|-"
+        echo -e "|- -q     Quiet Modus:"
+        echo -e "|-        Sicherheitsfrage beim Programmstart überspringen, keine Kopfzeile und keine sonstigen"
+        echo -e "|-        Hinweise des Programms anzeigen. Die Option muss am Anfang stehen."
+        echo -e "|-        Richtig: '$datei -q -y', '$datei -qy', '$datei -yq'"
+        echo -e "|-        Falsch : '$datei -y -q'"
+        echo -e "|-        HINWEIS: Warn- und Fehlermeldungen werden immer angezeigt."
+        echo -e "|-"
+        echo -e "|- Erweiterte Optionen:"
+        echo -e "|- -APTOPTION Paketname"
+        echo -e "|-        Apt wird mit der angegebenen APTOPTION und dem PAKETNAMEN aufgerufen. Alle original"
+        echo -e "|-        Optionen von Apt können verwendet werden. (list, show, remove...)"
+        echo -e "|- -A     Aptitude im interaktiven Modus starten. `fncTXTPaketInstalliert aptitude`"
+        echo -e "|- -S     Synaptic starten. Funktioniert nur unter einem laufenden X-Server. `fncTXTPaketInstalliert synaptic`"
+        echo -e "|- Manche Optionen können miteinander kombiniert werden. '-qs' ist das gleiche wie '-sq'."
+        echo -e "|-"
+        echo -e "|- Beispiele:"
+        echo -e "|- -'$datei':"
+        echo -e "|-  Komplette Aktualisierung durchführen (update & full-upgrade)"
+        echo -e "|-"
+        echo -e "|- -'$datei -qy':"
+        echo -e "|-  Komplette Aktualisierung im Quiet Modus und ohne weitere Nachfragen durchführen"
+        echo -e "|-"
+        echo -e "|- -'$datei PAKETNAME(N)':"
+        echo -e "|-  Quellen werden nach dem/den Paket(en) durchsucht und falls ein entsprechendes Paket"
+        echo -e "|-  gefunden wurde, wird es installiert."
+        echo -e "|-"
+        echo -e "|- -'$datei -q -purge PAKETNAME':"
+        echo -e "|-  Das Paket PAKETNAME wird deinstalliert und alle entsprechenden Konfigurationsdateien werden"
+        echo -e "|-  vollständig entfernt. Der Quiet Modus ist aktiviert."
+        echo -e "|-"
+        echo -e "|- -'$datei ---help':"
+        echo -e "|-  Die Hilfe für Apt anzeigen. Argument wird als APTOPTION '--help' übernommen."
+        echo -e "|-"
+        echo -e "|-"
+        echo -e "|- Tipps zur Suche:"
+        echo -e "|- -Um gleichzeitig nach 2 Begriffen zu suchen, notieren Sie zwischen diesen einfach \".*.\"." 
+        echo -e "|-  Beispiel: '$datei -s foo.*.nouveau' sucht nach 'foo' und 'nouveau'."
+        #echo -e "|-"
+        echo -e "|- -Um nach einem '.', '-' oder '*' zu suchen, müssen Sie das Zeichen mittels 2 Backslashs maskieren." 
+        echo -e "|-  Beispiel: '$datei -s foo.*.2\\\\.0' sucht nach 'foo' und '2.0'."
+        #echo -e "|-"
+        echo -e "|- -Leerzeichen können mit einem Backslash maskiert werden, oder Sie setzen den Suchbegriff in" 
+        echo -e "|-  Anführungszeichen. Beide Beispiele (Das Leerzeichen befindet sich übrigens vor der '2'!)"
+        echo -e "|-  erzeugen die gleiche Ausgabe:"
+        echo -e "|-  Beispiel: '$datei -s foo.*.\ 2\\\\.0' sucht nach 'foo' und ' 2.0' mittels Backslash."
+        echo -e "|-  Beispiel: '$datei -s foo.*.\" 2\\\\.0\"' sucht nach 'foo' und ' 2.0' mittels Anführungszeichen."
+        echo -e "|-"
+        echo -e "|-"
+#         echo -e "|- Falls Sie eine Softwareverwaltung für die Befehlszeile suchen, starten Sie Aptitude im"
+#         echo -e "|- interaktiven Modus. '$datei -A' oder 'aptitude'"
+#         #echo -e "|-"
+#         echo -e "|- Wenn Sie eine grafische Desktopumgebung nutzen, können Sie auch Synaptic zur Verwaltung"
+#         echo -e "|- Ihrer Pakete verwenden. '$datei -S' oder 'synaptic'"
+        echo -e "|- Falls Sie eine Softwareverwaltung für die Befehlszeile suchen, starten Sie Aptitude im"
+        echo -e "|- interaktiven Modus. ('$datei -A' oder 'aptitude') Wenn Sie eine grafische Desktopumgebung"
+        echo -e "|- nutzen, können Sie auch Synaptic zur Verwaltung Ihrer Pakete verwenden. ('$datei -S' oder"
+        echo -e "|- 'synaptic') Die Pakete müssen natürlich installiert und entsprechende Benutzerrechte"
+        echo -e "|- gesetzt sein."
+        echo -e "|-"
+        exit 0;
+    else
+        if ( [ "$1" == "-s" ] ) 
+        then
+            echo -e "$benutzung"
+            echo -e "|- Sonder- und Leerzeichen müssen teilweise maskiert werden! Nähere Infos dazu finden Sie"
+            echo -e "|- in der Hilfe ('$datei -h') unter dem Punkt 'Tipps zur Suche'."
+            echo -e "|-"
+            if ( [ "$2" == "" ] ) 
+            then
+                echo -e "|- FEHLER: Die Suchoption wurde gesetzt (-s), aber kein Suchbegriff eingegeben!"
+                echo -e "|-         Nähere Infos finden Sie in der Hilfe. ('$datei -h')"
+                echo -e "|-"
+                exit 0;
+            fi
+        fi
+    fi
+
+    echo -e "$txtEingabe"
+else
+    # -q wurde gesetzt!
+    nix=0
+fi
+
+
+# \b-.*q.*
+#if ( [[ "$1" == -[q|s][q|.] ]] ) 
+# \b-.*q.*
+# DEBUG-INFOS:
+#echo $1
+#if ( [[ "$1" == \b-.*q.?q. ]] ) 
+#if [[ "$1" == \b-.*q. ]]
+
+
+flagCheckAusgabeAptUpdate=""
+function fncCheckAusgabeAptUpdate {
+    # -Prüft die Ausgabe von 'apt update' zeilenweise, da der Exit-Status nur die
+    #  erfolgreiche Ausführung anzeigt, daraus aber nicht ersichtlich wird, ob ein
+    #  Update gemacht werden muss!
+    # -'Aktualisierung ... verfügbar. ...' oder 'Alle Pakete sind aktuell.'
+    # -Argumente:
+    # --$1: Pfad zur Textdatei mit der Ausgabe
+    
+    [[ "$1" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    [[ -z "$1" ]] && echo -e "|- FEHLER:"\\t"${FUNCNAME[0]} - Kein Argument übergeben!" && return 11
+    #[[ -z "$2" ]] && echo -e "|- FEHLER:"\\t"2. Argument nicht angegeben!" && return 12
+    
+    flagCheckAusgabeAptUpdate=""
+    while read txtAusgabeAptUpdate
+    do
+        #[[ "$txtAusgabeAptUpdate" == Aktualisierung*verfügbar* ]] && flagCheckAusgabeAptUpdate="true" && kdialog --title "$datei.Info" --msgbox "<b>$datei:</b><br><br>Es sind Aktualisierungen verfügbar!<br><br>" 2>/dev/null &
+        [[ "$txtAusgabeAptUpdate" == Aktualisierung*verfügbar* ]] && flagCheckAusgabeAptUpdate="true"
+        
+        #[[ "$txtAusgabeAptUpdate" == Alle*Pakete*aktuell* ]] && flagCheckAusgabeAptUpdate="" && kdialog --title "$datei.Info" --msgbox "<b>$datei:</b><br><br>Es sind keine Aktualisierungen verfügbar!<br><br>" 2>/dev/null &
+        [[ "$txtAusgabeAptUpdate" == Alle*Pakete*aktuell* ]] && flagCheckAusgabeAptUpdate=""
+        
+    done < $1
+}
+
+
+
+
+
+
+function fncBEFEHL {
+    # -Argumente:
+    # --$1: Befehl zum Ausführen
+    # --$2: Text oder Zeichen am Anfang der Ausgabe
+    
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return 11
+    [[ -z "$2" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return 12
+    
+    # -Der Name der Datei:
+    [ -z "$datei" ] && datei=${0//*\//}
+    # -Befehl zum Ausführen: $txtBEFEHL oder $1
+    [ -n "$1" ] && txtBEFEHL="$1"
+    [ -n "$2" ] && txtAUSGABEanfang="$2" || txtAUSGABEanfang="--- $datei."
+    
+    
+    # -Zusatzoptionen beim Installieren:
+    # --empfohlen: --install-recommends
+    # --vorgeschlagen: --install-suggests
+    #txtBefehlZusatzInstallieren="apt --install-recommends --install-suggests"
+    #[[ "$txtBEFEHL" == "apt install"* ]] && txtBEFEHL=${txtBEFEHL//apt/$txtBefehlZusatzInstallieren}
+    
+    
+    txtBefehlFehler="Keine Fehlermeldung vorhanden."
+    [[ "${txtBEFEHL: -1}" == " " ]] && txtBEFEHL="${txtBEFEHL:0 :-1}"
+    
+    [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""full-upgrade" ]] && [ -z "$flagCheckAusgabeAptUpdate" ] && return
+    
+    if ( [[ "$flagTESTDRIVE" != "true" ]] )
+    then
+        echo -e "$txtAUSGABEanfang""AUSFÜHREN: '$txtBEFEHL'"
+        actionBEFEHL="echo -e $txtBEFEHL"
+        #[[ "$txtBEFEHL" == "apt update" ]] && `$actionBEFEHL` >$dateiTMPBefehlAusgabe 2>$dateiTMPBefehlFehler || `$actionBEFEHL` 2>$dateiTMPBefehlFehler
+        [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && `$actionBEFEHL` 2>$dateiTMPBefehlFehler | tee $dateiTMPBefehlAusgabe || `$actionBEFEHL` 2>$dateiTMPBefehlFehler
+        stsBEFEHL=$?
+        
+        #[ -f $dateiTMPBefehlAusgabe ] && cat $dateiTMPBefehlAusgabe
+        [ -f $dateiTMPBefehlFehler ] && [[ -n "`cat $dateiTMPBefehlFehler`" ]] && txtBefehlFehler="`cat $dateiTMPBefehlFehler`"
+        
+        # -Ausgabe von 'apt update' auswerten:
+        [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && fncCheckAusgabeAptUpdate "$dateiTMPBefehlAusgabe"
+        
+        # -Exit-Status auswerten:
+        #[ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""ERFOLGREICH: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""ERFOLGREICH: Status: '$stsBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Status: '$stsBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Info:   '$txtBefehlFehler'"
+        [ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""ERFOLGREICH: Befehl: '$txtBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Status: '$stsBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Info:   '$txtBefehlFehler'"
+        [ -f $dateiTMPBefehlAusgabe ] && rm $dateiTMPBefehlAusgabe
+        [ -f $dateiTMPBefehlFehler ] && rm $dateiTMPBefehlFehler
+        
+        # -Info PopUp bzgl Aktualisierung:
+        if ( [[ "$flagInfoPopup" == "true" ]] )
+        then
+            [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && [ -z "$flagCheckAusgabeAptUpdate" ] && kdialog --title "$datei.$$" --sorry "<b>$datei.Info:</b><br><br>Es sind keine Aktualisierungen verfügbar!<br><br>" 2>/dev/null &
+            [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && [ -n "$flagCheckAusgabeAptUpdate" ] && kdialog --title "$datei.$$" --msgbox "<b>$datei.Info:</b><br><br>Es sind Aktualisierungen verfügbar!<br><br>" 2>/dev/null &
+        fi
+    else
+        echo -e "$txtAUSGABEanfang""TESTMODUS: '$txtBEFEHL'"
+        stsBEFEHL=$?
+    fi
+    echo -e "$txtAUSGABEanfang"
+    return $stsBEFEHL;
+}
+
+
+
+
+
+
+
+
+
+strARGUMENTEkomplett=""
+# ===== START Argumente ohne Optionen zusammen fassen =========================
+function fncARGUMENTEzusammen {
+    # -Schleife um Optionen und Argumente zu trennen und die Argumente (Suchbegriffe) in einer
+    #  Variablen zusammen zu fassen:
+    for i in $*
+    do
+        #echo -e "|- str: $i"
+        if ( [[ "$i" == -* ]] )
+        then
+            continue
+        else
+            if ( [[ "$strARGUMENTEkomplett" != "" ]] )
+            then
+                strARGUMENTEkomplett="$strARGUMENTEkomplett "
+            fi
+            strARGUMENTEkomplett=$strARGUMENTEkomplett$i
+        fi
+    done
+    #return $strARGUMENTEkomplett
+}
+# ===== ENDE Argumente ohne Optionen zusammen fassen ==========================
+
+
+
+
+
+# ===== START Argumente checken und verarbeiten ===============================
+function fncARGUMENTEcheck {
+    # -Schleife um Argumente zu checken, damit die APTOPTION korrekt verwendet werden:
+    for i in $*
+    do
+        if ( [[ "$i" == -* ]] && [[ "$i" != -? ]] && [[ "$i" != -?? ]] )
+        then
+            nix=0
+            #echo -e "|- str: $i"
+            # -Option ist APTOPTION, daher den Apt Aufruf entsprechend füllen:
+            case "$i" in
+                (---*)
+                    strAPTOPTION=${i//\-\-\-/\-\-} ;;
+                (--*)
+                    strAPTOPTION=${i//\-\-/\-} ;;
+                (-*)
+                    strAPTOPTION=${i//\-/} ;;
+                (*)
+                    strAPTOPTION="" ;;
+            esac
+            #strAPTOPTION=${i//\-/}
+            #echo -e "|- BEFEHL: apt $strAPTOPTION $strARGUMENTEkomplett"
+            fncBEFEHL "apt $strAPTOPTION $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+            exit 0;
+        fi
+        if ( [[ "$i" == --* ]] )
+        then
+            nix=0
+            #echo -e "|- str: $i"
+            # -Option ist APTOPTION, daher den Apt Aufruf entsprechend füllen:
+            case "$i" in
+                (--*)
+                    strAPTOPTION=${i//\-\-/\-} ;;
+                (*)
+                    strAPTOPTION="" ;;
+            esac
+            #strAPTOPTION=${i//\-/}
+            #echo -e "|- BEFEHL: apt $strAPTOPTION $strARGUMENTEkomplett"
+            #apt $strAPTOPTION $strARGUMENTEkomplett
+            fncBEFEHL "apt $strAPTOPTION $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+            exit 0;
+        fi
+        #exit 0;
+    done
+}
+# ===== ENDE Argumente checken und verarbeiten ================================
+
+
+
+
+
+
+# =================================================================================================
+# ===== START Standard Optionen definieren, auslesen und zuweisen =================================
+
+# -Die AutoYesFunktion:
+strBefehlAutoYes=""
+
+function fncOptionenAuslesenZuweisen {
+    # -Schleife um Standard Optionen auszulesen und entsprechend zuzuweisen:
+    for i in "$@"
+    do
+        #echo -e "DEBUG Option: '$i'"
+        # -Die AutoYesFunktion setzen:
+        [[ "$i" == -*y* ]] && strBefehlAutoYes="-y "
+        
+        # -Den Quiet Modus setzen:
+        [[ "$i" == -*q* ]] && flagInfoPopup="false"
+    done
+}
+
+fncOptionenAuslesenZuweisen $@
+
+[[ "$1" == "-q" ]] && [[ "$2" == "-y" ]] && string1="-qy" && [[ "$3" != "" ]] && string2="$3" 
+
+# ===== ENDE Standard Optionen definieren, auslesen und zuweisen ==================================
+# =================================================================================================
+
+
+
+
+
+
+
+if ( [[ "$1" == "-i" ]] )
+then
+    # -Info Option wurde gewählt:
+    echo -e "|- System Informationen anzeigen:"
+    echo -e "|- -Linux Version:"
+    txtINFOlinux=`lsb_release -d`
+    txtINFOlinux=${txtINFOlinux//Description:*D/D}
+    txtINFOdebian=`cat /etc/debian_version`
+    [[ -n "$txtINFOdebian" ]] && txtINFOdebian=" ($txtINFOdebian)" || txtINFOdebian=""
+    echo -e "|-  $txtINFOlinux""$txtINFOdebian"
+    echo -e "|- -Kernel Version:"
+    txtINFOkernel=`uname -a`
+    echo -e "|-  $txtINFOkernel"
+    echo -e "|- -KDE Version:"
+    txtINFOkdeplasma=`plasmashell --version 2>/dev/null`
+    echo -e "|-  $txtINFOkdeplasma"
+    echo -e "|-"
+    echo -e "|- -Geräte Informationen:"
+    txtINFOlsblk=`lsblk`
+    echo -e "$txtINFOlsblk"
+    exit 0;
+fi
+
+
+if ( [[ "$1" == "-I" ]] )
+then
+    # -Info Option speichern wurde gewählt:
+    #$0 -i
+    #$0 -i > zz-info.txt
+    #$0 -i > $dateiAUSGABEspeichern && chown $nutzer:$nutzer $dateiAUSGABEspeichern && echo -e "|- -Systeminformationen wurden erfolgreich gespeichert:"\\n"|- $dateiAUSGABEspeichern"
+    $0 -i > $dateiAUSGABEspeichern && $(chown $nutzer:$nutzer $dateiAUSGABEspeichern) && echo -e "|- -Systeminformationen wurden erfolgreich gespeichert:"\\n"|- $dateiAUSGABEspeichern"
+#     echo -e "|- System Informationen anzeigen:"
+#     echo -e "|- -Linux Version:"
+#     txtINFOlinux=`lsb_release -d`
+#     txtINFOlinux=${txtINFOlinux//Description:*D/D}
+#     echo -e "|-  $txtINFOlinux"
+#     echo -e "|- -Kernel Version:"
+#     txtINFOkernel=`uname -a`
+#     echo -e "|-  $txtINFOkernel"
+#     echo -e "|- -KDE Version:"
+#     txtINFOkdeplasma=`plasmashell --version 2>/dev/null`
+#     echo -e "|-  $txtINFOkdeplasma"
+#     echo -e "|-"
+#     echo -e "|- -Geräte Informationen:"
+#     txtINFOlsblk=`lsblk`
+#     echo -e "$txtINFOlsblk"
+    exit 0;
+fi
+
+
+
+
+
+
+
+
+# -Sonderfall: Aptitude starten
+if ( [[ "$1" == "-A" ]] ) 
+then
+    strBefehlSonderfall="aptitude"
+    
+    # -Prüfen ob Sonderfall installiert ist:
+    fncCheckPaketInstalliertVar "$strBefehlSonderfall"
+    
+    # -Sonderfall ist NICHT installiert:
+    [ "$stsCheckPaketAusgabe" != "true" ] && echo -e "$layoutAusgabeAnfang FEHLER: '$strBefehlSonderfall' ist nicht oder nicht korrekt installiert! Bitte beachten Sie die Ausgabe\\n$layoutAusgabeAnfang         in der Konsole. Nähere Infos finden Sie auch in der Hilfe. ('$datei -h')\\n$layoutAusgabeAnfang" && exit 1;
+    
+    # -Sonderfall ist installiert:
+    fncBEFEHL "$strBefehlSonderfall" "$layoutAusgabeAnfang"
+    strBefehlSonderfall=""
+    exit 0;
+fi
+
+
+# -Sonderfall: Synaptic starten
+if ( [[ "$1" == "-S" ]] ) 
+then
+    strBefehlSonderfall="synaptic"
+    
+    # -Prüfen ob Sonderfall installiert ist:
+    fncCheckPaketInstalliertVar "$strBefehlSonderfall"
+    
+    # -Sonderfall ist NICHT installiert:
+    [ "$stsCheckPaketAusgabe" != "true" ] && echo -e "$layoutAusgabeAnfang FEHLER: '$strBefehlSonderfall' ist nicht oder nicht korrekt installiert! Bitte beachten Sie die Ausgabe\\n$layoutAusgabeAnfang         in der Konsole. Nähere Infos finden Sie auch in der Hilfe. ('$datei -h')\\n$layoutAusgabeAnfang" && exit 1;
+    
+    # -Sonderfall ist installiert:
+    fncBEFEHL "$strBefehlSonderfall" "$layoutAusgabeAnfang"
+    strBefehlSonderfall=""
+    exit 0;
+fi
+
+
+
+
+
+
+
+
+
+if ( [[ "$1" == "" ]] || ( [[ "$1" == -*y* ]] && [[ "$2" == "" ]] ) || ( [[ "$string1" == "-qy" ]] && [[ "$string2" == "" ]] ) )
+then
+    # -Zusätzliche Befehle ausführen:
+    #fncBEFEHL "youtube-dl -U" "$layoutAusgabeAnfang"
+    [[ `fncCheckPaketInstalliertVar "youtube-dl" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "youtube-dl -U" "$layoutAusgabeAnfang"
+    [[ `fncCheckPaketInstalliertVar "yt-dlp" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "yt-dlp -U" "$layoutAusgabeAnfang"
+    #echo -e "|-"
+    # -$1 leer
+    # -normales update
+    #echo -e "|- BEFEHL: apt update && apt full-upgrade"
+    #apt update && apt full-upgrade
+    fncBEFEHL "apt ""$strBefehlAutoYes""update" "$layoutAusgabeAnfang"
+    #echo -e "|-"
+    fncBEFEHL "apt ""$strBefehlAutoYes""full-upgrade" "$layoutAusgabeAnfang"
+    exit 0;
+else
+    fncARGUMENTEzusammen $*
+    fncARGUMENTEcheck $*
+    #if ( [ "$1" == "-s" ] || [ "$1" == "-qs" ] || [ "$1" == "-sq" ] )
+    if ( [[ "$1" == -*s* ]] )
+    then
+        # -$1 nicht leer, $1 suchanweisung
+        # -wenn die Suchoption gesetzt ist, kann das QUIET Flag ignoriert werden, denn
+        #  1.: der Suchbegriff $2 ist leer: Fehlermeldung muss angezeigt werden!
+        #  2.: $2 nicht leer, d.h. es wird gesucht und natürlich die Ausgabe der Suche angezeigt
+        if ( [[ "$2" == "" ]] || [[ "$2" == -* ]] ) 
+        then
+            # -$1 nicht leer, $1 suchanweisung, $2 leer
+            echo -e "|- FEHLER: Die Suchoption wurde gesetzt (-s), aber kein korrekter Suchbegriff eingegeben!"
+            echo -e "|-         Oder der Suchbegriff ist eine Option. Nähere Infos finden Sie in der Hilfe. ('$datei -h')"
+            echo -e "|-"
+            exit 0;
+        else
+            # -$1 nicht leer, $1 suchanweisung, $2 nicht leer
+            # -suche starten
+            #echo -e "|- BEFEHL: aptitude search $strARGUMENTEkomplett" 
+            #aptitude search $strARGUMENTEkomplett
+            fncBEFEHL "aptitude search $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+            exit 0;
+        fi
+    elif ( [[ "$1" == -*q* ]] ) 
+    then
+        # -$1 ist -q
+        # -also keine infos ausgeben, nur FEHLER
+        flagInfoPopup="false"
+        if ( ( [[ "$2" == "" ]] ) || ( [[ "$2" == -*y* ]] && [[ "$3" == "" ]] ) ) 
+        then
+            # -$1 ist -q, $2 leer
+            # -normales update im QUIET-MODE
+            #echo -e "|- BEFEHL: apt update && apt full-upgrade"
+            #apt update && apt full-upgrade
+            [[ `fncCheckPaketInstalliertVar "youtube-dl" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "youtube-dl -U" "$layoutAusgabeAnfang"
+            [[ `fncCheckPaketInstalliertVar "yt-dlp" "stsCheckPaketAusgabe"` == "true" ]] && fncBEFEHL "yt-dlp -U" "$layoutAusgabeAnfang"
+            fncBEFEHL "apt ""$strBefehlAutoYes""update" "$layoutAusgabeAnfang"
+            fncBEFEHL "apt ""$strBefehlAutoYes""full-upgrade" "$layoutAusgabeAnfang"
+            exit 0;
+        else
+            # -$1 ist -q, $2 ist -y, $3 nicht leer
+            # -normale paket installation im QUIET-MODE mit AutoYes
+            # -VORSICHT: script variablen verschieben sich!
+            #echo -e "|- BEFEHL: apt update && apt install $strARGUMENTEkomplett" 
+            #apt update && apt install $strARGUMENTEkomplett
+            fncBEFEHL "apt ""$strBefehlAutoYes""update" "$layoutAusgabeAnfang"
+            fncBEFEHL "apt ""$strBefehlAutoYes""install $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+            exit 0;
+        fi
+    fi
+    if ( [[ "$2" != "" ]] && [[ "$2" == -* ]] ) 
+    then
+        # -$1 nicht leer, $1 keine suchanweisung, $2 nicht leer
+        echo -e "|- FEHLER: '$1' ist keine gültige Option und '$2' ist kein gültiges Argument."
+        #echo -e "|-         Um $1 zu installieren darf ansonsten kein Argument übergeben werden."
+        #echo -e "|-         Um nach $2 zu suchen muss '-s' als Option gesetzt werden."
+        echo -e "|-         Nähere Infos finden Sie in der Hilfe. ('$datei -h')"
+        echo -e "|-"
+        #echo -e "|- DEBUG: strARGUMENTEkomplett: '""$strARGUMENTEkomplett""'"
+        exit 0;
+    fi
+    # -$1 nicht leer, $1 keine suchanweisung, $2 leer
+    # -normale paket installation
+    flagInfoPopup="false"
+    #echo -e "|- BEFEHL: apt update && apt install $strARGUMENTEkomplett"
+    #apt update && apt install $strARGUMENTEkomplett
+    fncBEFEHL "apt ""$strBefehlAutoYes""update" "$layoutAusgabeAnfang"
+    fncBEFEHL "apt ""$strBefehlAutoYes""install $strARGUMENTEkomplett" "$layoutAusgabeAnfang"
+    exit 0;
+fi 
+
+
+exit 0;
+
+
+
+

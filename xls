@@ -1,0 +1,417 @@
+#!/bin/bash 
+
+datei=${0//*\//}
+titel="Verzeichnisinhalt anzeigen!"
+benutzung="|- Benutzung: \\n|- '$datei [OPTIONEN] PFAD' \\n|-"
+
+
+# flag fuer den Quiet-Modus definieren:
+flagQUIETmode=false
+strOPTIONEN=""
+strOPTIONENzwei=""
+strPFAD=""
+
+
+# -Vorgabe Optionen: alle Dateien und Verzeichnisse, als Liste ausgeben
+strVorgabeOptionen="-lA"
+# -Vorgabe Optionen: Verzeichnisse zuerst ausgeben
+strVorgabeOptionen="--group-directories-first"
+# -Vorgabe Optionen: alle Dateien und Verzeichnisse, als Liste, Verzeichnisse zuerst ausgeben
+strVorgabeOptionen="-lA --group-directories-first"
+# -Vorgabe Optionen: alle Dateien und Verzeichnisse, als Liste, Verzeichnisse zuerst ausgeben, Farben verwenden
+strVorgabeOptionen="-lA --group-directories-first --color=auto"
+
+
+
+# TO-DO:
+# -$1 ist Option und $2 ist Verzeichnis
+# -Option für Details ein- oder ausblenden
+# -kombinierte Optionen erkennen
+
+
+
+# -Argumente aus der Befehlszeile verarbeiten:
+typeset -i zz=0
+zz=0
+for i in "$@"
+do
+    #arrARGUMENTE[$zz]="$i"
+    zz=zz+1
+    #echo -e "-- \"@\" - $zz. Argument: $i"
+    
+    if ( [[ "$i" == --* ]] )
+    then
+        [[ -z "$strOPTIONENzwei" ]] && strOPTIONENzwei="$i" && continue
+        strOPTIONENzwei="$strOPTIONENzwei $i" && continue
+    fi
+    
+    if ( [[ "$i" == -* ]] )
+    then
+        [[ -z "$strOPTIONEN" ]] && strOPTIONEN="-"
+        strOPTIONEN="$strOPTIONEN""${i:1}"
+    else
+        strPFAD="$i"
+        break
+    fi
+done
+
+[[ -n "$strOPTIONENzwei" ]] && [[ -n "$strOPTIONEN" ]] && strOPTIONEN="$strOPTIONEN $strOPTIONENzwei"
+[[ -n "$strOPTIONENzwei" ]] && [[ -z "$strOPTIONEN" ]] && strOPTIONEN="$strOPTIONENzwei"
+
+
+[[ -z "$strPFAD" ]] && strPFAD="`pwd`"
+
+
+
+
+#echo -e "|- $0\\t -Optionen: $strOPTIONEN\\t -Pfad: $strPFAD"
+
+
+
+if ( [[ ! -d "$strPFAD" ]] && [[ ! -f "$strPFAD" ]] )
+then
+    # -Pfad ist kein Verzeichnis und keine Datei
+    echo -e "|- FEHLER: Der eingegebene Pfad konnte nicht gefunden werden!"
+    #strBefehlPfad="$strPFAD"
+    exit 11;
+fi
+
+
+
+
+#echo -e "|- Optionen:"\\t"Eingabe: $strOPTIONEN"\\t"Vorgabe: $strVorgabeOptionen"
+
+[[ -z "$strOPTIONEN" ]] && strOPTIONEN="$strVorgabeOptionen"
+
+#echo -e "|- $0\\t -Optionen: $strOPTIONEN\\t -Pfad: $strPFAD"
+#echo -e "|- Befehl: $datei"\\t"Optionen: $strOPTIONEN"\\t"Pfad: $strPFAD"
+#echo -e "|- Befehl:\\t$datei\\t -Optionen: $strOPTIONEN\\t -Pfad: $strPFAD"
+echo -e "|- Eingabe:"\\t"'$datei $@'"
+
+
+strAusfuehrenBefehl="ls $strOPTIONEN '$strPFAD'"
+#strAusfuehrenBefehl="'ls $strOPTIONEN $strPFAD'"
+
+
+#echo -e "|- Befehl:\\t'$strAusfuehrenBefehl'"
+echo -e "|- Ausführen:"\\t"'$strAusfuehrenBefehl'"
+
+# -Leider wird der doppelte Bindestrich aus den Optionen nicht erkannt!
+#ls "$strOPTIONEN" "$strPFAD"
+# -Deshalb muss der BacktickEchoTrick genutzt werden:
+#`echo -e "$strAusfuehrenBefehl"`
+#`echo -e "'$strAusfuehrenBefehl'"`
+`echo -e "ls $strOPTIONEN $strPFAD"`
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+if ( [[ "$strPFAD" != "" ]] )
+then
+    if ( [[ ! -d "$strPFAD" ]] && [[ ! -f "$strPFAD" ]] )
+    then
+        # -Pfad ist kein Verzeichnis und keine Datei
+        echo -e "|- FEHLER: Der eingegebene Pfad konnte nicht gefunden werden!"
+        #strBefehlPfad="$strPFAD"
+        exit 11;
+    else
+        strOPTIONEN="$strOPTIONEN"":STERN:"
+        strBefehlPfad="$strPFAD"
+    fi
+else
+    # -Kein Pfad angegeben, also aktuelles Verzeichnis:
+    strPFAD=`pwd`
+    strBefehlPfad="$strPFAD"
+fi
+
+
+
+
+
+
+
+
+# -Pfad: Datei (nach dem letzten Slash)
+strPfadDatei=${strPFAD//*\//}
+#if ( [[ "$strPfadDatei" != "" ]] && [[ ! -d "$strPFAD" ]] && [[ ! -f "$strPFAD" ]] )
+if ( [[ "$strPfadDatei" != "" ]] && [[ ! -d "$strPFAD" ]] && [[ ! -f "$strPFAD" ]] )
+then
+    intANZstrPfadDatei=${#strPfadDatei}
+    # -Pfad: Verzeichnisse (bis zum letzten Slash)
+    strPfadVerzeichnisse="${strPFAD:0: -$intANZstrPfadDatei}"
+else
+    strPfadVerzeichnisse="$strPFAD"
+fi
+
+
+# typeset -i zz=0
+# for i in "$@"
+# do
+#     arrARGUMENTE[$zz]="$i"
+#     zz=zz+1
+#     echo -e "|- DEBUG: Argumente -\"@\"- $zz.: $i"
+# done
+
+
+# -Info Zeile:
+#echo -e "|- Befehl: $0\\t - \$1: $1\\t - \$2: $2"
+# -Info Zeile:
+echo -e "|- Befehl: $0\\t - Optionen: $strOPTIONEN\\t - Pfad: $strPFAD"
+# -Info Zeile:
+echo -e "|- Befehl: $0\\t - Pfad: Verzeichnisse: $strPfadVerzeichnisse - Datei: $strPfadDatei"
+
+
+
+#[[ "$testSTERN" == *\* ]] && echo -e "|--- Stern JA" || echo -e "|--- Stern NEIN"
+#[[ "$1" == *\\* ]] && echo -e "|--- Stern JA" || echo -e "|--- Stern NEIN"
+
+#exit 0;
+
+
+if ( [[ "$strPFAD" != "" ]] )
+then
+    # -$1: Kann Optionen oder ein Pfad (Verzeichnis oder Datei) sein!
+    # -$2: Muss Pfad sein! ($1 sind auf jeden Fall Optionen.)
+    #
+    if ( [[ "$strPfadDatei" != "" ]] )
+    then
+        if ( [[ -d "$strPFAD" ]] || [[ -f "$strPFAD" ]] )
+        then
+            # -Pfad ist korrekt: Verzeichnis oder Datei
+            strBefehlPfad="$strPFAD"
+        else
+            strOPTIONEN="$strOPTIONEN"":STERN:"
+            strBefehlPfad="$strPFAD"
+        fi
+    else
+        strBefehlPfad="$strPFAD"
+    fi
+else
+    # -Kein Pfad angegeben, also aktuelles Verzeichnis:
+    strPFAD=`pwd`
+    strBefehlPfad="$strPFAD"
+fi
+
+
+
+
+
+# if ( [[ "$2" != "" ]] )
+# then
+#     # -$2: Muss Pfad sein! ($1 sind auf jeden Fall Optionen.)
+#     strPFAD="$2"
+# elif ( [[ "$strPFAD" == "" ]] )
+# then
+#     strPFAD=`pwd`
+# fi
+
+
+
+
+# -Falls das Verzeichnis/Pfad mittels Auswahlfenster abgefragt werden soll: 
+if ( [[ "$1" == -*\?* ]] )
+then
+    eingabeVERZEICHNIS=$(kdialog --title="Verzeichnis wählen:" --getexistingdirectory $arrSHORTCUTverzeichnis 2>/dev/null)
+    checkDIALOG=$(echo -e "$?")
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+            strOPTIONEN=""
+            strPFAD=$eingabeVERZEICHNIS
+            checkDIALOGfehler="" ;;
+        (1)
+            # -abbruchBENUTZER
+            checkDIALOGfehler="|- Sie haben die Auswahl des Arbeitsverzeichnis abgebrochen. Das Skript wird daher beendet." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER:"\\n\
+"|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+"|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+"|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+"|-"\\n\
+"|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+"|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        echo -e $checkDIALOGfehler
+        echo -e "|-"
+        exit $checkDIALOG;
+    fi
+fi
+
+
+
+
+
+# # -Info Zeile:
+# echo -e "|- Befehl: $0\\t - Pfad: $strPFAD"
+# 
+# if [[ "$strOPTIONEN" == "" ]]
+# then
+#     ls -lA --group-directories-first "$strPFAD"
+# fi
+# 
+# 
+# # -Info Zeile:
+# echo -e "|- Befehl: $0\\t - Befehl-Pfad: $strBefehlPfad"
+# if [[ "$strOPTIONEN" == "" ]]
+# then
+#     ls -lA --group-directories-first "$strBefehlPfad"
+# fi
+# 
+# # -Info Zeile:
+# echo -e "|- Befehl: $0\\t - Befehl-Pfad: $strBefehlPfad"
+# if [[ "$strOPTIONEN" == "" ]]
+# then
+#     `ls -lA --group-directories-first "$strBefehlPfad"`
+# fi
+
+# -Info Zeile:
+#echo -e "|- Befehl: $0\\t - Befehl-Pfad: $strBefehlPfad"
+if [[ "$strOPTIONEN" == "" ]]
+then
+    ls -lA --group-directories-first "$strBefehlPfad"
+elif [[ "$strOPTIONEN" == *:STERN:* ]]
+then
+    ls -lA --group-directories-first "$strBefehlPfad"*
+fi
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+# -------------------- altes System --------------------
+
+# normaler Modus, ohne schnick-schnack:
+if [[ "$1" == "" ]]
+then
+    # $1 ist leer
+    ls -lA --group-directories-first $strPFAD
+    exit 0;
+elif ( [[ -d $1 ]] )
+then
+    # $1 ist ein Verzeichnis!
+    echo -e "|- Befehl: $0\\t"
+    ls -lA --group-directories-first "$1"
+    exit 0;
+elif ( [[ -f $1 ]] )
+then
+    # $1 ist eine Datei!
+    ls -lA --group-directories-first "$1"
+    exit 0;
+elif [[ "$1" == -[hqntp]* ]]
+then
+    # $1 ist eine Option
+    echo -e "|- OPTION: $1"
+    nix=1
+    exit 0;
+else
+    echo -e "|- FEHLER: $1"
+    echo -e "|-         Ist kein gültiges Verzeichnis und auch keine gültige Option!"
+    echo -e "|-         Bitte korrigieren Sie Ihre Eingabe."
+    echo -e "|-         Nähere Infos finden Sie in der Hilfe. (-h)"
+    echo -e "|-"
+    exit 1;
+fi
+
+
+
+
+
+if [[ "$1" != -*q* ]]
+then
+    # wird (fast) immer angezeigt:
+    echo -e "|-"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $datei -| $titel"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|-"
+    # version, GPL, autor...
+
+    if ( [ "$1" == "-h" ] ) 
+    then
+        echo -e $benutzung
+        echo -e "|- Optionen:"
+        echo -e "|- -h     Diesen Hilfetext anzeigen."
+        echo -e "|- -n     Den kompletten Inhalt ohne Details nebeneinander anzeigen. ls -A..."
+        echo -e "|- -t     Den kompletten Inhalt mit Details und dem vollständigen Zeitstempel anzeigen. --full-time"
+        echo -e "|- -p     Seitenweise anzeigen. -???"
+        echo -e "|- -o     Den kompletten Inhalt mit Details und oder ohne den Eigentümer/Gruppen Infos anzeigen. ls -gG"
+        echo -e "|- -q     Keine Kopfzeilen oder sonstige Hinweise des Programms anzeigen."
+        echo -e "|-        HINWEIS: Fehlermeldungen werden immer angezeigt."
+        echo -e "|- Manche Optionen können miteinander kombiniert werden."
+        echo -e "|-"
+        echo -e "|- Befehlsvarianten:"
+        echo -e "|- -BEFEHL (ohne Argumente):"
+        echo -e "|- -Inhalt des aktuellen Verzeichnis anzeigen. Mit Details und den Unterverzeichnissen am Anfang."
+        echo -e "|-"
+        echo -e "|-"
+        exit 0;
+    else
+        if ( [ "$1" == "-s" ] ) 
+        then
+            echo -e "|- Sonder- und Leerzeichen müssen teilweise maskiert werden! Nähere Infos dazu finden Sie"
+            echo -e "|- in der Hilfe (-h) unter dem Punkt 'Tipps zur Suche'."
+            echo -e "|-"
+            if ( [ "$2" == "" ] ) 
+            then
+                echo -e "|- FEHLER: Die Suchoption wurde gesetzt (-s), aber kein Suchbegriff eingegeben!"
+                echo -e "|-         Nähere Infos finden Sie in der Hilfe. (-h)"
+                echo -e "|-"
+                exit 1;
+            fi
+        fi
+    fi
+
+    echo -e $benutzung
+else
+    # $1 enthält -q
+    # d.h. der Quiet-Modus wurde gesetzt!
+    flagQUIETmode=true
+    echo -e "|- Quiet-Modus gestartet!"
+    if [[ "$1" == -*h* ]]
+    then
+        echo -e $benutzung
+        echo -e "|- FEHLER: Im Quiet-Modus (-q) kann die Hilfe nicht angezeigt werden!"
+        echo -e "|-         Nähere Infos finden Sie in der Hilfe. (-h)"
+        exit 1;
+    fi
+    nix=0
+fi
+
+
+exit 0;
+
+
+
+

@@ -1,0 +1,382 @@
+#!/bin/bash
+# script von -lx-
+
+#####################################################################
+##### START globale variablen #################################################
+zeitSTART=`date`
+
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+fmtRESET=`tput sgr0`
+
+datei=${0//*\//}
+##### ENDE globale variablen ##################################################
+#####################################################################
+##### START private variablen ##################################################
+pfadLOG="/var/log/"
+pfadLOG2="/aa_daten/bak/log/"
+
+txtTITEL="Logdateien anzeigen und durchsuchen!"
+benutzung="|- Benutzung:\\n\
+|- '$datei [OPTIONEN] [SUCHSTRING]' \\n\
+|-"
+benutzung2="|- Die LOGDATEI wird in den Standard Log Verzeichnissen gesucht, oder mittels\\n\
+|- einer Option (-m, -c, -r,...) festgelegt. Weitere Optionen und Hinweise zum\\n\
+|- SUCHSTRING finden sich in der Hilfe (-h).\\n\
+|-"
+##### ENDE private variablen ##################################################
+#####################################################################
+
+
+
+##############################################################
+##### START Pipe für Here Dokument in More Befehl #############################
+#more <<EOHEREmore
+
+actionMORE="true"
+if ( [[ "$#" -gt 0 ]] )
+then
+    for i in $@
+    do
+        if ( [[ "$i" == "flagINTERN" ]] )
+        then
+            actionMORE="false"
+            shift
+            break
+        fi
+        if ( [[ "$i" == -*q* ]] )
+        then
+            actionMORE="false"
+            #shift
+            break
+        fi
+    done
+fi
+
+if ( [[ "$actionMORE" == "true" ]] )
+then
+    #echo -e "|- @alt: $@"
+    #echo -e "|- 1: $1 - 2: $2 - 3: $3"
+    $datei 'flagINTERN' "$@" | more
+    exit 0;
+fi
+
+#echo -e "|- @neu: $@"
+#echo -e "|- 1: $1 - 2: $2 - 3: $3"
+
+
+
+
+#if ( [[ "$1" == -*h* ]] || [[ "$1" != -*q* ]] ) 
+if ( [[ "$1" != -*q* ]] ) 
+then
+    # wird (fast) immer angezeigt:
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $datei -| $txtTITEL"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $zeitSTART"
+    echo -e "|-"
+    # version, GPL, autor...
+
+    if ( [[ "$1" == -*h* ]] ) 
+    then
+        echo -e $benutzung
+        echo -e "|- Optionen:"
+        echo -e "|- -h     Diesen Hilfetext anzeigen. Andere Optionen werden ignoriert."
+        echo -e "|- -l     Den kompletten Inhalt von $pfadLOG anzeigen."
+        echo -e "|- -la    Den kompletten Inhalt von $pfadLOG mit Details anzeigen."
+        echo -e "|- -R     Inhalt Rekursiv anzeigen. Nur in Kombination mit '-l' und '-la' wirksam!"
+        echo -e "|- -b     Die lxBACKUP Logdatei (aktuell) anzeigen."
+        echo -e "|- -ba    Die lxBACKUP Logdatei (Archiv) anzeigen."
+        echo -e "|- -bn    Die lxBACKUPnetwork Logdatei (aktuell) anzeigen."
+        echo -e "|- -bna   Die lxBACKUPnetwork Logdatei (Archiv) anzeigen."
+        echo -e "|- -c     Die Cronjobs Logdatei anzeigen."
+        echo -e "|- -m     Die MiniDLNA Logdatei anzeigen."
+        echo -e "|- -r     Die Logdatei der RAM Auslastung anzeigen (minütlich). '-r5' bzw '-r15' für die 5 minütliche bzw"
+        echo -e "|-        15 minütliche Logdatei"
+        echo -e "|- -.     Um einen Namenszusatz an die Logdatei anzuhängen. Die Optionen für einen direkten Logdatei"
+        echo -e "|-        Aufruf (-m, -c, -r,...) müssen davor gesetzt werden."
+        echo -e "|-        Beispiel: '$datei -c -.1' zeigt den Inhalt der Datei cronjobs.log.1 an."
+        #echo -e "|-        Beispiel: '$datei -m -.1_03' zeigt den Inhalt der Datei minidlna.log.1_03 an."
+        echo -e "|-        Beispiel: '$datei messages -.1' zeigt den Inhalt der Datei messages.1 an."
+        echo -e "|- -q     Nicht more zur Ausgabe nutzen und keine Kopfzeilen anzeigen."
+        echo -e "|-        HINWEIS: Fehlermeldungen werden immer angezeigt."
+        echo -e "|-"
+        echo -e "|- Die Ausgabe erfolgt durch das Programm more. Bedienung:"
+        echo -e "|- 'RETURN'\tzeilenweise weiterscrollen"
+        echo -e "|- 'd'\t\tden halben Screen weiterscrollen"
+        echo -e "|- 'SPACE'\tkompletten Screen weiterscrollen"
+        echo -e "|- 'h'\t\tOptionen anzeigen"
+        echo -e "|- 'q'\t\tbeendet Ausgabe"
+        echo -e "|-"
+        echo -e "|- Befehlsvarianten:"
+        echo -e "|- -BEFEHL (ohne Argumente):"
+        echo -e "|- -Komplette syslog wird angezeigt"
+        echo -e "|-"
+        echo -e "|- -BEFEHL (Nur 1 Argument):"
+        echo -e "|- -Innerhalb von $pfadLOG wird nach einer Logdatei mit dem Namen oder Namenszusatz gesucht."
+        echo -e "|- --Datei gefunden: Komplette Logdatei wird angezeigt"
+        echo -e "|- --Keine Datei gefunden: Automatisch syslog als LOGDATEI und das Argument als SUCHSTRING setzen"
+        echo -e "|-"
+        echo -e "|- -BEFEHL (2 Argumente):"
+        echo -e "|- -1. Argument gibt LOGDATEI an und das 2. Argument entweder einen Namenszusatz oder den"
+        echo -e "|-  SUCHSTRING nach dem gesucht wird"
+        echo -e "|-"
+        echo -e "|- -BEFEHL (3 Argumente):"
+        echo -e "|- -1. Argument gibt LOGDATEI an, 2. Argument den Namenszusatz, das 3. Argument den SUCHSTRING"
+        echo -e "|-"
+        echo -e "|-"
+        echo -e "|- Tipps zur Suche:"
+        echo -e "|- -Um gleichzeitig nach 2 Begriffen zu suchen, notieren Sie zwischen diesen einfach \".*.\"." 
+        echo -e "|- --Beispiel: '$datei foo.*.nouveau' sucht nach 'foo' und 'nouveau' in der Syslog Datei."
+        echo -e "|- --Beispiel: '$datei -c foo.*.nouveau' sucht nach 'foo' und 'nouveau' in der Cronjobs Logdatei."
+        echo -e "|-"
+        echo -e "|- -Um nach einem '.' oder '*' zu suchen, müssen Sie das Zeichen mittels 2 Backslashs maskieren." 
+        echo -e "|- --Beispiel: '$datei user.log foo.*.2\\\\.0' sucht nach 'foo' und '2.0' in der user.log."
+        echo -e "|-"
+        echo -e "|- -Leerzeichen können mit einem Backslash maskiert werden, oder Sie setzen den Suchbegriff in" 
+        echo -e "|-  Anführungszeichen. Beide Beispiele (Das Leerzeichen befindet sich übrigens vor der '2'!)"
+        echo -e "|-  erzeugen die gleiche Ausgabe:"
+        echo -e "|- --Beispiel: '$datei foo.*.\ 2\\\\.0' sucht nach 'foo' und ' 2.0' mittels Backslash."
+        echo -e "|- --Beispiel: '$datei foo.*.\" 2\\\\.0\"' sucht nach 'foo' und ' 2.0' mittels Anführungszeichen."
+        echo -e "|-"
+        exit 0;
+    fi
+
+    echo -e $benutzung
+    echo -e $benutzung2
+    #echo -e "|- Ohne Angabe einer Logdatei wird automatisch syslog benutzt! Siehe '$datei -h'."
+    #echo -e "|-"
+    str1="$1"
+    str2="$2"
+    str3="$3"
+else
+    # -q wurde gesetzt!
+    # -Vvariablen entsprechend neu zuweisen:
+    str1="$1"
+    str2="$2"
+    str3="$3"
+    # -Wenn NUR -q gesetzt ist, muss verhindert werden, dass dieser String als
+    #  Suchstring genutzt wird:
+    if ( [[ "$str1" == "-q" ]] )
+    then
+        str1="$2"
+        str2="$3"
+        str3="$4"
+    fi
+fi
+
+
+
+if ( [[ "$str1" == -*R* ]] ) 
+then
+    optionREKURSIV="R"
+    icoBINDESTRICH=" -"
+    txtREKURSIV=" und Unterverzeichnissen"
+else
+    optionREKURSIV=""
+    icoBINDESTRICH=""
+    txtREKURSIV=""
+fi
+
+if ( [[ "$str1" == -*la* ]] ) 
+then
+    icoBINDESTRICH="-"
+    echo -e "|- Inhalt von $pfadLOG$txtREKURSIV mit Details:"
+    echo -e "|- ls "$icoBINDESTRICH$optionREKURSIV"lA --group-directories-first $pfadLOG"
+    ls "$icoBINDESTRICH$optionREKURSIV"lA --group-directories-first $pfadLOG
+    exit 0;
+fi
+if ( [[ "$str1" == -*l* ]] ) 
+then
+    echo -e "|- Inhalt von $pfadLOG$txtREKURSIV:"
+    echo -e "|- ls"$icoBINDESTRICH$optionREKURSIV" --group-directories-first $pfadLOG"
+    ls$icoBINDESTRICH$optionREKURSIV --group-directories-first $pfadLOG
+    exit 0;
+fi
+
+
+
+
+if ( [[ "$str1" == -*bna* ]] ) 
+then
+    str1="lxBACKUPnetwork.archiv.log"
+    pfadLOG="/aa_daten/bak/log/"
+fi
+
+if ( [[ "$str1" == -*bn* ]] ) 
+then
+    str1="lxBACKUPnetwork.aktuell.log"
+    pfadLOG="/aa_daten/bak/log/"
+fi
+
+if ( [[ "$str1" == -*ba* ]] ) 
+then
+    str1="lxBACKUP.archiv.log"
+    pfadLOG="/aa_daten/bak/log/"
+fi
+
+if ( [[ "$str1" == -*b* ]] ) 
+then
+    str1="lxBACKUP.aktuell.log"
+    pfadLOG="/aa_daten/bak/log/"
+fi
+
+if ( [[ "$str1" == -*c* ]] ) 
+then
+    str1="cronjobs.log"
+    pfadLOG="/aa_daten/bak/log/"
+fi
+
+if ( [[ "$str1" == -*m* ]] ) 
+then
+    str1="minidlna.log"
+    pfadLOG="/aa_daten/bak/log/minidlna/"
+fi
+
+if ( [[ "$str1" == -*r* ]] ) 
+then
+    str1="RAMminuetlich.log"
+    pfadLOG="/aa_daten/bak/log/"
+fi
+
+if ( [[ "$str1" == -*r5* ]] ) 
+then
+    str1="RAM5minuetlich.log"
+    pfadLOG="/aa_daten/bak/log/"
+fi
+
+if ( [[ "$str1" == -*r15* ]] ) 
+then
+    str1="RAM15minuetlich.log"
+    pfadLOG="/aa_daten/bak/log/"
+fi
+
+# -den Namenszusatz anhängen:
+# -die Unterscheidung zum Suchstring erfolgt mittels -.* Muster, denn dies
+#  weist eindeutig auf den Namenszusatz hin
+if ( [[ "$str2" == -.* ]] ) 
+then
+	#echo -e "--- namenszusatz"
+	namenszusatz=${str2//-\./\.}
+	str2="$3"
+fi
+
+if ( [[ "$str1" == "" ]] ) 
+then
+	namenszusatz=""
+	str1="syslog"
+elif ( [[ "$str1" == -.* ]] ) 
+then
+	#echo -e "--- namenszusatz"
+	namenszusatz=${str1//-\./\.}
+	str1="syslog"
+fi
+str1=$str1$namenszusatz
+
+
+function fncSUCHENdatei {
+    # 1. Argument ist Logdatei
+    # 2. Argument ist Suchstring
+    #
+    # -Suchstring bei Bedarf aufteilen:
+    str2BAK="$str2"
+    #while ( [[ "$str2" == *.\*.* ]] )
+    #while ( [[ "$str2" != "" ]] )
+    while ( [[ "$str2" != "" ]] && [[ "$str2" != "flagSUCHENbak" ]] )
+    do
+        strSUCHE=${str2//* /}
+        str2=${str2// $strSUCHE/}
+        if ( [[ "$str2" == "flagSUCHENbak" ]] )
+        then
+            strSUCHE="$str2BAK"
+            strSUCHE=${strSUCHE// /\*}
+            str2=""
+        fi
+        if ( [[ "$str2" == "$strSUCHE" ]] )
+        then
+            #strSUCHE=$str2BAK
+            #strSUCHE=${strSUCHE// /.\*.}
+            str2="flagSUCHENbak"
+        fi
+        #echo -e "|- str2BAK: $str2BAK - str2: $str2 - strSUCHE: $strSUCHE"
+        echo -e "|- Logdatei: $str1 - Suchbegriff: $strSUCHE"
+        while read txtINHALT
+        do
+            #echo -e $txtINHALT >> $dateiLOGS
+            #echo -e $txtINHALT >> $dateiLOGSarchiv
+            #txtBEFEHLstatusBAK="|- EE $txtINHALT"
+            if ( [[ "$txtINHALT" == *$strSUCHE* ]] )
+            then
+                echo $txtINHALT
+            fi
+        done < $pfadLOG$str1
+    done
+}
+
+
+# if ( [[ "$str1" == "syslog$namenszusatz" ]] ) 
+# then
+# 	echo -e "|- cat $str1"
+# 	cat $pfadLOG$str1
+# 	exit 0;
+# else
+    if ( [[ "$str2" == "" ]] ) 
+    then
+        # nur 1 Argument:
+        if ( [[ -f "$pfadLOG$str1" ]] )
+        then
+            # Argument ist Logdatei
+            echo -e "|- cat $str1"
+            cat $pfadLOG$str1
+            exit 0;
+        else
+            # Argument ist keine Logdatei. also Suchstring
+            # fuer syslog
+            str2=$str1
+            str1="syslog"
+            # 1. Argument ist Logdatei
+            # 2. Argument ist Suchstring
+            #echo -e "|- cat $str1 | grep \"$str2\"" 
+            #cat $pfadLOG$str1 | grep "$str2" 
+            fncSUCHENdatei
+            exit 0;
+        fi
+    else
+        # 2 Argumente:
+        if ( [[ -f "$pfadLOG$str1" ]] )
+        then
+            # 1. Argument ist Logdatei
+            # 2. Argument ist Suchstring
+            #echo -e "|- cat $str1 | grep \"$str2\"" 
+            #cat $pfadLOG$str1 | grep "$str2" 
+            fncSUCHENdatei
+            exit 0;
+        else
+            # 1. Argument ist keine gueltige datei, deshalb
+            # abbrechen und Hinweis anzeigen
+            echo -e "|- FEHLER: Die Datei $str1 kann im Logverzeichnis nicht gefunden werden!"
+            echo -e "|- Nähere Infos unter: '$datei -h'"
+            exit 0;
+        fi
+    fi
+# fi
+
+
+#     echo -e "--"
+#     echo -e "------"
+#     echo -e "----------"
+#     echo -e "-- $0 - Logdateien durchsuchen!"
+#     echo -e "-- Hinweise zur Verwendung:"
+#     echo -e "-- \"$0 (LOGDATEI) SUCHSTRING\""
+#     echo -e "-- Ohne Angabe der Logdatei wird syslog benutzt!"
+
+
+exit 0;
+
+
+
+
+
+

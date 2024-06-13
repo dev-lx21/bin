@@ -1,0 +1,3075 @@
+#!/bin/bash
+# skript von -lx-
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+#
+# ----- DONE:
+#
+# ----- Bugs:
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+
+
+
+
+flagCRONJOB="false"
+
+
+# -Cronjob bzw Display testen:
+if [[ `tty` == *dev* ]]
+then
+    #echo -e "Kein Cronjob!"
+    fmtFETT=`tput bold`
+    fmtINVERS=`tput rev`
+    fmtUNTERSTRICHEN=`tput smul`
+
+    fmtCOLORfgBLAU=`tput setf 1`
+    fmtCOLORfgGRUEN=`tput setf 2`
+    fmtCOLORfgGELB=`tput setf 3`
+    fmtCOLORfgROT=`tput setf 4`
+    fmtCOLORbgBLAU=`tput setb 1`
+    fmtCOLORbgGRUEN=`tput setb 2`
+    fmtCOLORbgGELB=`tput setb 3`
+    fmtCOLORbgROT=`tput setb 4`
+
+    fmtRESET=`tput sgr0`
+else
+    #echo -e "Cronjob!"
+    flagCRONJOB="true"
+    # -Damit tput funktioniert muss Umgebungsvariable TERM entsprechend gesetzt sein!
+    [ ! -z $TERM ] && varENVshellTERMnow=$TERM
+    [ $TERM != "xterm" ] && export TERM="${TERM-xterm}"
+    
+    fmtFETT=`tput bold`
+    fmtINVERS=`tput rev`
+    fmtUNTERSTRICHEN=`tput smul`
+
+    fmtCOLORfgBLAU=`tput setf 1`
+    fmtCOLORfgGRUEN=`tput setf 2`
+    fmtCOLORfgGELB=`tput setf 3`
+    fmtCOLORfgROT=`tput setf 4`
+    fmtCOLORbgBLAU=`tput setb 1`
+    fmtCOLORbgGRUEN=`tput setb 2`
+    fmtCOLORbgGELB=`tput setb 3`
+    fmtCOLORbgROT=`tput setb 4`
+
+    fmtRESET=`tput sgr0`
+    
+fi
+
+
+datei=${0//*\//}
+txtTITEL="Systemtool für Prozesse, Dienste und Konfiguration!"
+nutzer=`ps --pid $$ -o user=`
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+function fncYEAR1231 {
+    case "$1" in
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y%m%d'`
+            ;;
+    esac
+}
+
+function fncSTATUSlxps {
+    # -Erwartet als $1 einen Prozessnamen!
+    [ ! "$1" ] && return
+    # -Prozessinfo anzeigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Prozess: \"$1\" - Info anzeigen:"
+    sleep 0.5
+    lxPS -q $1
+}
+
+
+
+function fncFrageWeiterAbbrechen {
+    # -Wenn Cronjob wird weiter ausgeführt:
+    [[ "$flagCRONJOB" == "true" ]] && return
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Soll das Skript weiter ausgeführt werden?"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Weiter: j --- Abbrechen: Beliebige Taste"
+    read -n 1 -s eingabeTASTE
+    #[[ "$eingabeTASTE" == "j" ]] || [[ "$eingabeTASTE" == "J" ]] && echo -e "|- ...weiter..."
+    [[ "$eingabeTASTE" == "j" ]] && echo -e "|- `fncHHMMSS 'norm.mS3'` --- $datei wird weiter ausgeführt..." && return
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- $datei wurde beendet." && exit 0;
+    
+}
+
+
+function fncFrageJaNeinStandardJa {
+    # -Wenn Cronjob wird weiter ausgeführt:
+    [[ "$flagCRONJOB" == "true" ]] && return
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Ja: Beliebige Taste --- Nein: n"
+    read -n 1 -s eingabeTASTE
+    #[[ "$eingabeTASTE" == "j" ]] || [[ "$eingabeTASTE" == "J" ]] && echo -e "|- ...weiter..."
+    [[ "$eingabeTASTE" == "n" ]] && return 1;
+    return 0;
+}
+
+
+function fncFrageJaNeinStandardNein {
+    # -Wenn Cronjob wird weiter ausgeführt:
+    [[ "$flagCRONJOB" == "true" ]] && return
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Ja: j --- Nein: Beliebige Taste"
+    read -n 1 -s eingabeTASTE
+    #[[ "$eingabeTASTE" == "j" ]] || [[ "$eingabeTASTE" == "J" ]] && echo -e "|- ...weiter..."
+    [[ "$eingabeTASTE" == "j" ]] && return 1;
+    return 0;
+}
+
+
+function fncBEFEHL {
+    # -Argumente:
+    # --$1: Befehl zum Ausführen
+    # --$2: Text oder Zeichen am Anfang der Ausgabe
+    
+    # -Der Name der Datei:
+    [ -z "$datei" ] && datei=${0//*\//}
+    # -Befehl zum Ausführen: $txtBEFEHL oder $1
+    [ -n "$1" ] && txtBEFEHL="$1"
+    [ -n "$2" ] && txtAUSGABEanfang="$2" || txtAUSGABEanfang="|- "
+    
+    if ( [[ "$flagTESTDRIVE" != "true" ]] )
+    then
+        echo -e "$txtAUSGABEanfang""AUSFÜHREN: '$txtBEFEHL'"
+        actionBEFEHL="echo -e $txtBEFEHL"
+        #`$actionBEFEHL` 2>/dev/null
+        `$actionBEFEHL`
+        #$($txtBEFEHL)
+        stsBEFEHL=$?
+        # -Exit-Status auswerten:
+        [ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""KEIN FEHLER: '$stsBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: '$stsBEFEHL'"
+    else
+        echo -e "$txtAUSGABEanfang""TESTMODUS: '$txtBEFEHL'"
+        stsBEFEHL=$?
+    fi
+    return $stsBEFEHL;
+}
+
+function fncBEFEHL2 {
+    # -Argumente:
+    # --$1: Befehl zum Ausführen
+    # --$2: Text oder Zeichen am Anfang der Ausgabe
+    
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return 11
+    [[ -z "$2" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return 12
+    
+    # -Der Name der Datei:
+    [ -z "$datei" ] && datei=${0//*\//}
+    # -Befehl zum Ausführen: $txtBEFEHL oder $1
+    [ -n "$1" ] && txtBEFEHL="$1"
+    [ -n "$2" ] && txtAUSGABEanfang="$2" || txtAUSGABEanfang="--- $datei."
+    
+    
+    # -Zusatzoptionen beim Installieren:
+    # --empfohlen: --install-recommends
+    # --vorgeschlagen: --install-suggests
+    #txtBefehlZusatzInstallieren="apt --install-recommends --install-suggests"
+    #[[ "$txtBEFEHL" == "apt install"* ]] && txtBEFEHL=${txtBEFEHL//apt/$txtBefehlZusatzInstallieren}
+    
+    
+    txtBefehlFehler="Keine Fehlermeldung vorhanden."
+    [[ "${txtBEFEHL: -1}" == " " ]] && txtBEFEHL="${txtBEFEHL:0 :-1}"
+    
+    [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""full-upgrade" ]] && [ -z "$flagCheckAusgabeAptUpdate" ] && return
+    
+    if ( [[ "$flagTESTDRIVE" != "true" ]] )
+    then
+        echo -e "$txtAUSGABEanfang""AUSFÜHREN: '$txtBEFEHL'"
+        actionBEFEHL="echo -e $txtBEFEHL"
+        #[[ "$txtBEFEHL" == "apt update" ]] && `$actionBEFEHL` >$dateiTMPBefehlAusgabe 2>$dateiTMPBefehlFehler || `$actionBEFEHL` 2>$dateiTMPBefehlFehler
+        [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && `$actionBEFEHL` 2>$dateiTMPBefehlFehler | tee $dateiTMPBefehlAusgabe || `$actionBEFEHL` 2>$dateiTMPBefehlFehler
+        stsBEFEHL=$?
+        
+        #[ -f $dateiTMPBefehlAusgabe ] && cat $dateiTMPBefehlAusgabe
+        [ -f $dateiTMPBefehlFehler ] && [[ -n "`cat $dateiTMPBefehlFehler`" ]] && txtBefehlFehler="`cat $dateiTMPBefehlFehler`"
+        
+        # -Ausgabe von 'apt update' auswerten:
+        [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && fncCheckAusgabeAptUpdate "$dateiTMPBefehlAusgabe"
+        
+        # -Exit-Status auswerten:
+        #[ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""ERFOLGREICH: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""ERFOLGREICH: Status: '$stsBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Status: '$stsBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Info:   '$txtBefehlFehler'"
+        [ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""ERFOLGREICH: Befehl: '$txtBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Status: '$stsBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Info:   '$txtBefehlFehler'"
+        [ -f $dateiTMPBefehlAusgabe ] && rm $dateiTMPBefehlAusgabe
+        [ -f $dateiTMPBefehlFehler ] && rm $dateiTMPBefehlFehler
+        
+        # -Info PopUp bzgl Aktualisierung:
+        if ( [[ "$flagInfoPopup" == "true" ]] )
+        then
+            [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && [ -z "$flagCheckAusgabeAptUpdate" ] && kdialog --title "$datei.$$" --sorry "<b>$datei.Info:</b><br><br>Es sind keine Aktualisierungen verfügbar!<br><br>" 2>/dev/null &
+            [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && [ -n "$flagCheckAusgabeAptUpdate" ] && kdialog --title "$datei.$$" --msgbox "<b>$datei.Info:</b><br><br>Es sind Aktualisierungen verfügbar!<br><br>" 2>/dev/null &
+        fi
+    else
+        echo -e "$txtAUSGABEanfang""TESTMODUS: '$txtBEFEHL'"
+        stsBEFEHL=$?
+    fi
+    echo -e "$txtAUSGABEanfang"
+    return $stsBEFEHL;
+}
+
+
+#echo -e "test-systemd..."\\n >> /home/lx21/bin/lxSYS.cache.txt
+
+
+###############################################################################
+##### START SystemD Unterstützung #############################################
+# -Die Aufrufe durch SystemD Prozesse verarbeiten:
+#
+# -SystemD kann für Minidlna keine Logs anlegen, daher wird Journalctl genutzt.
+# -Pipes und Umleitungen sind in SystemD Befehlen nicht erlaubt, daher wird lxSYS
+#  mit entsprechenden Argumenten aufgerufen:
+# -/home/lx21/bin/lxSYS "lxSYS.systemd.ACTION" "journalctl.minidlna.logs"
+# -Befehl in der Konsole: lxSYS lxSYS.systemd.ACTION journalctl minidlna CHECK
+zeitHMSjetzt=`fncHHMMSS`
+
+# # -Bei Bedarf alle Argumente ausgeben und kontrollieren:
+# typeset -i zz=0
+# for i in $@
+# do
+#     zz=zz+1
+#     echo -e "|- DEBUG Argumente - @ - $zz.: $i"
+# done
+
+# echo -e "1: $1"
+# echo -e "2: $2"
+
+
+
+function fncSYSTEMDjournalctl {
+    # -$1: Das lxSYS Flag
+    # -$2: Prozessname zum Starten, Checken, Stoppen
+    # -$3: Elternprozess der durch systemd überwacht wird
+    # -$4: Action: START, CHECK, STOP
+
+    #echo -e "--- `fncHHMMSS 'norm.mS2'` - $datei ---" >> /home/lx21/bin/lxSYS.cache.txt
+    #echo -e "--- 1: $1"\\n"--- 2: $2"\\n >> /home/lx21/bin/lxSYS.cache.txt
+    #echo -en "---" >> /home/lx21/bin/lxSYS.cache.txt
+#     typeset -i zz=0
+#     for i in $@
+#     do
+#         zz=zz+1
+#         #echo -en " $i" >> /home/lx21/bin/lxSYS.cache.txt
+#     done
+    txtSYSTEMDpid=`ps -C systemd -o pid= -o user= | grep -i root`
+    txtSYSTEMDpid=${txtSYSTEMDpid//root/}
+    
+    txtDIENSTparentNAMEarr=(`ps -A -o comm= | grep -i $3`)
+    txtDIENSTparentNAME=${txtDIENSTparentNAMEarr[0]}
+    [ -z $txtDIENSTparentNAME ] && txtDIENSTparentNAME=$3
+    txtDIENSTsystemdUNIT="$txtDIENSTparentNAME"
+    [ "$txtDIENSTparentNAME" == "minidlnad" ] && txtDIENSTsystemdUNIT="minidlna"
+    txtDIENSTparentPIDarr=(`ps -C $txtDIENSTparentNAME -o pid= --sort=+ppid`)
+    txtDIENSTparentPID=${txtDIENSTparentPIDarr[0]}
+    txtDIENSTchildNAME="$2"
+    txtDIENSTchildPID=""
+    #txtLOGinfoNORM=${1//.ACTION/.$4:}" $4 $txtDIENSTparentNAME.$2"
+    #txtLOGinfoNORM=${1//.ACTION/.$4:}" $4 $2.$txtDIENSTparentNAME"
+    #txtLOGinfoNORM=${1//.ACTION/.$4:}" $4 ${fmtFETT}${fmtCOLORfgBLAU}$2${fmtRESET}.$txtDIENSTparentNAME"
+    txtLOGinfoNORM=${1//.ACTION/.$4:}" $4 ${fmtFETT}$2${fmtRESET}.$txtDIENSTparentNAME"
+    txtLOGinfoSTART=${1//.ACTION/.$4:}
+    #txtLOGinfoENDE="$4 $txtDIENSTparentNAME.$2"
+    #txtLOGinfoENDE="$4 $2.$txtDIENSTparentNAME"
+    #txtLOGinfoENDE="$4 ${fmtFETT}${fmtCOLORfgGRUEN}$2${fmtRESET}.$txtDIENSTparentNAME"
+    txtLOGinfoENDE="$4 ${fmtFETT}$2${fmtRESET}.$txtDIENSTparentNAME"
+    txtLOGinfoENDErestartSTOP="STOP ${fmtFETT}$2${fmtRESET}.$txtDIENSTparentNAME"
+    txtLOGinfoENDErestartSTART="START ${fmtFETT}$2${fmtRESET}.$txtDIENSTparentNAME"
+    
+    
+    strJOURNALCTLserviceLOGDATEI="/aa_daten/bak/log/$3/$3.log"
+    strJOURNALCTLservicePIDDATEI="/aa_daten/bak/log/$3/$3.log.PID"
+    case "$4" in
+        ( "START" )
+            # -Ausgabe für die Logdatei: START Kopfzeile
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoNORM wird ausgeführt..." >> $strJOURNALCTLserviceLOGDATEI
+            
+#             #`systemctl start $txtDIENSTparentNAME`
+#             echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $4 systemd.$txtDIENSTsystemdUNIT wird ausgeführt..." >> $strJOURNALCTLserviceLOGDATEI
+#             `systemctl start $txtDIENSTsystemdUNIT` >> $strJOURNALCTLserviceLOGDATEI 2>> $strJOURNALCTLserviceLOGDATEI
+#             [ "`ps -C $txtDIENSTparentNAME -o comm --no-headers`" != "" ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $4 systemd.$txtDIENSTsystemdUNIT wurde erfolgreich ausgeführt!" >> $strJOURNALCTLserviceLOGDATEI
+#             [ "`ps -C $txtDIENSTparentNAME -o comm --no-headers`" == "" ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $4 systemd.$txtDIENSTsystemdUNIT wurde erfolgreich ausgeführt!" >> $strJOURNALCTLserviceLOGDATEI
+            
+            #`journalctl -aqf -u $3 -S $zeitHMSjetzt >> $strJOURNALCTLserviceLOGDATEI` &
+            $2 -aqf -u $3 -S $zeitHMSjetzt >> $strJOURNALCTLserviceLOGDATEI &
+            #echo -e "$2.$3-PID-$!" >> /home/lx21/bin/lxSYS.cache.PID.txt
+            txtDIENSTchildPID=$!
+            echo -e "$txtDIENSTchildPID" > $strJOURNALCTLservicePIDDATEI
+            # -Ausgabe für die Logdatei:
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: systemd (PID: $txtSYSTEMDpid)" >> $strJOURNALCTLserviceLOGDATEI
+            [ -n $txtDIENSTparentPID ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $txtDIENSTparentNAME (PID: $txtDIENSTparentPID)" >> $strJOURNALCTLserviceLOGDATEI
+            [ -z $txtDIENSTparentPID ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $txtDIENSTparentNAME (Wenn das System bereit ist, wird der Prozess automatisch gestartet.)" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $2 (PID: $txtDIENSTchildPID)" >> $strJOURNALCTLserviceLOGDATEI
+            
+            
+            # -Ausgabe für die Logdatei: ENDE Fußzeile
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtLOGinfoENDE wurde erfolgreich abgeschlossen!" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            ;;
+        ( "CHECK" )
+            # -Checken ob der Elternprozess $3 läuft. Falls nicht wird nur ein entsprechender Eintrag
+            #  in die Logdatei geschrieben.
+            # -Checken ob der Prozess $2 läuft, falls nicht wird er gestartet.
+            flagDIENSTcheckFEHLER=""
+            
+            # -Ausgabe für die Logdatei: START Kopfzeile
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoNORM wird ausgeführt..." >> $strJOURNALCTLserviceLOGDATEI
+            
+            
+#             # -Check $3 Elternprozess: In der PS-Liste suchen!
+#             [ -z `ps -All | grep -i $3` ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTparentNAME: Dienst läuft nicht!" >> $strJOURNALCTLserviceLOGDATEI
+#             [ -z `ps -All | grep -i $3` ] && flagDIENSTcheckFEHLER=$flagDIENSTcheckFEHLER".DIENST"$txtDIENSTparentNAME"NICHTaktiv"
+#             [ -z `ps -All | grep -i $3` ] || echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTparentNAME: Dienst läuft! - PID: $txtDIENSTparentPID" >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -Check $3 Elternprozess: In der PS-Liste suchen!
+            txtDIENSTparentPIDarr=(`ps -C $txtDIENSTparentNAME -o pid= --sort=+ppid`)
+            txtDIENSTparentPID=${txtDIENSTparentPIDarr[0]}
+            [ -z `ps -p $txtDIENSTparentPID -o comm=` ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTparentNAME: Dienst läuft nicht!" >> $strJOURNALCTLserviceLOGDATEI
+            [ -z `ps -p $txtDIENSTparentPID -o comm=` ] && flagDIENSTcheckFEHLER=$flagDIENSTcheckFEHLER".DIENST"$txtDIENSTparentNAME"NICHTaktiv"
+            [ -z `ps -p $txtDIENSTparentPID -o comm=` ] || echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTparentNAME: Dienst läuft! (PID: $txtDIENSTparentPID)" >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -Check $2 Prozess: Mittels der PID Datei!
+            #[ ! -f $strJOURNALCTLservicePIDDATEI ] && echo -e "$txtLOGerror $2.$3 PID Datei nicht gefunden!"
+            #[ ! -f $strJOURNALCTLservicePIDDATEI ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst läuft nicht: $txtDIENSTchildNAME" >> $strJOURNALCTLserviceLOGDATEI
+            [ ! -f $strJOURNALCTLservicePIDDATEI ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: PID Datei existiert nicht!" >> $strJOURNALCTLserviceLOGDATEI
+            [ ! -f $strJOURNALCTLservicePIDDATEI ] && flagDIENSTcheckFEHLER=$flagDIENSTcheckFEHLER".PIDDATEI"$txtDIENSTchildNAME"NICHTvorhanden"
+            [ ! -f $strJOURNALCTLservicePIDDATEI ] || echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: PID Datei existiert!" >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -Check $2 Prozess: Mittels der PS Ausgabe:
+            txtDIENSTchildPIDsARR=(`ps -C $2 -o pid= --sort=+ppid`)
+            for iPID in "${txtDIENSTchildPIDsARR[@]}"
+            do
+                iPPID=`ps -p $iPID -o ppid=`
+                iPPname=`ps -p $iPPID -o comm=`
+                [ "$iPPname" == "systemd" ] && txtDIENSTchildPID=$iPID
+                [ "$iPPname" == "$datei" ] && txtDIENSTchildPID=$iPID
+            done
+            [ -z $txtDIENSTchildPID ] && txtDIENSTchildPID="9999999"
+            [ -z `ps -p $txtDIENSTchildPID -o comm=` ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst läuft nicht!" >> $strJOURNALCTLserviceLOGDATEI
+            #echo -e "childPID: $txtDIENSTchildPID"
+            [ -z `ps -p $txtDIENSTchildPID -o comm=` ] && flagDIENSTcheckFEHLER=$flagDIENSTcheckFEHLER".DIENST"$txtDIENSTchildNAME"NICHTaktiv"
+            #echo -e "checkFEHLER: $flagDIENSTcheckFEHLER"
+            [ -z `ps -p $txtDIENSTchildPID -o comm=` ] || echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst läuft! (PID: $txtDIENSTchildPID)" >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -CHECK-START: Wenn der $txtDIENSTparentNAME keinen Fehler hat, aber der $txtDIENSTchildNAME einen Fehler
+            #  hat, wird nur der $txtDIENSTchildNAME neu gestartet:
+#             [[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTchildNAME* ]] && echo -e "checkFEHLER ist-child: $flagDIENSTcheckFEHLER"
+#             [ "$flagDIENSTcheckFEHLER" != *$txtDIENSTparentNAME* ] && echo -e "child-name: $txtDIENSTchildNAME ----- checkFEHLER nicht-parent: $flagDIENSTcheckFEHLER"
+#             [ "$flagDIENSTcheckFEHLER" == *"$txtDIENSTchildNAME"* ] && echo -e "checkFEHLER zeichen ist-child: $flagDIENSTcheckFEHLER"
+#             [ "$flagDIENSTcheckFEHLER" == *$txtDIENSTchildNAME* ] && echo -e "checkFEHLER ist-child: $flagDIENSTcheckFEHLER"
+            
+            function fncSYSTEMDdienstAUTOSTART {
+                case "$5" in
+                    ( "DIENST.PIDDATEI" )
+                    echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst neu starten..." >> $strJOURNALCTLserviceLOGDATEI
+                    $2 -aqf -u $3 -S $zeitHMSjetzt >> $strJOURNALCTLserviceLOGDATEI &
+                    txtDIENSTchildPID=$!
+                    echo -e "$txtDIENSTchildPID" > $strJOURNALCTLservicePIDDATEI
+                    echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst erfolgreich neu gestartet! (PID: $txtDIENSTchildPID)" >> $strJOURNALCTLserviceLOGDATEI
+                    flagDIENSTcheckFEHLER=""
+                    ;;
+                    ( "PIDDATEI" )
+                    echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: PID Datei neu anlegen..." >> $strJOURNALCTLserviceLOGDATEI
+                    txtDIENSTchildPID="$6"
+                    echo -e "$txtDIENSTchildPID" > $strJOURNALCTLservicePIDDATEI
+                    echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: PID Datei erfolgreich neu angelegt!" >> $strJOURNALCTLserviceLOGDATEI
+                    flagDIENSTcheckFEHLER=""
+                    ;;
+                    (*)
+                    echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Zu wenig oder falsche Argumente. Dienst nicht neu" >> $strJOURNALCTLserviceLOGDATEI
+                    echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: gestartet. Bitte wiederholen Sie den Vorgang." >> $strJOURNALCTLserviceLOGDATEI
+                    ;;
+                esac
+            }
+            
+            
+            [[ "$flagDIENSTcheckFEHLER" != *$txtDIENSTparentNAME* ]] && [[ "$flagDIENSTcheckFEHLER" == *DIENST$txtDIENSTchildNAME* ]] && fncSYSTEMDdienstAUTOSTART $@ "DIENST.PIDDATEI"
+            [[ "$flagDIENSTcheckFEHLER" != *$txtDIENSTparentNAME* ]] && [[ "$flagDIENSTcheckFEHLER" != *DIENST$txtDIENSTchildNAME* ]] && [[ "$flagDIENSTcheckFEHLER" == *PIDDATEI$txtDIENSTchildNAME* ]] && fncSYSTEMDdienstAUTOSTART $@ "PIDDATEI" $txtDIENSTchildPID
+            
+#             [ "$flagDIENSTcheckFEHLER" != *$txtDIENSTparentNAME* ] && [[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTchildNAME* ]] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst neu starten..." >> $strJOURNALCTLserviceLOGDATEI
+#             [ "$flagDIENSTcheckFEHLER" != *$txtDIENSTparentNAME* ] && [[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTchildNAME* ]] && $2 -aqf -u $3 -S $zeitHMSjetzt >> $strJOURNALCTLserviceLOGDATEI &
+#             [ "$flagDIENSTcheckFEHLER" != *$txtDIENSTparentNAME* ] && [[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTchildNAME* ]] && txtDIENSTchildPID=$!
+#             [ "$flagDIENSTcheckFEHLER" != *$txtDIENSTparentNAME* ] && [[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTchildNAME* ]] && echo -e "$txtDIENSTchildPID" > $strJOURNALCTLservicePIDDATEI
+#             [ "$flagDIENSTcheckFEHLER" != *$txtDIENSTparentNAME* ] && [[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTchildNAME* ]] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst erfolgreich neu gestartet! (PID: $txtDIENSTchildPID)" >> $strJOURNALCTLserviceLOGDATEI
+            
+            #[[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTparentNAME* ]] && txtLOGinfoERGEBNIS="Dienst/Prozess ($txtDIENSTparentNAME) ist nicht gestartet. Keine Unterprozesse vorhanden."
+            #[[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTparentNAME* ]] && txtLOGinfoERGEBNIS="Systemdienst $txtDIENSTparentNAME ist kein aktiver Prozess, daher keine weiteren Aufgaben."
+            
+            txtLOGinfoERGEBNIS01="$4 ERGEBNIS:"
+            
+            [[ "$flagDIENSTcheckFEHLER" == *$txtDIENSTparentNAME* ]] && txtLOGinfoERGEBNIS02="Systemdienst $txtDIENSTparentNAME nicht gestartet, daher keine weiteren Aufgaben."
+            [[ "$flagDIENSTcheckFEHLER" == "" ]] && txtLOGinfoERGEBNIS02="Beide Dienste arbeiten ohne Probleme!"
+            
+            #echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtLOGinfoERGEBNIS01 $txtLOGinfoERGEBNIS02" >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -Ausgabe für die Logdatei: ENDE Fußzeile
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtLOGinfoENDE wurde erfolgreich abgeschlossen!" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtLOGinfoERGEBNIS01 $txtLOGinfoERGEBNIS02" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            ;;
+        ( "STOP" )
+            # -Ausgabe für die Logdatei: START Kopfzeile
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoNORM wird ausgeführt..." >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -Wenn PID Datei nicht existiert, wird versucht die PID mittels PS auszulesen. Wird die
+            #  PID so auch nicht gefunden, ist kein Dienst zum Beenden vorhanden: return 120
+            [ ! -f $strJOURNALCTLservicePIDDATEI ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: PID Datei existiert nicht!" >> $strJOURNALCTLserviceLOGDATEI
+            txtDIENSTchildPIDsARR=(`ps -C $2 -o pid= --sort=+ppid`)
+            txtDIENSTchildPIDsLISTE=""
+            txtDIENSTchildPIDsLISTEtmp=""
+            for iPID in "${txtDIENSTchildPIDsARR[@]}"
+            do
+                iPPID=`ps -p $iPID -o ppid=`
+                iPPname=`ps -p $iPPID -o comm=`
+                [ "$iPPname" == "systemd" ] && txtDIENSTchildPID=$iPID
+                [ "$iPPname" == "$datei" ] && txtDIENSTchildPID=$iPID
+                [ -z $txtDIENSTchildPIDsLISTE ] && txtDIENSTchildPIDsLISTEtmp=$txtDIENSTchildPID
+                [ -z $txtDIENSTchildPIDsLISTE ] || [ $txtDIENSTchildPID != *$txtDIENSTchildPIDsLISTE* ] && txtDIENSTchildPIDsLISTE=$txtDIENSTchildPIDsLISTE","$txtDIENSTchildPID
+                #echo -e "txtDIENSTchildPIDsLISTE: $txtDIENSTchildPIDsLISTE"
+                [ -z $txtDIENSTchildPIDsLISTE ] && [ ! -z $txtDIENSTchildPIDsLISTEtmp ] && txtDIENSTchildPIDsLISTE=$txtDIENSTchildPIDsLISTEtmp
+                [ ! -z $txtDIENSTchildPIDsLISTEtmp ] && txtDIENSTchildPIDsLISTEtmp=""
+            done
+            [ -z `ps -p $txtDIENSTchildPID -o comm=` ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst läuft nicht!" >> $strJOURNALCTLserviceLOGDATEI
+            #[ ! -f $strJOURNALCTLservicePIDDATEI ] && return 118;
+            [ -z `ps -p $txtDIENSTchildPID -o comm=` ] && return 120;
+            
+            [ -f $strJOURNALCTLservicePIDDATEI ] && while read intPIDjournalctlSTART
+            do
+                nix=0
+                #echo -e "intPIDjournalctlSTART: $intPIDjournalctlSTART"
+#                 # -Den START journalctl Prozess beenden:
+#                 [ ! -z `ps -p $intPIDjournalctlSTART -o pid=` ] && kill $intPIDjournalctlSTART
+            done < $strJOURNALCTLservicePIDDATEI
+            [ -z $intPIDjournalctlSTART ] && intPIDjournalctlSTART=$txtDIENSTchildPID
+            # lsof -f -- /aa_daten/bak/log/minidlna/minidlna.log 2>/dev/null | grep minidlna.log
+            while ( [[ ! `lsof -p $intPIDjournalctlSTART 2>/dev/null` ]] && [[ ! -z `ps -p $intPIDjournalctlSTART -o pid=` ]] )
+            do
+                # -Falls die Datei noch geöffnet ist...
+                sleep 0.2
+            done
+            # -Den START journalctl Prozess beenden:
+            [ ! -z `ps -p $intPIDjournalctlSTART -o pid=` ] && kill $intPIDjournalctlSTART >/dev/null 2>&1 || echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Fehler: Der Prozess `ps -p $intPIDjournalctlSTART -o comm=` (PID: $intPIDjournalctlSTART) konnte nicht beendet werden!" >> $strJOURNALCTLserviceLOGDATEI
+            sleep 0.4
+            rm $strJOURNALCTLservicePIDDATEI
+            
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: systemd (PID: $txtSYSTEMDpid)" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $txtDIENSTparentNAME (PID: $txtDIENSTparentPID)" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $2 (PID: $intPIDjournalctlSTART)" >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -Ausgabe für die Logdatei: ENDE Fußzeile
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtLOGinfoENDE wurde erfolgreich abgeschlossen!" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            ;;
+        ( "RESTART" )
+            # -Ausgabe für die Logdatei: START Kopfzeile
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtLOGinfoENDErestartSTOP wird ausgeführt..." >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -Wenn PID Datei nicht existiert, wird versucht die PID mittels PS auszulesen. Wird die
+            #  PID so auch nicht gefunden, ist kein Dienst zum Beenden vorhanden: return 120
+            [ ! -f $strJOURNALCTLservicePIDDATEI ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: PID Datei existiert nicht!" >> $strJOURNALCTLserviceLOGDATEI
+            txtDIENSTchildPIDsARR=(`ps -C $2 -o pid= --sort=+ppid`)
+            txtDIENSTchildPIDsLISTE=""
+            txtDIENSTchildPIDsLISTEtmp=""
+            for iPID in "${txtDIENSTchildPIDsARR[@]}"
+            do
+                iPPID=`ps -p $iPID -o ppid=`
+                iPPname=`ps -p $iPPID -o comm=`
+                [ "$iPPname" == "systemd" ] && txtDIENSTchildPID=$iPID
+                [ "$iPPname" == "$datei" ] && txtDIENSTchildPID=$iPID
+                [ -z $txtDIENSTchildPIDsLISTE ] && txtDIENSTchildPIDsLISTEtmp=$txtDIENSTchildPID
+                [ -z $txtDIENSTchildPIDsLISTE ] || [ $txtDIENSTchildPID != *$txtDIENSTchildPIDsLISTE* ] && txtDIENSTchildPIDsLISTE=$txtDIENSTchildPIDsLISTE","$txtDIENSTchildPID
+                #echo -e "txtDIENSTchildPIDsLISTE: $txtDIENSTchildPIDsLISTE"
+                [ -z $txtDIENSTchildPIDsLISTE ] && [ ! -z $txtDIENSTchildPIDsLISTEtmp ] && txtDIENSTchildPIDsLISTE=$txtDIENSTchildPIDsLISTEtmp
+                [ ! -z $txtDIENSTchildPIDsLISTEtmp ] && txtDIENSTchildPIDsLISTEtmp=""
+            done
+            [ -z `ps -p $txtDIENSTchildPID -o comm=` ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtDIENSTchildNAME.$txtDIENSTparentNAME: Dienst läuft nicht!" >> $strJOURNALCTLserviceLOGDATEI
+            #[ ! -f $strJOURNALCTLservicePIDDATEI ] && return 118;
+            [ -z `ps -p $txtDIENSTchildPID -o comm=` ] && return 120;
+            
+            [ -f $strJOURNALCTLservicePIDDATEI ] && while read intPIDjournalctlSTART
+            do
+                nix=0
+                #echo -e "intPIDjournalctlSTART: $intPIDjournalctlSTART"
+#                 # -Den START journalctl Prozess beenden:
+#                 [ ! -z `ps -p $intPIDjournalctlSTART -o pid=` ] && kill $intPIDjournalctlSTART
+            done < $strJOURNALCTLservicePIDDATEI
+            [ -z $intPIDjournalctlSTART ] && intPIDjournalctlSTART=$txtDIENSTchildPID
+            # lsof -f -- /aa_daten/bak/log/minidlna/minidlna.log 2>/dev/null | grep minidlna.log
+            while ( [[ ! `lsof -p $intPIDjournalctlSTART 2>/dev/null` ]] && [[ ! -z `ps -p $intPIDjournalctlSTART -o pid=` ]] )
+            do
+                # -Falls die Datei noch geöffnet ist...
+                sleep 0.2
+            done
+            # -Den START journalctl Prozess beenden:
+            [ ! -z `ps -p $intPIDjournalctlSTART -o pid=` ] && kill $intPIDjournalctlSTART
+            sleep 0.4
+            rm $strJOURNALCTLservicePIDDATEI
+            
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: systemd (PID: $txtSYSTEMDpid)" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $txtDIENSTparentNAME (PID: $txtDIENSTparentPID)" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $2 (PID: $intPIDjournalctlSTART)" >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -Ausgabe für die Logdatei: ENDE Fußzeile
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtLOGinfoENDErestartSTOP wurde erfolgreich abgeschlossen!" >> $strJOURNALCTLserviceLOGDATEI
+            #echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -RESTART: Nach STOP eine kurze Pause einlegen und dann START ausführen:
+            #sleep 0.2
+            
+            # -Ausgabe für die Logdatei: START Kopfzeile
+            #echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtLOGinfoENDErestartSTART wird ausgeführt..." >> $strJOURNALCTLserviceLOGDATEI
+            
+            #`systemctl restart $txtDIENSTparentNAME`
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $4 systemd.$txtDIENSTsystemdUNIT wird ausgeführt..." >> $strJOURNALCTLserviceLOGDATEI
+            `systemctl restart $txtDIENSTsystemdUNIT` >> $strJOURNALCTLserviceLOGDATEI 2>> $strJOURNALCTLserviceLOGDATEI
+            [ "`ps -C $txtDIENSTparentNAME -o comm --no-headers`" != "" ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $4 systemd.$txtDIENSTsystemdUNIT wurde erfolgreich ausgeführt!" >> $strJOURNALCTLserviceLOGDATEI
+            [ "`ps -C $txtDIENSTparentNAME -o comm --no-headers`" == "" ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $4 systemd.$txtDIENSTsystemdUNIT wurde erfolgreich ausgeführt!" >> $strJOURNALCTLserviceLOGDATEI
+            
+            #`journalctl -aqf -u $3 -S $zeitHMSjetzt >> $strJOURNALCTLserviceLOGDATEI` &
+            $2 -aqf -u $3 -S $zeitHMSjetzt >> $strJOURNALCTLserviceLOGDATEI &
+            #echo -e "$2.$3-PID-$!" >> /home/lx21/bin/lxSYS.cache.PID.txt
+            txtDIENSTchildPID=$!
+            echo -e "$txtDIENSTchildPID" > $strJOURNALCTLservicePIDDATEI
+            # -Ausgabe für die Logdatei:
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: systemd (PID: $txtSYSTEMDpid)" >> $strJOURNALCTLserviceLOGDATEI
+            [ -n $txtDIENSTparentPID ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $txtDIENSTparentNAME (PID: $txtDIENSTparentPID)" >> $strJOURNALCTLserviceLOGDATEI
+            [ -z $txtDIENSTparentPID ] && echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $txtDIENSTparentNAME (Wenn das System bereit ist, wird der Prozess automatisch gestartet.)" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART Dienst: $2 (PID: $txtDIENSTchildPID)" >> $strJOURNALCTLserviceLOGDATEI
+            
+            # -Ausgabe für die Logdatei: ENDE Fußzeile
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART $txtLOGinfoENDErestartSTART wurde erfolgreich abgeschlossen!" >> $strJOURNALCTLserviceLOGDATEI
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoSTART ---------------------------------------------------------------" >> $strJOURNALCTLserviceLOGDATEI
+            ;;
+        ( "STOP-KillMode-control-group" )
+            # -Die Befehle für STOP-KillMode-control-group:
+            #zeitHMSjetzt=`fncHHMMSS`
+            #echo -e "--- `fncHHMMSS 'norm.mS2'` - $4 - -aqn 4" >> $strJOURNALCTLserviceLOGDATEI
+            #`journalctl -aqn 4 -u $3 >> $strJOURNALCTLserviceLOGDATEI` &
+            `journalctl -aq -u $3 -S $zeitHMSjetzt >> $strJOURNALCTLserviceLOGDATEI` &
+            intPIDjournalctlSTOP="$!"
+            echo -e "-`fncYEAR1231 '1231'`- `fncHHMMSS 'norm.mS3'` $txtLOGinfoNORM" >> $strJOURNALCTLserviceLOGDATEI
+            [ ! -f $strJOURNALCTLservicePIDDATEI ] && echo -e "$txtLOGerror $2.$3 PID Datei nicht gefunden!"
+            [ ! -f $strJOURNALCTLservicePIDDATEI ] && return 118;
+            while read intPIDjournalctlSTART
+            do
+                nix=0
+                # -Den START journalctl Prozess beenden:
+                [ ! -z `ps -p $intPIDjournalctlSTART -o pid=` ] && kill $intPIDjournalctlSTART
+                #kill $intPIDjournalctlSTART
+            done < $strJOURNALCTLservicePIDDATEI
+            rm $strJOURNALCTLservicePIDDATEI
+            # -Den STOP journalctl Prozess beenden:
+            #[ ! -z `ps -p $intPIDjournalctlSTOP -o pid=` ] && kill $intPIDjournalctlSTOP
+            ;;
+        (*)
+            nix=0
+            ;;
+    esac
+
+    #kdialog --title "$datei.Info" --msgbox " --- <b>$datei: Info</b> --- <br><br>1: $1<br>2: $2" &
+    #beep -l 200 -f 600 -r 2 -D 100 --new -l 600 -f 600 -D 100
+
+}
+
+
+
+function fncSYSTEMD {
+    # -$1: Das lxSYS Flag
+    # -$2: Prozessname zum Starten, Checken, Stoppen
+    # -$3: Elternprozess der durch systemd überwacht wird
+    # -$4: Action: START, CHECK, STOP
+    case "$2" in
+        ( "journalctl" )
+            fncSYSTEMDjournalctl $@
+            return $?;
+            ;;
+        (*)
+            nix=0
+            ;;
+    esac
+}
+
+##### ENDE SystemD Unterstützung ##############################################
+###############################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+case "$1" in
+    # --- lxSYS Action: systemd -----------------------------------------------
+    # -$1: Das lxSYS Flag
+    # -$2: Prozessname zum Starten, Checken, Stoppen
+    # -$3: Elternprozess der durch systemd überwacht wird
+    # -$4: Action: START, CHECK, STOP
+    # lxSYS.systemd.ACTION journalctl minidlna CHECK
+    ( "lxSYS.systemd.ACTION" )
+        txtLOGerror="-"$1"-ERROR:"
+        #[ ! -f "/home/lx21/bin/lxSYS.cache.txt" ] && echo -e "nix-datei..."
+        [ -z $2 ] && echo -e "$txtLOGerror Fehlendes oder ungültiges Argument: \$2" && exit 112;
+        [ -z $3 ] && echo -e "$txtLOGerror Fehlendes oder ungültiges Argument: \$3" && exit 113;
+        [ -z $4 ] && echo -e "$txtLOGerror Fehlendes oder ungültiges Argument: \$4" && exit 114;
+        fncSYSTEMD $@
+        exit $?;
+        ;;
+    # --- lxSYS Action: todo --------------------------------------------------
+    ( "todo" )
+        echo -e "--- lxSYS ToDoListe -----------------------------------------------------------"
+        #exit 0;
+        pfadDOCUMENTSbak="/home/$nutzer/Dokumente/bak/"
+        dateiTODOliste="aa_ToDoListe-Tasks.txt"
+        dateiSICHERUNGold="aa_ToDoListe-Tasks_bak-old.txt"
+        dateiSICHERUNGnew="aa_ToDoListe-Tasks_bak-new.txt"
+        
+        [[ "$2" == "show" ]] && cat $pfadDOCUMENTSbak$dateiTODOliste && errDATEIwrite=$? && echo -e "--- Status: Erfolgreich! (Exit-Code: $errDATEIwrite)" && echo -e "-------------------------------------------------------------------------------" && exit $errDATEIwrite;
+        
+        `cp $pfadDOCUMENTSbak$dateiTODOliste $pfadDOCUMENTSbak$dateiSICHERUNGold 1>/dev/null` && errDATEIwrite=$? && echo -e "--- Status: Erfolgreich! (Exit-Code: $errDATEIwrite)" && echo -e "--- Sicherung wurde erstellt: '$dateiSICHERUNGold'"
+        echo -e "---\n---"
+        #exec >`tty` 2>&1
+        
+        vi $pfadDOCUMENTSbak$dateiTODOliste && errDATEIwrite=$? && echo -e "--- Status: Erfolgreich! (Exit-Code: $errDATEIwrite)" && echo -e "--- Die neue Version der ToDoListe wurde gespeichert: '$dateiTODOliste'"
+        echo -e "---\n---"
+        
+        `cp $pfadDOCUMENTSbak$dateiTODOliste $pfadDOCUMENTSbak$dateiSICHERUNGnew 1>/dev/null` && errDATEIwrite=$? && echo -e "--- Status: Erfolgreich! (Exit-Code: $errDATEIwrite)" && echo -e "--- Sicherung wurde erstellt: '$dateiSICHERUNGnew'"
+        #exec >`tty` 2>&1
+        
+        echo -e "-------------------------------------------------------------------------------"
+        exit $?;
+        ;;
+    # --- lxSYS Action: collectiongain ----------------------------------------
+    ( "collectiongain" )
+        echo -e "--- lxSYS collectiongain starten ----------------------------------------------"
+        
+        strCollGainOptionen=""
+        [[ "$2" != "" ]] && strCollGainOptionen="$2 "
+        
+        arrCollGainVerzeichnisse=(/aa_daten/musik /aa_daten/musik_tmp)
+        for strCollGainVerzMusik in "${arrCollGainVerzeichnisse[@]}"
+        do
+            echo -e "-------------------------------------------------------------------------------"
+            echo -e "--- Info START: $strCollGainVerzMusik"
+            #strCollGainVerzMusik="/aa_daten/musik"
+            strCollGainLogsDateiName="${strCollGainVerzMusik//\//-}"
+            [[ "$strCollGainLogsDateiName" == -* ]] && strCollGainLogsDateiName="${strCollGainLogsDateiName:1}"
+            strCollGainLogsVerz="/aa_daten/bak/log/collectiongain/"
+            strCollGainLogsDatei="/aa_daten/bak/log/collectiongain/"`fncYEAR1231 "YEAR"`"/""$strCollGainLogsDateiName""_"`fncYEAR1231 "nurZAHLEN"`"-"`fncHHMMSS "nurZAHLEN"`".txt"
+            [[ ! -d "$strCollGainLogsVerz`fncYEAR1231 "YEAR"`" ]] && mkdir -p "$strCollGainLogsVerz`fncYEAR1231 "YEAR"`"
+            
+            #flagTESTDRIVE="true"
+            collectiongain $strCollGainOptionen"$strCollGainVerzMusik" | tee -a "$strCollGainLogsDatei"
+            echo -e "--- Info ENDE: $strCollGainVerzMusik"
+            echo -e "-------------------------------------------------------------------------------"
+        done
+        
+        
+        exit 0;
+        
+        
+        pfadDOCUMENTSbak="/home/$nutzer/Dokumente/bak/"
+        dateiTODOliste="aa_ToDoListe-Tasks.txt"
+        dateiSICHERUNGold="aa_ToDoListe-Tasks_bak-old.txt"
+        dateiSICHERUNGnew="aa_ToDoListe-Tasks_bak-new.txt"
+        
+        [[ "$2" == "show" ]] && cat $pfadDOCUMENTSbak$dateiTODOliste && errDATEIwrite=$? && echo -e "--- Status: Erfolgreich! (Exit-Code: $errDATEIwrite)" && echo -e "-------------------------------------------------------------------------------" && exit $errDATEIwrite;
+        
+        `cp $pfadDOCUMENTSbak$dateiTODOliste $pfadDOCUMENTSbak$dateiSICHERUNGold 1>/dev/null` && errDATEIwrite=$? && echo -e "--- Status: Erfolgreich! (Exit-Code: $errDATEIwrite)" && echo -e "--- Sicherung wurde erstellt: '$dateiSICHERUNGold'"
+        echo -e "---\n---"
+        #exec >`tty` 2>&1
+        
+        vi $pfadDOCUMENTSbak$dateiTODOliste && errDATEIwrite=$? && echo -e "--- Status: Erfolgreich! (Exit-Code: $errDATEIwrite)" && echo -e "--- Die neue Version der ToDoListe wurde gespeichert: '$dateiTODOliste'"
+        echo -e "---\n---"
+        
+        `cp $pfadDOCUMENTSbak$dateiTODOliste $pfadDOCUMENTSbak$dateiSICHERUNGnew 1>/dev/null` && errDATEIwrite=$? && echo -e "--- Status: Erfolgreich! (Exit-Code: $errDATEIwrite)" && echo -e "--- Sicherung wurde erstellt: '$dateiSICHERUNGnew'"
+        #exec >`tty` 2>&1
+        
+        echo -e "-------------------------------------------------------------------------------"
+        exit $?;
+        ;;
+    (*)
+        nix=0
+        ;;
+esac
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+fmtRESET=`tput sgr0`
+
+
+
+pfad="$1"
+flag_update=$2
+flag_aufruf_intern=$3
+zeitSTARTutc=`date '+%s'`
+zeitSTART=`date -d @$zeitSTARTutc`
+zeitSTARTdateiname=`date -d @$zeitSTARTutc '+%F_%T'`
+zeitSTARTdateiname=${zeitSTARTdateiname//\-/}
+zeitSTARTdateiname=${zeitSTARTdateiname//:/}
+zeitSTARTdateiname=${zeitSTARTdateiname//_/\-}
+flagACTION="false"
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Prozess Option --------------------------------------------------------------------------
+arrPROZESSE=($datei)
+
+if ( [[ "$1" == "-PS" ]] )
+then
+    echo -e "-"\\n"--- Eigene Prozesse anzeigen: ---------------------------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        echo -e "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            echo -e "$ausgabe"
+        else
+            echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        echo -e "-"
+    done
+    exit 0;
+fi
+
+if ( [[ "$1" == "-PSK" ]] )
+then
+    echo -e "-"\\n"--- Eigene Prozesse anzeigen und beenden (kill): --------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        echo -e "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            echo -e "$ausgabe"
+            ausgabePIDs=`lxPS -pid $i`
+            ausgabePIDs=${ausgabePIDs//$$/}
+            for ii in $ausgabePIDs
+            do
+                nix=1
+                #echo -e "- PIDs: "$ii
+                #ps -ppid $ii -o pid=
+                ausgabeCHILDPIDsTMP=`ps --ppid $ii -o pid=`
+                ausgabeCHILDPIDs=$ausgabeCHILDPIDs" "$ausgabeCHILDPIDsTMP
+            done
+            #echo -e "- PIDs: "$ausgabePIDs
+            #echo -e "- CPIDs:"$ausgabeCHILDPIDs
+            if ( [[ "$ausgabePIDs" != "" ]] )
+            then
+                echo -e "- kill -9 "$ausgabePIDs $ausgabeCHILDPIDs
+                kill -9 $ausgabePIDs $ausgabeCHILDPIDs
+            else
+                echo -e "- INFO: Keine Prozesse zum Beenden gefunden!"
+            fi
+        else
+            echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        echo -e "-"
+    done
+    exit 0;
+fi
+
+# ----- ENDE Prozess Option ---------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+function fncEingabePlasmaSicherungUVZ {
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Sie können hier einen anderen Namen für das Verzeichnis mit der Sicherung"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- angeben. Ändern Sie einfach die Vorgabe '$strPlasmaSicherung02UVZ' und schliessen"    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Sie die Eingabe mit der RETURN Taste ab. Wenn Sie die Standardvorgabe direkt"    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- übernehmen möchten, drücken Sie einfach die RETURN Taste."
+    
+    # -Read Befehl mit Vorbelegung und Bestätigen durch RETURN Taste:
+    #fncFrageJaNeinStandardNein
+    read -re -p "|- `fncHHMMSS 'norm.mS3'` --- " -i "$strPlasmaSicherung02UVZ" -n 64 strPlasmaSicherung02UVZ
+    
+}
+
+
+
+strZeitstempelDatumZeit=""
+# -Pfad zu dem Verzeichnis in dem die Sicherungen gespeichert werden:
+strPlasmaSicherung01Pfad=""
+# -Name für Sicherung: Zeitstempel oder Benutzereingabe
+strPlasmaSicherung02UVZ=""
+strPlasmaSicherungPfadFertig=""
+function fncPlasmaCPPfad {
+    # -Pfad für Sicherung abfragen und entsprechend zusammenbauen:
+    
+    # -Name für UVZ Zeitstempel:
+    strZeitstempelDatumZeit="`date '+%Y%m%d'`_`date '+%H%M%S'`"
+    strPlasmaSicherung02UVZ="$strZeitstempelDatumZeit"
+    
+    # -Name für UVZ Benutzereingabe:
+    [[ "$1" == "UVZBenutzereingabe" ]] && fncEingabePlasmaSicherungUVZ
+
+    
+    #strPlasmaSicherungPfadFertig="/aa_daten/bak/plasma/$strPlasmaSicherung02UVZ"
+    #strPlasmaSicherungPfadFertig="~/Dokumente/bak/plasma/$strPlasmaSicherung02UVZ"
+    strPlasmaSicherungPfadFertig="/home/$nutzer/Dokumente/bak/plasma/$strPlasmaSicherung02UVZ"
+}
+fncPlasmaCPPfad
+
+
+# -Wegen Unterschieden beim Auslesen der aktuellen Cursorposition, wird clear
+#  aufgerufen. Wenn die aktuelle Cursorposition in der untersten Zeile ist, stimmt
+#  die getCPos Funktion nicht!!!
+if ( [[ "$1" != -*l* ]] )
+then
+    nix=1
+    #clear
+fi
+
+
+
+# -die Namen der Dateien zum Zwischenspeichern und Loggen festlegen:
+dateiCONF="/home/$nutzer/bin/$datei.conf"
+dateiURLS="00_$datei.URLS.txt"
+dateiLOGS="00_$datei.LOGS.txt"
+dateiLOGStmp="00_$datei.LOGS.txt.tmp"
+
+
+txtHR="|--------------------------------------------------------------------------------"
+
+txtKOPF=\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $datei -| "
+
+txtKOPFlogs=$txtKOPF"Logdatei"\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+txtKOPF=$txtKOPF$txtTITEL\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+
+
+
+
+txtBENUTZUNG=\
+"|- Benutzung:"\\n\
+"|- '$datei [OPTIONEN]...'"\\n\
+"|- Verschiedene Werkzeuge zur Systemüberwachung (für Prozesse und Dienste) und"\\n\
+"|- zur Systemverwaltung!"\\n\
+"|-"
+
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Optionen:"\\n\
+"|- -h\\t\\tDiesen Hilfetext anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- -hM\\t\\tDiesen Hilfetext mittels More anzeigen. Während dessen 'h' tippen, um Hinweise zur Bedienung"\\n\
+"|-   \\t\\tvon More einzublenden. Andere Optionen werden ignoriert."\\n\
+"|- -hc\\t\\tDie Konfigurationsdatei ($datei.conf) anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- -conf\\tDie Konfigurationsdatei ($datei.conf) bearbeiten. Dabei wird zuerst die aktuelle Konfiguration"\\n\
+"|-      \\t\\tgesichert ($datei.conf.bak.$zeitSTARTdateiname) und erst dann VI zum Bearbeiten gestartet."\\n\
+"|-      \\t\\tAndere Optionen werden ignoriert. Falls noch keine Konfigurationsdatei existiert wird sie"\\n\
+"|-      \\t\\tjetzt erstellt"\\n\
+"|- -l\\t\\tDie Logdatei im aktuellen Verzeichnis anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- Manche Optionen können kombiniert werden. Dabei ist '-qf' das gleiche wie '-fq'."\\n\
+"|-"\\n\
+"|- Erweiterte Optionen:"\\n\
+"|- '$datei -replace'\\tProzesse mittels 'replace' neu starten: kwin_x11, plasmashell"\\n\
+"|- '$datei plasma-cp'\\tPlasma Konfigurationsdateien sichern. Verzeichnis:"\\n\
+"|-\\t\\t\\t$strPlasmaSicherungPfadFertig"\\n\
+"|- '$datei plasma-rm'\\tPlasma Konfigurationsdateien löschen. Zuerst können die"\\n\
+"|-\\t\\t\\taktuellen Dateien gesichert werden, erst dann erfolgt die Löschung!"\\n\
+"|-"\\n\
+"|- Beliebigen Prozess prüfen und ggf neu starten:"\\n\
+"|- '$datei PROZESSNAME'"\\n\
+"|-"\\n\
+"|- ToDo Liste bearbeiten (mit Sicherung und Speicherüberwachung):"\\n\
+"|- '$datei todo'"\\n\
+"|-"\\n\
+"|- SystemD Prozesssteuerung: START, STOP, RESTART, CHECK"\\n\
+"|- '$datei lxSYS.systemd.ACTION journalctl minidlna CHECK'"\\n\
+"|-"\\n\
+"|-"\\n\
+"|- Dieses Tool benötigt folgende Pakete um zu funktionieren:"\\n\
+"|- -lxPS, ps, lsof, cp, mv, rm, systemd"\\n\
+"|-"
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tKein zulässiges Argument übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+txtENDEzeit=\\n\
+"|-"\\n\
+"|- Start:\t$zeitSTART"\\n\
+"|- Ende:\t"
+
+
+
+
+
+
+# SHORTCUT
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++ START function $datei.conf auslesen ++++++++++++++++++++++++++++
+function fncDATEIconfAUSLESEN {
+    # -Wenn der richtige Schlüssel gefunden wurde, wird der entsprechende
+    #  Wert ausgelesen und einer Variablen zugewiesen:
+    eingabeURLkontrolle=$eingabeURL
+    flagURLconf="false"
+    flagSCglobalGEFUNDEN="false"
+    while read txtDATEIconf
+    do
+        # -Kommentare und leere Zeilen ignorieren:
+        if ( [[ "$txtDATEIconf" == \#* ]] || [[ "$txtDATEIconf" == "" ]] )
+        then
+            continue
+        fi
+        
+        # -URL Shortcut auslesen:
+        if ( [[ "$eingabeSCurl" != "" ]] && [[ "$txtDATEIconf" == url:$eingabeURL=* ]] )
+        then
+            #echo -e "--- Shortcut URL: $txtDATEIconf"
+            eingabeURL=${txtDATEIconf//url:$eingabeURL=/}
+            flagURLconf="true"
+            break
+        fi
+        
+        # -GLOBALEN Shortcut auslesen:
+        if ( [[ "$eingabeSC" != "" ]] && [[ "$txtDATEIconf" == $eingabeSC* ]] )
+        then
+            #echo -e "--- Shortcut GLOBAL: $txtDATEIconf"
+            arrSHORTCUT=($txtDATEIconf)
+            arrSHORTCUTsc=${arrSHORTCUT[0]}
+            arrSHORTCUTverzeichnis=${arrSHORTCUT[1]}
+            arrSHORTCUTverzeichnisAUSWAHL=${arrSHORTCUT[2]}
+            arrSHORTCUTquiet=${arrSHORTCUT[3]}
+            if ( [[ "$arrSHORTCUTquiet" != "quietNEIN" ]] )
+            then
+                if ( [[ "$arrSHORTCUTquiet" == "quietQ" ]] )
+                then
+                    strg1=$strg1"q"
+                fi
+                if ( [[ "$arrSHORTCUTquiet" == "quietQQ" ]] )
+                then
+                    strg1=$strg1"qq"
+                fi
+                if ( [[ "$arrSHORTCUTquiet" == "quietQQQ" ]] )
+                then
+                    strg1=$strg1"qqq"
+                fi
+            fi
+            if ( [[ "$arrSHORTCUTsc" != "$eingabeSC" ]] )
+            then
+                flagSCglobalGEFUNDEN="false"
+                continue
+            else
+                flagSCglobalGEFUNDEN="true"
+                if ( [[ "${#arrSHORTCUT[*]}" -gt 4 ]] )
+                then
+                    # -URLs einlesen:
+                    for i in "${arrSHORTCUT[@]}"
+                    do
+                        if ( [[ "$i" == http*:\/\/* ]] )
+                        then
+                            if ( [[ "$arrSHORTCUTurl" == "" ]] )
+                            then
+                                arrSHORTCUTurl="$i"
+                                continue
+                            fi
+                            arrSHORTCUTurl="$arrSHORTCUTurl $i"
+                        fi
+                    done
+                    #eingabeURL=$arrSHORTCUTurl
+                fi
+                #echo -e "--- $arrSHORTCUTsc - $arrSHORTCUTverzeichnis - $arrSHORTCUTverzeichnisAUSWAHL - $arrSHORTCUTurl"
+                break
+            fi
+            #echo -e "--- $arrSHORTCUTsc - $arrSHORTCUTverzeichnis - $arrSHORTCUTverzeichnisAUSWAHL - $arrSHORTCUTurl"
+            #exit 0;
+        fi
+    done < $dateiCONF
+    
+    # -Shortcut konnte nicht gefunden werden:
+    if ( [[ "$eingabeSC" != "" ]] && [[ "$flagSCglobalGEFUNDEN" == "false" ]] )
+    then
+        echo -e $txtKOPF
+        echo -e "|- Der von Ihnen angegebene Shortcut '$eingabeSC' konnte in der Konfigurationsdatei"
+        echo -e "|- nicht gefunden werden. Bitte kontrollieren Sie Ihre Eingabe!"
+        echo -e "|- Weitere Hilfe erhalten Sie mit '-h'!"
+        echo -e "|- "
+        exit 2;
+    fi
+}
+# +++++ ENDE function $datei.conf auslesen ++++++++++++++++++++++++++++
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+
+
+
+
+strg1="-"
+strg2="-"
+strg3="-"
+flagSCglobal="false"
+flagMORE="false"
+flagVERZEICHNISauswahl="false"
+flagForceArgument="false"
+flagForceGlobal="false"
+
+befehlAUSGABEmore=""
+# -Die Argumente kontrollieren und neu aufteilen:
+# --ALLE normalen Optionen (-q,-h,...) werden im $strg1 gespeichert
+# --die Shutdown Optionen (-off...) werden im $strg2 gespeichert
+#for i in $*
+for i in "$@"
+do
+    eingabeSC=""
+    eingabeSCurl=""
+    if ( [[ "$flagSCglobal" == "true" ]] )
+    then
+        # -Prüfen ob globaler Shortcut in der $datei.conf steht:
+        #eingabeURL=${i//\-/}
+        #eingabeURL=${i//\-url=/}
+        #echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL"
+        eingabeSC=$i
+        if ( [[ "$eingabeSC" != "" ]] )
+        then
+            fncDATEIconfAUSLESEN
+        fi
+        #continue
+    fi
+    if ( [[ "$i" == -sc ]] || [[ "$i" == -sccd ]] || [[ "$i" == -scl* ]] || [[ "$i" == -scq* ]] )
+    then
+        flagSCglobal="true"
+        strg1=$strg1${i//\-/}
+        #continue
+    fi
+    if ( [[ "$i" == -*M ]] )
+    then
+        flagMORE="true"
+        #befehlAUSGABEmore="| more"
+        #befehlAUSGABEmore="echo -e $befehlAUSGABEmore"
+        #befehlAUSGABEmore="echo -e more"
+        #befehlAUSGABEmore="| $befehlAUSGABEmore"
+    fi
+    if ( [[ "$i" == -cd* ]] )
+    then
+        flagVERZEICHNISauswahl="true"
+    fi
+done
+for i in "$@"
+do
+    if ( [[ "$i" == -*conf* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"conf"
+        break
+    fi
+    
+    if ( [[ "$i" == -*f* ]] && [[ "$i" != -off* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"f"
+        flagForceArgument="true"
+        flagForceGlobal="true"
+        #echo -e "|- \"$i\" * einzel Vergleich: -f gesetzt"
+    fi
+    if ( [[ "$i" == -*h* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"h"
+    fi
+    if ( [[ "$i" == -*hc* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"c"
+    fi
+    if ( [[ "$i" == -*l* ]] && [[ "$i" != -url* ]] && [[ "$i" != -replace ]] )
+    then
+        if ( [[ "$i" == -*l\?* ]] )
+        then
+            strg1=$strg1"l?"
+        elif ( [[ "$i" == -*scl* ]] )
+        then
+            strg1=$strg1"scl"
+        else
+            strg1=$strg1"l"
+        fi
+    fi
+    if ( [[ "$i" == -*q* ]] )
+    then
+        # -Die Quietoptionen aus dem Befehlsaufruf sind mächtiiger als die Quietoptionen
+        #  aus den Shortcuts in der Konfigurationsdatei!        
+        # --Da die Shortcut Optionen bereits gesetzt sind, werden Sie komplett entfernt.
+        # --Auslesen der aktuellen Quietoptionen aus dem Befehlsaufruf.
+        strg1=${strg1//q/}
+        strg1TMP=$strg1
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == -*qq* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == -*qqq* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == "-off" ]] )
+    then
+        strg2=$strg2"off"
+        #echo -e "|- \"$i\" * einzel Vergleich: -off gesetzt"
+    elif ( [[ "$i" == -off=* ]] )
+    then
+        #echo -e "|- \"$i\" * einzel Vergleich: -off=* gesetzt"
+        intOFFminuten=${i//*=/}
+        #echo -e "|- \"$intOFFminuten\" * einzel Vergleich: intOFFminuten"
+        strg2=$strg2"off="$intOFFminuten
+    elif ( [[ "$i" == -off* ]] )
+    then
+        #echo -e "|- \"$i\" * einzel Vergleich: FEHLER -off* gesetzt"
+        strg2=""
+    elif ( [[ "$i" != -* ]] )
+    then
+        #echo -e "|- \"$i\" * einzel Vergleich: FEHLER kein gültiges Argument"
+        flagFEHLERargument="true"
+    fi
+    if ( [[ "$i" == -url=* ]] )
+    then        
+        # -Prüfen ob Shortcut in der $datei.conf steht, falls nicht wird die Eingabe einfach
+        #  als URL übernommen!
+        #eingabeURL=${i//\-/}
+        eingabeURL=${i//\-url=/}
+        #echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL"
+        eingabeSCurl=$i
+        if ( [[ "$eingabeURL" != *.* ]] )
+        then
+            fncDATEIconfAUSLESEN
+        fi
+        if ( [[ "$flagURLconf" != "true" ]] )
+        then
+            # -Eingabe ist normale URL:
+            eingabeURL=${i//\-url=/}
+            eingabeURL=${eingabeURL//\&/aaaUNDaaa}
+            if ( [[ "$eingabeURL" != http*:\/\/* ]] )
+            then
+                eingabeURL="http://"$eingabeURL
+                #echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL"
+            fi
+            #eingabeURL=${eingabeURL//aaaUNDaaa/\&}
+        fi
+    fi
+    if ( [[ "$i" == http*:\/\/* ]] )
+    then
+        eingabeURL="$eingabeURL $i"
+        #echo -e "|- DEBUG-INFO:\\n|- eingabeURL mit i: $eingabeURL"
+    fi
+done
+
+
+
+
+
+###############################################################################
+# Die Konfigurationsdatei zum lxDOWNLOAD Skript
+###############################################################################
+#
+# -Individuelle Shortcuts können hier eingetragen werden.
+# -Leere Zeilen und Zeilen mit '#' am Anfang werden ignoriert.
+#
+
+
+
+
+# -Die Konfigurationsdatei erstellen:
+# --$dateiCONF
+function fncDATEIconfERSTELLEN {
+    echo -e "|- Das Skript erstellt jetzt die Konfigurationsdatei..."
+    
+    [[ -f "$dateiCONF" ]] && echo -e "|- Fehler:\\tEine Konfigurationsdatei wurde gefunden! Bitte prüfen Sie die"\\n"|-\\t\\tSchreib- und Leserechte der Datei. Wenn Sie die Datei löschen"\\n"|-\\t\\tkann das Skript eine neue Konfigurationsdatei erstellen!"\\n"|-\\t\\tDatei: $dateiCONF" && exit 1;
+    
+    touch $dateiCONF
+    echo -e "###############################################################################" >> $dateiCONF
+    echo -e "# Die Konfigurationsdatei zum $datei Skript" >> $dateiCONF
+    echo -e "###############################################################################" >> $dateiCONF
+    echo -e "#"\\n"# -Hier können z. Bsp individuelle Shortcuts gespeichert werden."\\n"# -Leere Zeilen und Zeilen mit '#' am Anfang werden ignoriert." >> $dateiCONF
+    echo -e "#"\\n"# -Prozess Shortcuts:"\\n\
+    "#  Um nicht den kompletten Prozessnamen eingeben zu müssen, kann ein Shortcut erstellt werden."\\n\
+    "#  Ein Shortcuteintrag besteht aus 3 Teilen, die jeweils durch ein Leerzeichen getrennt werden:"\\n\
+    "#  -der Shortcut"\\n\
+    "#  -der Prozessname oder ein Stopbefehl (systemctl)"\\n\
+    "#  -der Startbefehl für den Prozess"\\n\
+    "#  Da die Befehle zum Starten eines Prozesses teilweise vom eigentlichen Prozessnamen abweichen"\\n\
+    "#  oder zusätzliche Optionen notwendig sind, kann der Startbefehl gesondert hinterlegt werden."\\n\
+    "#  Ein Eintrag für einen Prozess Shortcut fängt immer mit 'psc:' an." >> $dateiCONF
+    echo -e "#  Beispiele:"\\n\
+    "#  \"psc:plasma plasmashell plasmashell\""\\n\
+    "#  \"psc:kdeconn kdeconnectd kdeconnect-cli\""\\n\
+    "#  \"psc:minidlna 'systemctl stop minidlna' 'systemctl start minidlna'\""\\n\
+    "#  \"psc:\""\\n\
+    "#  \"psc:\""\\n\
+    "#" >> $dateiCONF
+    "#  -"\\n\
+    "#  -"\\n\
+    "#" >> $dateiCONF
+    echo -e "#"\\n"# -Hier können z. Bsp individuelle Shortcuts gespeichert werden."\\n"# -Leere Zeilen und Zeilen mit '#' am Anfang werden ignoriert."\\n"#" >> $dateiCONF
+    echo -e "#"\\n"# -Hier können z. Bsp individuelle Shortcuts gespeichert werden."\\n"# -Leere Zeilen und Zeilen mit '#' am Anfang werden ignoriert."\\n"#" >> $dateiCONF
+    echo -e "###############################################################################" >> $dateiCONF
+    echo -e "###############################################################################" >> $dateiCONF
+    echo -e "###############################################################################" >> $dateiCONF
+    echo -e "###############################################################################" >> $dateiCONF
+    
+}
+
+
+
+
+
+
+# -Die Konfigurationsdatei anzeigen:
+# --$dateiCONF
+if ( [[ "$strg1" == -*hc* ]] )
+then
+    echo -e $txtHR\\n"|- Ausgabe $dateiCONF"\\t"-START-"\\n$txtHR
+    [[ -f "$dateiCONF" ]] && cat $dateiCONF || echo -e "|- Fehler:\\tDie Konfigurationsdatei wurde nicht gefunden. Anscheinend wurde die"\\n"|-\\t\\tDatei noch nicht angelegt!"
+    echo -e $txtHR\\n"|- Ausgabe $dateiCONF"\\t"-ENDE-"\\n$txtHR
+    exit 0;
+fi
+
+
+# -Die Konfigurationsdatei bearbeiten:
+# --$dateiCONF
+if ( [[ "$strg1" == -*conf* ]] )
+then
+    [[ ! -f "$dateiCONF" ]] && fncDATEIconfERSTELLEN || echo -e "|- Fehler:\\tDie Konfigurationsdatei konnte nicht erstellt werden. Bitte prüfen Sie"\\n"|-\\t\\tdie Benutzerrechte!"\\n"|-\\t\\tDatei: $dateiCONF" && exit 1;
+    
+    echo -e $txtHR\\n"|- Bearbeiten $dateiCONF"\\t"-START-"\\n$txtHR
+    #cat $dateiCONF
+    echo -e "|- Sicherung der Konfigurationsdatei erstellen..."\\n"|-"
+    #stsCONFcp=`cp $dateiCONF /home/$nutzer/bin/testCP/$datei.conf.bak.$zeitSTARTdateiname`
+    cp $dateiCONF $dateiCONF.bak.$zeitSTARTdateiname 1>/dev/null 2>&1
+    stsCONFcp=$?
+    sleep 0.5
+    if ( [[ "$stsCONFcp" -gt "0" ]] )
+    then
+        echo -e "|- Sicherung konnte nicht erstellt werden! Bitte prüfen Sie die Zugriffsrechte innerhalb"
+        echo -e "|- des Zielordners und Ihre eigenen Benutzerrechte. Das Skript wird jetzt beendet."\\n"|-"
+        exit 1;
+    else
+        echo -e "|- Sicherung erfolgreich erstellt!"
+        echo -e "|- Dateiname: $datei.conf.bak.$zeitSTARTdateiname"\\n"|-"
+    fi
+    
+    echo -e "|- Konfigurationsdatei bearbeiten:"
+    echo -e "|- Befehl: 'vi $dateiCONF'"
+    vi $dateiCONF
+    stsCONFvi=$?
+    
+#     echo -e "|- Status: $stsCONFvi\\t0=Keine Fehler! Bearbeitung erfolgreich abgeschlossen."
+#     echo -e "|-\\t\\t1=Fehler! Keine Rückmeldung über die Speichervorgänge. Bitte die Änderungen überprüfen!"
+#     echo -e "|-\\t\\t2=Fehler! Bearbeitung wurde entweder durch Benutzer oder anderen Prozess abgebrochen."
+    
+    case "$stsCONFvi" in
+        (0)
+            txtCONFvi="Keine Fehler! Bearbeitung erfolgreich abgeschlossen."
+            ;;
+        (*)
+            txtCONFvi="Fehlerhafter oder unklarer Status! Bitte die Änderungen überprüfen!"
+            ;;
+    esac
+    
+#    echo -e "|- Status: $stsCONFvi\\t$txtCONFvi"
+    
+    echo -e "|- Bearbeitung der Datei erfolgreich abgeschlossen!"\\n"|-"
+    echo -e $txtHR\\n"|- Bearbeiten $dateiCONF"\\t"-ENDE-"\\n$txtHR
+    exit 0;
+fi
+
+
+
+
+
+
+
+
+###############################################################################
+# -Die Hilfe anzeigen:
+if ( [[ "$strg1" == -*h* ]] )
+then
+    #echo -e $txtKOPF
+    #echo -e $txtKOPF $txtHILFE | more
+    #echo -e $txtKOPF $txtHILFE $befehlAUSGABEmore
+    
+    if ( [[ "$flagMORE" == "false" ]] )
+    then
+        # -Normaler Aufruf ohne More-Option
+        echo -e $txtKOPF\\n$txtHILFE
+    else
+        echo -e $txtKOPF\\n$txtHILFE | more
+    fi
+    exit 0;
+fi
+
+
+
+
+# -Die Logdatei anzeigen:
+#if ( [[ "$*" == -*l* ]] )
+if ( [[ "$strg1" == -*l* ]] )
+then
+    cat $dateiLOGS
+    echo -e \\n$txtHR
+    exit 0;
+fi
+
+echo -e $txtKOPF
+
+txtINFOeingabeBEFEHL="|- -Eingabe Befehl:\\t$datei $*"\\n"|-"
+echo -e $txtINFOeingabeBEFEHL
+###############################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if ( [[ "$*" == "kruler" ]] )
+then
+    txtPROZESSrestartNAME="$*"
+    
+    # -Einen Prozess kontrolliert beenden und kontrolliert neu starten:
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Prozess \"$txtPROZESSrestartNAME\" beenden und neu starten!"\\n"|- `fncHHMMSS 'norm.mS3'`"
+    intPIDrestart=`ps -C $txtPROZESSrestartNAME -o pid=`
+    intPIDrestartBAK="$intPIDrestart"
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Alte PID:\\t$intPIDrestart"
+    sleep 0.4
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Prozess \"$txtPROZESSrestartNAME\" $intPIDrestart wird beendet!"
+    #konsole --new-tab -e "kquitapp plasmashell"
+    #kquitapp plasmashell
+    
+    #kquitapp "$txtPROZESSrestartNAME"
+    kill $intPIDrestart
+    pidKONSOLE=$!
+    #echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Kquitapp PID:\\t$pidKONSOLE"
+    
+    #echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Kquitapp PID:\\t$pidKONSOLE"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Kill PID:\\t$pidKONSOLE"
+    while ( [[ "$intPIDrestart" != "" ]] )
+    do
+        echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Prozess \"$txtPROZESSrestartNAME\" $intPIDrestart wird beendet..."
+        intPIDrestart=`ps -C $txtPROZESSrestartNAME -o pid=`
+        sleep 0.1
+    done
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Prozess \"$txtPROZESSrestartNAME\" $intPIDrestartBAK erfolgreich beendet!"
+    sleep 0.4
+    
+    #echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Kquitapp PID:\\t$pidKONSOLE"
+    #sleep 2
+    #kill -9 $pidKONSOLE
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Prozess \"$txtPROZESSrestartNAME\" wird neu gestartet..."
+    sleep 1
+    #konsole --new-tab -e "plasmashell & disown"
+    #plasmashell >/dev/null 2>&1 & disown
+    "$txtPROZESSrestartNAME" >/dev/null 2>&1 & disown
+    pidKONSOLE=$!
+    sleep 1
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Neue PID:\\t$pidKONSOLE"
+    #kill -9 $pidKONSOLE
+
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Fertig!"
+    exit 0;
+    
+fi
+
+
+
+
+
+
+
+
+
+
+
+# -Es fehlen noch: Shortcuts, Bash Daten...
+ArrPlasmaDateien=(/home/$nutzer/.config/plasma-org.kde.plasma.desktop-appletsrc /home/$nutzer/.config/plasmashellrc /home/$nutzer/.config/plasmarc)
+
+function fncPlasmaCP {
+    fncPlasmaCPPfad UVZBenutzereingabe
+    
+    strPlasmaSicherung02UVZ="`date '+%Y%m%d'`_`date '+%H%M%S'`"
+    strPlasmaSicherungPfadFertig="/home/$nutzer/Dokumente/bak/plasma/$strPlasmaSicherung02UVZ"
+    
+    #echo -e "|- `fncHHMMSS 'norm.mS3'` --- '$txtAusgabeBefehl'"
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Verzeichnis erstellen und Dateien kopieren..."
+    
+    #echo -e "|- mkdir -p $strPlasmaSicherungPfadFertig"
+    mkdir -p $strPlasmaSicherungPfadFertig
+    #echo -e "|- PID: $! --- Status: $?"
+    cp /home/$nutzer/.config/plasma-org.kde.plasma.desktop-appletsrc /home/$nutzer/.config/plasmashellrc /home/$nutzer/.config/plasmarc $strPlasmaSicherungPfadFertig
+    #echo -e "|- PID: $! --- Status: $?"
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Die Sicherung wurde erfolgreich erstellt!"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- $strPlasmaSicherungPfadFertig"
+}
+
+function fncPlasmaCPbak {
+    fncPlasmaCPPfad UVZBenutzereingabe
+    
+    strPlasmaSicherung02UVZ="`date '+%Y%m%d'`_`date '+%H%M%S'`"
+    strPlasmaSicherungPfadFertig="/home/$nutzer/Dokumente/bak/plasma/$strPlasmaSicherung02UVZ"
+    
+    #echo -e "|- `fncHHMMSS 'norm.mS3'` --- '$txtAusgabeBefehl'"
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Verzeichnis erstellen und Dateien kopieren..."
+    
+    #echo -e "|- mkdir -p $strPlasmaSicherungPfadFertig"
+    mkdir -p $strPlasmaSicherungPfadFertig
+    #echo -e "|- PID: $! --- Status: $?"
+    cp /home/$nutzer/.config/plasma-org.kde.plasma.desktop-appletsrc /home/$nutzer/.config/plasmashellrc /home/$nutzer/.config/plasmarc $strPlasmaSicherungPfadFertig
+    #echo -e "|- PID: $! --- Status: $?"
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Die Sicherung wurde erfolgreich erstellt!"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- $strPlasmaSicherungPfadFertig"
+}
+
+
+
+###############################################################################
+# -Plasma Befehle ausführen: plasma-cp
+if ( [[ "$*" == "plasma-cp" ]] )
+then
+    # -Info zum gewählten Befehl anzeigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --> Plasma Konfiguration sichern:"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` ---"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- WICHTIG: Um die KDE Konfiguration komplett zu sichern, müssen folgende Verzeichnisse"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- ebenfalls kopiert werden: '~/.local', '~/.config'"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Das Unterverzeichnis für die Sicherung kann vom Benutzer umbenannt werden."
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Standard: 'Datum_Zeit'"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- $strPlasmaSicherungPfadFertig"
+
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    
+    # -Benutzer muss weitere Ausführung mit j bestätigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Sicherung jetzt erstellen?"
+    fncFrageJaNeinStandardJa
+    [ $? -ne 1 ] && fncPlasmaCP
+    [ $? -eq 1 ] && echo -e "|- `fncHHMMSS 'norm.mS3'` --- Das Erstellen der Sicherung wurde vom Benutzer abgebrochen."
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- $datei wurde beendet."
+    exit 0;
+fi
+
+
+
+###############################################################################
+# -Plasma Befehle ausführen: plasma-rc
+if ( [[ "$*" == "plasma-rc" ]] )
+then
+    # -Info zum gewählten Befehl anzeigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --> Plasma Konfiguration wiederherstellen:"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` ---"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Sie sollten nicht gleichzeitig in der Plasma Oberfläche angemeldet sein, denn"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- die Plasmashell wird beim Abmelden automatisch die gelöschten Dateien wiederherstellen."
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Nutzen Sie hierzu eine Terminalsitzung bzw. eine nicht-grafische Anmeldung. ('STRG + ALT + F1')"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Danach einfach neu anmelden, denn dadurch werden die Konfigurationsdateien von"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- der Plasmashell neu angelegt."
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    
+    # -Benutzer muss weitere Ausführung mit j bestätigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Es wird DRINGEND empfohlen die Dateien vor dem Löschen zu sichern."
+    sleep 2
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Sicherung jetzt erstellen?"
+    fncFrageJaNeinStandardJa
+    [ $? -ne 1 ] && fncPlasmaCP
+    [ $? -eq 1 ] && echo -e "|- `fncHHMMSS 'norm.mS3'` --- Das Erstellen der Sicherung wurde vom Benutzer abgebrochen."
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    
+    # -Benutzer muss weitere Ausführung mit j bestätigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Konfigurationsdateien jetzt löschen?"
+    fncFrageJaNeinStandardNein
+    [ $? -ne 1 ] && echo -e "|- `fncHHMMSS 'norm.mS3'` --- Der Löschvorgang wurde vom Benutzer abgebrochen." && echo -e "|- `fncHHMMSS 'norm.mS3'` --- $datei wurde beendet." && exit 0;
+    
+    #/home/$nutzer/bin/lxSYS plasma-cp
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Dateien werden gelöscht..."
+    #rm /home/$nutzer/.config/plasma-org.kde.plasma.desktop-appletsrc /home/$nutzer/.config/plasmashellrc /home/$nutzer/.config/plasmarc
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Die Konfigurationsdateien wurden erfolgreich gelöscht!"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- $datei wurde beendet."
+    exit 0;
+fi
+
+
+
+###############################################################################
+# -Plasma Befehle ausführen: plasma-rm
+if ( [[ "$*" == "plasma-rm" ]] )
+then
+    # -Info zum gewählten Befehl anzeigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --> Plasma Konfiguration löschen:"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` ---"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Sie sollten nicht gleichzeitig in der Plasma Oberfläche angemeldet sein, denn"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- die Plasmashell wird beim Abmelden automatisch die gelöschten Dateien wiederherstellen."
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Nutzen Sie hierzu eine Terminalsitzung bzw. eine nicht-grafische Anmeldung. ('STRG + ALT + F1')"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Danach einfach neu anmelden, denn dadurch werden die Konfigurationsdateien von"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- der Plasmashell neu angelegt."
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    
+    # -Benutzer muss weitere Ausführung mit j bestätigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Es wird DRINGEND empfohlen die Dateien vor dem Löschen zu sichern."
+    sleep 2
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Sicherung jetzt erstellen?"
+    fncFrageJaNeinStandardJa
+    [ $? -ne 1 ] && fncPlasmaCP
+    [ $? -eq 1 ] && echo -e "|- `fncHHMMSS 'norm.mS3'` --- Das Erstellen der Sicherung wurde vom Benutzer abgebrochen."
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    
+    # -Benutzer muss weitere Ausführung mit j bestätigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Konfigurationsdateien jetzt löschen?"
+    fncFrageJaNeinStandardNein
+    [ $? -ne 1 ] && echo -e "|- `fncHHMMSS 'norm.mS3'` --- Der Löschvorgang wurde vom Benutzer abgebrochen." && echo -e "|- `fncHHMMSS 'norm.mS3'` --- $datei wurde beendet." && exit 0;
+    
+    #/home/$nutzer/bin/lxSYS plasma-cp
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Dateien werden gelöscht..."
+    rm /home/$nutzer/.config/plasma-org.kde.plasma.desktop-appletsrc /home/$nutzer/.config/plasmashellrc /home/$nutzer/.config/plasmarc
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Die Konfigurationsdateien wurden erfolgreich gelöscht!"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- $datei wurde beendet."
+    exit 0;
+fi
+
+
+
+
+
+###############################################################################
+# -Prozess Sonderfall: replace
+#
+# -ToDo: Zeitbedarf für das Neustarten ermitteln...
+#
+function fncProzessReplace {
+    txtProzessReplaceName="$1"
+    
+    # -Info zum gewählten Befehl anzeigen:
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Prozess Replace: \"$txtProzessReplaceName\""
+    
+    # -PS Status anzeigen:
+    fncSTATUSlxps $txtProzessReplaceName
+    
+    intPIDReplaceAlt=`ps -C $txtProzessReplaceName -o pid=`
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Bitte haben Sie einen Moment Geduld während der Befehl ausgeführt wird!"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Starte Replace: \"$txtProzessReplaceName\""
+    "$txtProzessReplaceName" --replace >/dev/null 2>&1 & disown
+    pidKONSOLE=$!
+    sleep 0.25
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Replace wird ausgeführt..."
+    while ( [[ "$intPIDReplaceAlt" != "" ]] )
+    do
+        sleep 0.25
+        echo -e "|- `fncHHMMSS 'norm.mS3'` --- Replace wird ausgeführt..."
+        sleep 0.5
+        intPIDReplaceAlt=`ps --pid $intPIDReplaceAlt -o pid=`
+    done
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Replace wird ausgeführt..."
+    sleep 1
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Neue PID:\\t$pidKONSOLE"
+    sleep 1
+    
+    # -PS Status anzeigen:
+    fncSTATUSlxps $txtProzessReplaceName
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Replace beendet: \"$txtProzessReplaceName\""
+    #echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    echo -e "|-"
+}
+
+if ( [[ "$*" == *-replace* ]] )
+then
+    fncProzessReplace "kwin_x11"
+    echo -e "|-"
+    fncProzessReplace "plasmashell"
+    
+    exit 0;
+fi
+
+
+
+
+
+
+
+
+
+#exit 0;
+
+
+
+
+
+# SHORTCUT
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++ START function $datei.conf auslesen ++++++++++++++++++++++++++++
+function fncDATEIconfAUSLESEN {
+    # -Wenn der richtige Schlüssel gefunden wurde, wird der entsprechende
+    #  Wert ausgelesen und einer Variablen zugewiesen:
+    eingabeURLkontrolle=$eingabeURL
+    flagURLconf="false"
+    while read txtDATEIconf
+    do
+        #nix=1
+        if ( [[ "$txtDATEIconf" == url:$eingabeURL=* ]] )
+        then
+            eingabeURL=${txtDATEIconf//url:$eingabeURL=/}
+            flagURLconf="true"
+            break
+        fi
+    done < $dateiCONF
+}
+# +++++ ENDE function $datei.conf auslesen ++++++++++++++++++++++++++++
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+# # +++++ START Config auslesen
+# while read txtCONFIG
+# do
+#     #nix=1
+#     if ( [[ "$txtCONFIG" == --download-archiv* ]] )
+#     then
+#         archivORIGINAL=${txtCONFIG//\-\-download\-archiv /}
+#         #echo $archivORIGINAL
+#         break
+#     fi
+# done < ~/.config/youtube-dl/config
+# # +++++ ENDE Config auslesen
+
+
+
+
+strg1="-"
+strg2="-"
+strg3="-"
+# -Die Argumente kontrollieren und neu aufteilen:
+# --ALLE normalen Optionen (-q,-h,...) werden im $strg1 gespeichert
+# --die Shutdown Optionen (-off...) werden im $strg2 gespeichert
+for i in $*
+do
+    if ( [[ "$i" == -*f* ]] && [[ "$i" != -off* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"f"
+        #echo -e "|- \"$i\" * einzel Vergleich: -f gesetzt"
+    fi
+    if ( [[ "$i" == -*h* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"h"
+    fi
+    if ( [[ "$i" == -*l* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"l"
+    fi
+    if ( [[ "$i" == -*q* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == -*qq* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == -*qqq* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == "-off" ]] )
+    then
+        strg2=$strg2"off"
+        #echo -e "|- \"$i\" * einzel Vergleich: -off gesetzt"
+    elif ( [[ "$i" == -off=* ]] )
+    then
+        #echo -e "|- \"$i\" * einzel Vergleich: -off=* gesetzt"
+        intOFFminuten=${i//*=/}
+        #echo -e "|- \"$intOFFminuten\" * einzel Vergleich: intOFFminuten"
+        strg2=$strg2"off="$intOFFminuten
+    elif ( [[ "$i" == -off* ]] )
+    then
+        #echo -e "|- \"$i\" * einzel Vergleich: FEHLER -off* gesetzt"
+        strg2=""
+    elif ( [[ "$i" != -* ]] )
+    then
+        #echo -e "|- \"$i\" * einzel Vergleich: FEHLER kein gültiges Argument"
+        flagFEHLERargument="true"
+    fi
+    if ( [[ "$i" == -url=* ]] )
+    then        
+        # -Prüfen ob Shortcut in der $datei.conf steht, falls nicht wird die Eingabe einfach
+        #  als URL übernommen!
+        #eingabeURL=${i//\-/}
+        eingabeURL=${i//\-url=/}
+        #echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL"
+        if ( [[ "$eingabeURL" != *.* ]] )
+        then
+            fncDATEIconfAUSLESEN
+        fi
+        if ( [[ "$flagURLconf" != "true" ]] )
+        then
+            # -Eingabe ist normale URL:
+            eingabeURL=${i//\-url=/}
+            eingabeURL=${eingabeURL//\&/aaaUNDaaa}
+            if ( [[ "$eingabeURL" != http*:\/\/* ]] )
+            then
+                eingabeURL="http://"$eingabeURL
+                #echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL"
+            fi
+            #eingabeURL=${eingabeURL//aaaUNDaaa/\&}
+        fi
+    fi
+    if ( [[ "$i" == http*:\/\/* ]] )
+    then
+        eingabeURL="$eingabeURL $i"
+        #echo -e "|- DEBUG-INFO:\\n|- eingabeURL mit i: $eingabeURL"
+    fi
+    if ( [[ "$i" != -* ]] && [[ "$i" != "" ]] )
+    then
+        strPROZESSeingabe="$i"
+    fi
+done
+
+
+# echo -e "|- DEBUG-INFO: Ausgabe der String Variablen:"
+# echo -e "|- DEBUG-INFO: *: $*"
+# echo -e "|- DEBUG-INFO: \$strg1: $strg1 --- \$strg2: $strg2"
+
+#echo -e "|- DEBUG-INFO:\\n|- eingabeURL: $eingabeURL\\n|- eingabeURLneu: ${eingabeURL//aaaUNDaaa/\&}"
+#exit 0;
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+# -Sonderfälle UPDATE, AUFRUF_INTERN, -q, -h, -l
+# if ( [[ "$flag_update" != "true" ]] && [[ "$flag_aufruf_intern" != "true" ]] && [[ "$strg1" != -*q* ]] && [[ "$strg1" != -*h* ]] && [[ "$strg1" != -*l* ]] )
+# then
+#     # -Die Sicherheitsfrage:
+#     # --1. Argument: die Vorbelegung: WEITER oder ABBRECHEN
+#     # --2. Argument: die Datei die gestartet werden soll
+#     # --3. Argument: der Titel der Datei die gestartet werden soll
+#     flagSICHERHEITSFRAGE=`/home/lx21/bin/zz_inc_sicherheitsfrage.sh "WEITER" "$datei" "$txtTITEL"`
+#     flagSICHERHEITSFRAGE=$?
+#     # -Wenn der Rückgabewert nicht 0 ist, wurde entweder abgebrochen oder es gab einen Fehler!
+#     if ( [[ "$flagSICHERHEITSFRAGE" != "0" ]] )
+#     then
+#         # -Die Sicherheitsfrage beendet das Skript!
+#         #echo -e "--- Sicherheitsfrage: $flagSICHERHEITSFRAGE"
+#         exit 0;
+#     fi
+# fi
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+# # -Die Hilfe anzeigen:
+# if ( [[ "$strg1" == -*h* ]] )
+# then
+#     echo -e $txtKOPF
+#     echo -e $txtHILFE
+#     exit 0;
+# fi
+# 
+# # -Die Logdatei anzeigen:
+# if ( [[ "$strg1" == -*l* ]] )
+# then
+#     cat $dateiLOGS
+#     echo -e \\n$txtHR
+#     exit 0;
+# fi
+# 
+# 
+# echo -e $txtKOPF
+# 
+# 
+# txtINFOeingabeBEFEHL="|- -Eingabe Befehl:\\t$datei $*"
+# echo -e $txtINFOeingabeBEFEHL
+
+
+
+
+
+
+
+
+
+
+# -funktioniert, aber Befehle sind zu spezifisch:
+#echo -e "PID:"`(ps -C kdeconnectd --format pid=)` && kill -9 `(ps -C kdeconnectd --format pid=)` && sleep 2 && `(kdeconnect-cli 1>/dev/null 2>&1)` && echo -e "Neu:"`(ps -C kdeconnectd --format pid=)`
+
+# -leider funktioniert der direkte Daemon Aufruf nicht!!!
+#echo -e "PID:"`(ps -C kdeconnectd --format pid=)` && kill -9 `(ps -C kdeconnectd --format pid=)` && sleep 2 && `(/usr/lib/x86_64-linux-gnu/libexec/kdeconnectd 1>/dev/null 2>&1)` && echo -e "Neu:"`(ps -C kdeconnectd --format pid=)`
+
+if ( [[ `ps -C $strPROZESSeingabe -o comm=` ]] )
+then
+    txtPROZESSrestartNAME="$strPROZESSeingabe"
+    
+    # -PS Status anzeigen:
+    fncSTATUSlxps $txtPROZESSrestartNAME
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    
+    # -Info zum gewählten Befehl anzeigen:
+    #echo -e "|- `fncHHMMSS 'norm.mS3'` --- Den Prozess '$txtPROZESSrestartNAME' beenden und neu starten."
+    #echo -e "|- `fncHHMMSS 'norm.mS3'` --- Prozess: \"$txtPROZESSrestartNAME\""
+    #echo -e "|- `fncHHMMSS 'norm.mS3'` --- Möchten Sie diesen Prozess beenden und neu starten?"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Prozess: \"$txtPROZESSrestartNAME\" - Diesen Prozess beenden und neu starten?"
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    
+    # -Benutzer muss weitere Ausführung mit j bestätigen:
+    fncFrageWeiterAbbrechen
+    #echo -e "-ende-" && exit 0;
+    
+    # -Einen Prozess kontrolliert beenden und kontrolliert neu starten:
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Prozess: \"$txtPROZESSrestartNAME\" - Wird beendet und neu gestartet..."
+    
+    intPIDrestart=`ps -C $txtPROZESSrestartNAME -o pid=`
+    intPIDrestartBAK="$intPIDrestart"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Aktuelle PID:\\t$intPIDrestart"\\n"|- `fncHHMMSS 'norm.mS3'`"
+    #sleep 0.4
+    
+    #echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Prozess \"$txtPROZESSrestartNAME\" $intPIDrestart wird beendet!"
+    #konsole --new-tab -e "kquitapp plasmashell"
+    #kquitapp plasmashell
+    
+    #kquitapp "$txtPROZESSrestartNAME" &
+    kill -15 $intPIDrestart
+    pidKONSOLE=$!
+    pidSTATUS=$?
+    #pidKONSOLE2=`ps -C kquitapp -o pid=`
+    if ( [[ "$pidKONSOLE" == "" ]] )
+    then
+        pidKONSOLE=$pidKONSOLE2
+    fi
+    if ( [[ "$pidKONSOLE" == "" ]] )
+    then
+        pidKONSOLE=$pidKONSOLE2
+    fi
+    if ( [[ "$pidKONSOLE" == "" ]] )
+    then
+        txtPROZESSinfo="wurde beendet. Status: $pidSTATUS"
+    else
+        txtPROZESSinfo="wird ausgeführt. PID: $pidKONSOLE"
+    fi
+
+    #echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Kquitapp PID:\\t$pidKONSOLE"
+    
+    #echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Kquitapp Prozess \"$txtPROZESSrestartNAME\""
+    #echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Kquitapp $txtPROZESSinfo"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Kill Prozess \"$txtPROZESSrestartNAME\""
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Kill $txtPROZESSinfo"
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Prozess \"$txtPROZESSrestartNAME\" $intPIDrestart wird beendet..."
+    while ( [[ "$intPIDrestart" != "" ]] )
+    do
+        echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Prozess \"$txtPROZESSrestartNAME\" $intPIDrestart wird beendet..."
+        #intPIDrestart=`ps -C $txtPROZESSrestartNAME -o pid=`
+        intPIDrestart=`ps --pid $intPIDrestartBAK -o pid=`
+        sleep 0.1
+    done
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- --- Prozess \"$txtPROZESSrestartNAME\" $intPIDrestartBAK erfolgreich beendet!"
+    sleep 0.1
+    
+    #echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Kquitapp PID:\\t$pidKONSOLE"
+    #sleep 2
+    #kill -9 $pidKONSOLE
+    
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Prozess \"$txtPROZESSrestartNAME\" wird neu gestartet..."
+    sleep 0.1
+    #konsole --new-tab -e "plasmashell & disown"
+    #plasmashell >/dev/null 2>&1 & disown
+    "$txtPROZESSrestartNAME" >/dev/null 2>&1 & disown
+    pidKONSOLE=$!
+    sleep 1
+    echo -e "|- `fncHHMMSS 'norm.mS3'` --- Neue PID:\\t$pidKONSOLE"
+    #kill -9 $pidKONSOLE
+
+    echo -e "|- `fncHHMMSS 'norm.mS3'`"\\n"|- `fncHHMMSS 'norm.mS3'` --- Fertig!"
+    
+    # -PS Status anzeigen:
+    fncSTATUSlxps $txtPROZESSrestartNAME
+    
+    exit 0;
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+eingabeURLgespeichert=""
+txtFEHLERalteURLSgefunden=""
+
+if ( [[ -f "$dateiURLS" ]] )
+then
+    while read eingabeURLgespeichert
+    do
+        nix=0
+#         echo -e "|--- $eingabeURLgespeichert"
+#         echo -e "|- Eine Sicherung ('$dateiURLS') der zuletzt verwendeten URLs wurde gefunden!"
+#         echo -e "|- Anscheinend konnten die letzten Downloads nicht ordnungsgemäß beendet werden."
+#         echo -e "|- Falls Sie sich nicht sicher sind ob alle Downloads fehlerfrei abgeschlossen wurden,"
+#         echo -e "|- lassen Sie einfach das Skript mit den alten URLs noch einmal laufen. Dabei werden"
+#         echo -e "|- keine Dateien doppelt heruntergeladen!"
+#         echo -e "|-"
+        txtFEHLERalteURLSgefunden="<hr><b>INFO:</b><br>Eine Sicherung der zuletzt verwendeten URLs wurde gefunden! Anscheinend konnten die letzten Downloads nicht ordnungsgemäß beendet werden.<br>Falls Sie sich nicht sicher sind ob alle Downloads fehlerfrei abgeschlossen wurden, lassen Sie einfach das Skript mit den alten URLs noch einmal laufen. Dabei werden keine Dateien doppelt heruntergeladen!<hr>"
+        if ( [[ "$eingabeURLgespeichert" != "" ]] )
+        then
+            break;
+        fi
+    done < $dateiURLS
+fi
+
+
+if ( [[ "$eingabeURL" == "" ]] )
+then
+    # eingabeURL=$(kdialog --title="URL eingeben!" --inputbox "<hr><b style='align:middle;font-size:bigger'>$datei</b><hr><br>Bitte geben Sie die URLs der Dateien an, die das Skript herunterladen soll. Bei manchen Anbietern kann auch eine komplette Playliste angegeben werden.<br><br>Der WGET Befehl erwartet eine URL zu einem Verzeichnis mit Index Datei oder zu einer gültigen HTML Datei<br><br>Mehrere URLs müssen immer durch Leerzeichen getrennt werden!<br>$txtFEHLERalteURLSgefunden" "$eingabeURLgespeichert" --geometry=400x400)
+    eingabeURL=$(kdialog --title="URL eingeben!" --inputbox "<h3><center>$datei</center></h3><br>Bitte geben Sie die URLs der Dateien an, die das Skript herunterladen soll. Bei manchen Anbietern kann auch eine komplette Playliste angegeben werden.<br><br>Der WGET Befehl erwartet eine URL zu einem Verzeichnis mit Index Datei oder zu einer gültigen HTML Datei<br><br>Mehrere URLs müssen immer durch Leerzeichen getrennt werden!<br>$txtFEHLERalteURLSgefunden" "$eingabeURLgespeichert" --geometry=600x500)
+    checkDIALOG=$(echo -e "$?")
+else
+    checkDIALOG="0"
+fi
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+            case "$eingabeURL" in
+                ( http://???* )
+                    checkDIALOGfehler="" ;;
+                ( https://???* )
+                    checkDIALOGfehler="" ;;
+                ( url:?? )
+                    checkDIALOGfehler="" ;;
+                (*)
+                    checkDIALOGfehler="|- FEHLER:\\n|- Sie haben keine gültige URL eingegeben! Das Skript wird daher beendet." ;;
+            esac ;;
+        (1)
+            # -abbruchBENUTZER
+            checkDIALOGfehler="|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER:"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+    "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+    "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+    "|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        if ( [[ "$eingabeURL" != "" ]] )
+        then
+            echo -e "|- Ihre Eingabe:\\t$eingabeURL"
+        fi
+        echo -e $checkDIALOGfehler
+        echo -e "|-"
+        exit 1;
+    else
+        txtINFOeingabeURL="|- -Eingabe URL:\\t$eingabeURL"
+        echo -e $txtINFOeingabeURL
+    fi
+    # -die URL Eingabe wird in einer datei gesichert! $dateiURLS
+    # --wenn das Skript mit einem Fehler abgebrochen wird, müssen die URLs also nicht noch einmal eingegeben werden
+    # --wenn das Skript korrekt beendet wird kann die datei gelöscht werden, allerdings solte die Logdatei noch kontrolliert
+    #   werden... (grep "error")
+
+echo -e "$eingabeURL" > $dateiURLS
+
+
+
+
+# -------------------------------------------------------------------------------------------------------
+# ----- START Force Option abfragen -----------------------------------------------------------
+# -das $flagFORCE ersetzt -f
+flagFORCE="false"
+if ( [[ "$strg1" != -*qq* ]] )
+then
+    # -falls -f schon beim Befehlsaufruf gesetzt wurde, wird diese Abfrage übersprungen
+    if ( [[ "$strg1" != -*f* ]] )
+    then
+        kdialog --title="Force Download?" --warningcontinuecancel=\
+        "Um einen erneuten Download zu erzwingen, kann die Force Option<br>\
+        gesetzt werden. (\"-f\" beim Aufruf in der Konsole)<br><br>\
+        Die IDs der bereits heruntergeladenen Videodateien werden gespeichert<br>\
+        um keine Datei doppelt herunterzuladen. Wenn die Datei jedoch erneut<br>\
+        oder in einem neuen Format gespeichert werden soll, MUSS die<br>\
+        Force Option gesetzt werden.<br><br><br>\
+        Möchten Sie die Force Download Option einschalten?"\
+        --continue-label="Weiter, OHNE Force Download." --cancel-label="Weiter, MIT Force Download."
+
+        flagFRAGE=$(echo -e "$?")
+        if [[ "$flagFRAGE" == "2" ]]
+        then
+            # -Abbrechen wurde gewählt:
+            flagFORCE="true"
+        else
+            # -Weiter wurde gewählt:
+            nix=1
+        fi
+    else
+        # -f wurde beim Befehlsaufruf gesetzt
+        flagFORCE="true"
+    fi
+fi
+# ----- ENDE Force Option abfragen ------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------
+
+
+
+
+if ( [[ "$strg1" != -*qqq* ]] )
+then
+    # Formatauswahl wird nicht unterdrückt:
+    auswahlACTION=$(kdialog --title="Format auswählen!" --radiolist="== $datei ================<br><br>\
+    Bitte wählen Sie in welchen Formaten die Daten gespeichert werden sollen.<hr><br>\
+    Bei Audiodateien wird automatisch das Video Thumbnail als Cover in der<br>\
+    mp3 Datei gespeichert! Nur wenn das Thumbnail zusätzlich als eigenständige<br>\
+    Grafikdatei abgespeichert werden soll, wählen Sie eine der Optionen mit \"Thumbnail\".<br>Standard: \"Nur Video\"<hr><br>Dateiformate auswählen:<br>" \
+    "Nur Video" "Nur Video (mp4)" on \
+    "Nur Audio" "Nur Audio (mp3)" off \
+    "Audio und Thumbnail" "Audio und Thumbnail (mp3, jpg)" off \
+    "Video und Audio" "Video und Audio (mp4, mp3)" off \
+    "Video, Audio und Thumbnail" "Video, Audio und Thumbnail (mp4, mp3, jpg)" off \
+    "HTML-Seiten" "HTML-Seiten (html, jpg)" off)
+    #actionGRAFIK "Nur Grafik (wget)" off  --geometry="600x400")
+    checkDIALOG=$(echo -e "$?")
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+            case "$auswahlACTION" in
+                ("Nur Video")
+                    actionBEFEHL="youtube-dl -i" ;;
+                ("Nur Audio")
+                    actionBEFEHL="youtube-dl -i -x --audio-format mp3 --audio-quality 0 --embed-thumbnail" ;;
+                ("Audio und Thumbnail")
+                    actionBEFEHL="youtube-dl -i -x --audio-format mp3 --audio-quality 0 --embed-thumbnail --write-thumbnail" ;;
+                ("Video und Audio")
+                    actionBEFEHL="youtube-dl -i -x -k --audio-format mp3 --audio-quality 0 --embed-thumbnail" ;;
+                ("Video, Audio und Thumbnail")
+                    actionBEFEHL="youtube-dl -i -x -k --audio-format mp3 --audio-quality 0 --embed-thumbnail --write-thumbnail" ;;
+                ("HTML-Seiten")
+                    actionBEFEHL="wget -np -r -l inf -k -E" ;;
+                (*)
+                    checkDIALOGfehler="|- FEHLER:\\n|- Die Formatauswahl hat keine Daten übermittelt! Bitte erneut auswählen." ;;
+            esac ;;
+        (1)
+            # -abbruchBENUTZER
+            checkDIALOGfehler="|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER:"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+    "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+    "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+    "|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        echo -e $checkDIALOGfehler
+        echo -e "|-"
+        exit 0;
+    else
+        txtINFOauswahlACTION="|- -Ausgabe Formate:\\t$auswahlACTION"
+        echo -e $txtINFOauswahlACTION
+    fi
+else
+    # -qqq wurde gesetzt, daher müssen die Standard Werte geladen werden!
+    actionBEFEHL="youtube-dl -i"
+    auswahlACTION="Nur Video"
+    txtINFOauswahlACTION="|- -Ausgabe Formate:\\t$auswahlACTION"
+    echo -e $txtINFOauswahlACTION
+fi
+
+
+
+# -Dateiinfos in die Logdatei schreiben:
+echo -e $txtKOPFlogs > $dateiLOGS
+echo -e $txtINFOeingabeBEFEHL >> $dateiLOGS
+echo -e $txtINFOeingabeURL >> $dateiLOGS
+echo -e $txtINFOauswahlACTION >> $dateiLOGS
+
+
+
+
+# -die Force Download Option einbinden:
+#  wenn die Datei bereits heruntergeladen wurde, existiert ein Eintrag im youtube-dl Archiv. um den erneuten Download
+#  zu erzwingen wird ein temporäres Archiv benutzt, damit neue Download Einträge auch im Original-Archiv gespeichert
+#  werden, wird der Inhalt des archivTMP an das Original-Archiv kopiert. Das archivTMP wird danach wieder gelöscht.
+archivTMP="ytdl-archive.tmp"
+if ( [[ "$flagFORCE" == "true" ]] )
+then
+    actionBEFEHL=$actionBEFEHL" --download-archive $archivTMP"
+fi
+
+# -Umleitung der Ausgabe in die Logdatei:
+umleitungLOGDATEI=">> $dateiLOGS 2>> $dateiLOGS"
+
+# -Anzeige des Befehls und Befehl in Logdatei schreiben:
+#txtINFObefehl="|- -Der interne Aufruf:"\\n"|-  $actionBEFEHL $eingabeURL $umleitungLOGDATEI"\\n"|-"
+txtINFObefehl="|- -Befehl youtube-dl:\\t$actionBEFEHL http... $umleitungLOGDATEI"\\n"|-"
+echo -e $txtINFObefehl
+echo -e $txtINFObefehl >> $dateiLOGS
+
+
+
+# -Ausgabe der Force Download Option:
+if ( [[ "$flagFORCE" == "true" ]] )
+then
+    txtINFOforceDOWNLOAD="|- -Force Download ist eingeschaltet!"
+else
+    txtINFOforceDOWNLOAD=""
+fi
+# -Ausgabe der Shutdown Option:
+if ( [[ "$strg2" == "-off" ]] )
+then
+    txtINFOshutdown="|- -Nach erfolgreichem Beenden wird das System abgeschaltet! Wartezeit: 1 min"\\n"|-"
+    intOFFminuten=1
+elif ( [[ "$strg2" == -off=* ]] )
+then
+    txtINFOshutdown="|- -Nach erfolgreichem Beenden wird das System abgeschaltet! Wartezeit: $intOFFminuten min"\\n"|-"
+elif ( [[ "$strg2" == "-" ]] || [[ "$strg2" == "" ]] )
+then
+    txtINFOshutdown=""
+    intOFFminuten=""
+fi
+# -Zusatzinfos (Force und Shutdown Option) in Logdatei schreiben:
+if ( [[ "$txtINFOforceDOWNLOAD" != "" ]] )
+then
+    echo -e $txtINFOforceDOWNLOAD
+    echo -e $txtINFOforceDOWNLOAD >> $dateiLOGS
+fi
+if ( [[ "$txtINFOshutdown" != "" ]] )
+then
+    echo -e $txtINFOshutdown
+    echo -e $txtINFOshutdown >> $dateiLOGS
+fi
+
+
+
+#checkBEFEHL="echo -e $actionBEFEHL $eingabeURL"
+checkBEFEHL="echo -e $actionBEFEHL $eingabeURL"
+#echo -e "*** DEBUG: checkBEFEHL"\\n"*** "$checkBEFEHL" "$umleitungLOGDATEI
+#echo -e "*** DEBUG: checkBEFEHL"
+#echo -e "*** "$checkBEFEHL" "$umleitungLOGDATEI
+`$checkBEFEHL` >> $dateiLOGS 2>> $dateiLOGS &
+checkBEFEHLreturn=$?
+checkBEFEHLpid=$!
+
+
+
+
+
+function MOVEasciiKREISEL {
+    asciiKREISEL[0]="-"
+    asciiKREISEL[1]="\\"
+    asciiKREISEL[2]="|"
+    asciiKREISEL[3]="/"
+    tput cup $cursorZEILEkreisel 38
+    echo -n "${asciiKREISEL[0]}"
+    actionKONTROLLE="start"
+    intUTCsekunden=`date '+%s'`
+    intUTCreloadSTATUS=`echo -e "$intUTCsekunden + 2" | bc`
+    while ( [[ "$actionKONTROLLE" == "start" ]] )
+    do
+        intUTCsekunden=`date '+%s'`
+        if ( [[ "$intUTCsekunden" -ge "$intUTCreloadSTATUS" ]] && [[ "$intUTCsekunden" == *0 ]] )
+        then
+            fncSTATUSauslesen
+            intUTCreloadSTATUS=`echo -e "$intUTCsekunden + 10" | bc`
+        fi
+        for i in "${asciiKREISEL[@]}"
+        do
+            tput cup $cursorZEILEkreisel 38
+            echo -ne "\b$i"
+            sleep 0.1
+        done
+        if ( [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` == "" ]] )
+        then
+            #fg %
+            # -Das Quit-Flag-PS in TMP Datei schreiben:
+            echo -e "flagQUITps" > "$datei.$$.cache.tmp"
+            eingabeTASTE="e"
+            actionKONTROLLE="stop"
+            #beep -l 25 -f 466.2 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 250 -f 466.2 -D 100
+            break
+        fi
+        if ( [[ "$actionKONTROLLE" == "stop" ]] )
+        then
+            break
+        fi
+    done
+}
+
+function CHECKeingabeTASTE {
+    if ( [[ "$eingabeTASTE" != "e" ]] )
+    then
+        eingabeTASTE=""
+        flagQUIT=""
+        #stty raw echo
+        #while ( [[ "$eingabeTASTE" != "q" ]] )
+        #while ( [[ `dd bs=1 count=1 2>/dev/null` != "q" ]] && [[ `read "$datei.$$.cache.tmp"` != "flagQUITps" ]] )
+        while ( [[ "$eingabeTASTE" != "q" ]] && [[ `cat $datei.$$.cache.tmp` != "flagQUITps" ]] )
+        do
+            #eingabeTASTE=`dd bs=1 count=1 2>/dev/null`
+            #tput cup $cursorZEILEkreisel 39
+            read -n 1 -t 1 -s eingabeTASTE
+            #tput cub 1
+            #echo -n " "
+            #tput cub 1
+            #beep -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100
+        done
+        #stty -raw echo
+        if ( [[ "$eingabeTASTE" == "q" ]] && [[ `cat $datei.$$.cache.tmp` != "flagQUITps" ]] )
+        then
+            flagQUIT="TRUEq"
+        fi
+        if ( [[ "$eingabeTASTE" != "q" ]] && [[ `cat $datei.$$.cache.tmp` == "flagQUITps" ]] )
+        then
+            flagQUIT="TRUEps"
+        fi
+        if ( [[ "$eingabeTASTE" == "q" ]] && [[ `cat $datei.$$.cache.tmp` == "flagQUITps" ]] )
+        then
+            flagQUIT="TRUEqTRUEps"
+        fi
+    fi
+    # -zur Aktualisierung des Status
+    #fncSTATUSauslesen
+}
+
+function CHECKeingabeTASTEeinmal {
+    if ( [[ "$eingabeTASTE" != "e" ]] )
+    then
+        eingabeTASTE=""
+        stty raw echo
+        eingabeTASTE=`dd bs=1 count=1 2>/dev/null`
+        # if ( [[ "$eingabeTASTE" != "q" ]] )
+        # then
+        #     tput cub 1
+        #     echo -n "   "
+        #     tput cub 3
+        # fi
+        stty -raw echo
+    fi
+}
+
+
+
+
+
+
+
+
+
+
+
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++ START Status aus Logdatei anzeigen +++++++++++++++++++++++++++++++++++
+echo -e "|-\\n|- Status der Programmausführung:"
+txtZEIT="["`date '+%T'`"]"
+txtSTATUSausgabe="Warte auf Daten..."
+txtPLAYLIST=""
+echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabe${fmtRESET}"
+echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabe${fmtRESET}"
+echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabe${fmtRESET}"
+if ( [[ "$txtPLAYLIST" != "" ]] )
+then
+    #echo -e "|- Playlist Infos: $txtPLAYLIST\\n|-"
+    echo -e "|- IBearbeitet wird: $txtPLAYLIST\\n|-"
+else
+    echo -e "|- Aktuelle Datei wird ermittelt:\\n|-"
+fi
+
+function fncCURSORposition {
+    # -Zum Prüfen ob das Gesamtskript noch läuft: flagQUITps existiert nicht in  $datei.$$.cache.tmp
+    # -positionieren: tput cup Zeile Spalte
+    typeset -i cursorZEILE=0
+    typeset -i cursorZEILEstatus=0
+    function getCPos { 
+        local v=() t=$(stty -g)
+        stty -echo
+        printf "\033[6n"
+        IFS='[;' read -ra v -d R
+        stty $t
+        CPos=(${v[@]:1})
+    }
+    getCPos
+    cursorZEILE=$CPos
+    zeileDELETE=`tput dl1`
+    zeileINSERT=`tput il1`
+    cursorZEILEstatus=$cursorZEILE-2
+    while ( [[ "$actionKONTROLLE" != "stop" ]] )
+    do
+        sleep 10
+        while read txtSTATUS
+        do
+            txtSTATUSausgabe=$txtSTATUS
+        done < $dateiLOGS
+        tput cup $cursorZEILEstatus 0
+        echo $zeileDELETE
+        tput cup $cursorZEILEstatus 0
+        echo -e "|- ${fmtFETT}\"$txtSTATUSausgabe\"${fmtRESET}"
+    done
+}
+
+
+# -positionieren: tput cup Zeile Spalte
+typeset -i cursorZEILE=0
+typeset -i intANZAHLstatusZEILEN=0
+typeset -i cursorZEILEstatus=0
+typeset -i cursorZEILEkreisel=0
+function getCPos { 
+    local v=() t=$(stty -g)
+    stty -echo
+    printf "\033[6n"
+    IFS='[;' read -ra v -d R
+    stty $t
+    CPos=(${v[@]:1})
+}
+getCPos
+cursorZEILE=$CPos
+zeileDELETE=`tput dl1`
+zeileINSERT=`tput il1`
+intANZAHLstatusZEILEN=3
+cursorZEILEstatus=cursorZEILE-6
+cursorZEILEkreisel=cursorZEILE+1
+
+
+function fncSTATUSauslesen {
+    # -Zum Prüfen ob das Gesamtskript noch läuft: flagQUITps existiert nicht in  $datei.$$.cache.tmp
+        cursorZEILEstatus=cursorZEILE-6
+        cp $dateiLOGS $dateiLOGStmp
+        echo -e "" >> $dateiLOGStmp
+        echo -e "---EOF---" >> $dateiLOGStmp
+        txtZEIT="["`date '+%T'`"]"
+        txtPLAYLIST=""
+        txtPLAYLISTvideo=""
+        txtPLAYLISTaktuell=""
+        txtPLAYLISTende=""
+        typeset -i x=0
+        while read txtSTATUS
+        do
+            if ( [[ "$txtSTATUS" == *\]\ Downloading\ video*of* ]] )
+            then
+                txtPLAYLISTvideo=${txtSTATUS//*video/}
+                txtPLAYLISTvideo=${txtPLAYLISTvideo//of/von}
+                txtPLAYLISTvideo=" (Video$txtPLAYLISTvideo)"
+                #txtPLAYLIST=" $txtPLAYLISTaktuell$txtPLAYLISTvideo$txtTRENNERplaylist$txtPLAYLIST"
+            fi
+            if ( [[ "$txtSTATUS" == *\]\ Downloading\ playlist:* ]] )
+            then
+                if ( [[ "$txtPLAYLISTende" != "" ]] )
+                then
+                    txtTRENNERaufzaehlung=", "
+                else
+                    txtTRENNERaufzaehlung=""
+                fi
+                if ( [[ "$txtPLAYLISTaktuell" != "" ]] )
+                then
+                    txtPLAYLISTende="$txtPLAYLISTaktuell$txtTRENNERaufzaehlung$txtPLAYLISTende"
+                fi
+                if ( [[ "$txtPLAYLISTende" != "" ]] )
+                then
+                    txtTRENNERplaylist="- Fertig: "
+                else
+                    txtTRENNERplaylist=""
+                fi
+                txtPLAYLISTaktuell=${txtSTATUS//*playlist: /}
+                #txtPLAYLISTende="$txtTRENNERplaylist$txtPLAYLISTaktuell"
+            fi
+            txtSTATUSausgabeX5x=$txtSTATUSausgabeX4x
+            txtSTATUSausgabeX4x=$txtSTATUSausgabeX3x
+            txtSTATUSausgabeX3x=$txtSTATUSausgabeX2x
+            txtSTATUSausgabeX2x=$txtSTATUSausgabeX1x
+            txtSTATUSausgabeX1x=$txtSTATUSausgabeX0x
+            txtSTATUSausgabeX0x=$txtSTATUS
+            # -Alte Variable wird teilweise noch abgefragt:
+            txtSTATUSausgabe=$txtSTATUSausgabeX0x
+        done < $dateiLOGStmp
+        txtPLAYLIST=" $txtPLAYLISTaktuell$txtPLAYLISTvideo $txtTRENNERplaylist$txtPLAYLISTende"
+        txtSTATUSausgabeX0=$txtSTATUSausgabeX0x
+        txtSTATUSausgabeX1=$txtSTATUSausgabeX1x
+        txtSTATUSausgabeX2=$txtSTATUSausgabeX2x
+        #echo -e "|- --- 0: $txtSTATUSausgabeX0 - 1: $txtSTATUSausgabeX1 - 2: $txtSTATUSausgabeX2 - 3: $txtSTATUSausgabeX3"
+        if ( [[ "$txtSTATUSausgabe" == "---EOF---" ]] || [[ "$txtSTATUSausgabe" == "" ]] )
+        then
+            txtSTATUSausgabeX0=$txtSTATUSausgabeX1x
+            txtSTATUSausgabeX1=$txtSTATUSausgabeX2x
+            txtSTATUSausgabeX2=$txtSTATUSausgabeX3x
+            txtSTATUSausgabe=$txtSTATUSausgabeX0
+            if ( [[ "$txtSTATUSausgabe" == "---EOF---" ]] || [[ "$txtSTATUSausgabe" == "" ]] )
+            then
+                txtSTATUSausgabeX0=$txtSTATUSausgabeX2x
+                txtSTATUSausgabeX1=$txtSTATUSausgabeX3x
+                txtSTATUSausgabeX2=$txtSTATUSausgabeX4x
+                txtSTATUSausgabe=$txtSTATUSausgabeX0
+                if ( [[ "$txtSTATUSausgabe" == "---EOF---" ]] || [[ "$txtSTATUSausgabe" == "" ]] )
+                then
+                    txtSTATUSausgabeX0=$txtSTATUSausgabeX3x
+                    txtSTATUSausgabeX1=$txtSTATUSausgabeX4x
+                    txtSTATUSausgabeX2=$txtSTATUSausgabeX5x
+                    txtSTATUSausgabe=$txtSTATUSausgabeX0
+                fi
+            fi
+        fi
+        #txtSTATUSausgabe=${txtSTATUSausgabe//*[download]/}
+        #txtSTATUSausgabe=${txtSTATUSausgabe//*[/[}
+        txtSTATUSausgabeX2=${txtSTATUSausgabeX2//*[/[}
+        txtSTATUSausgabeX1=${txtSTATUSausgabeX1//*[/[}
+        txtSTATUSausgabeX0=${txtSTATUSausgabeX0//*[/[}
+        tput cup $cursorZEILEstatus 0
+        echo $zeileDELETE
+        tput cup $cursorZEILEstatus 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEstatus 0
+        txtZEIT="["`date '+%T'`"]"
+        echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabeX2${fmtRESET}"
+        cursorZEILEstatus=cursorZEILEstatus+1
+        tput cup $cursorZEILEstatus 0
+        echo $zeileDELETE
+        tput cup $cursorZEILEstatus 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEstatus 0
+        txtZEIT="["`date '+%T'`"]"
+        echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabeX1${fmtRESET}"
+        cursorZEILEstatus=cursorZEILEstatus+1
+        tput cup $cursorZEILEstatus 0
+        echo $zeileDELETE
+        tput cup $cursorZEILEstatus 0
+        echo $zeileINSERT
+        tput cup $cursorZEILEstatus 0
+        txtZEIT="["`date '+%T'`"]"
+        echo -e "|- ${fmtFETT}$txtZEIT $txtSTATUSausgabeX0${fmtRESET}"
+        #rm $dateiLOGStmp
+        if ( [[ "$txtPLAYLIST" != "" ]] )
+        then
+            cursorZEILEstatus=cursorZEILEstatus+1
+            tput cup $cursorZEILEstatus 0
+            echo $zeileDELETE
+            tput cup $cursorZEILEstatus 0
+            echo $zeileINSERT
+            tput cup $cursorZEILEstatus 0
+            echo -e "|- Playlist Infos: $txtPLAYLIST"
+        fi
+    #done
+}
+#fncSTATUSauslesen &
+# +++++ ENDE Status aus Logdatei anzeigen +++++++++++++++++++++++++++++++++++
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+echo -e "|-"
+echo -e "|- Um das Skript zu Beenden drücken Sie \"q\"."
+echo -n "|- $datei wird ausgeführt... "
+
+MOVEasciiKREISEL &
+MOVEasciiKREISELpid=$!
+
+# CHECKeingabeTASTE
+# CHECKeingabeTASTEpid=$!
+
+
+
+
+
+# -Die Ausgabe abschalten. Wegen kill Status/Fehler Meldungen.
+exec >/dev/null 2>&1
+
+
+while ( [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` != "" ]] && [[ "$actionKONTROLLE" != "stop" ]] )
+do
+    nix=1
+    CHECKeingabeTASTE
+    CHECKeingabeTASTEpid=$!
+    if ( [[ "$eingabeTASTE" == "q" ]] )
+    then
+        break
+    fi
+    kill $CHECKeingabeTASTEpid
+done
+
+tput cub 1
+if ( [[ "$eingabeTASTE" == "q" ]] )
+then
+    checkBEFEHLreturn="1"
+    echo -n " Abbruch durch Benutzer!"
+elif ( [[ "$actionKONTROLLE" == "stop" ]] )
+then
+    echo -n " Fertig!"
+fi
+
+#checkKILLreturnKREISEL=`kill -9 $MOVEasciiKREISELpid >/dev/null 2>/dev/null`
+#`kill -9 $MOVEasciiKREISELpid >/dev/null 2>&1`
+if ( [[ "$actionKONTROLLE" != "stop" ]] )
+then
+    kill $MOVEasciiKREISELpid
+fi
+
+#tput cub 1
+echo -e ""
+
+
+if ( [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` != "" ]] )
+then
+    #checkKILLreturnDOWNLOAD= `kill $checkBEFEHLpid > /dev/null 2> /dev/null`
+    kill $checkBEFEHLpid
+    checkBEFEHLreturn="1"
+fi
+#echo -e "|- Das Skript wurde beendet!"
+
+
+
+# -die temporäre Logdatei wird wieder entfernt:
+rm $dateiLOGStmp
+
+
+
+
+
+
+# -Logdatei auf Fehler kontrollieren:
+# -Am Ende des Skripts muss die Logdatei nach ERROR: || error: abgesucht werden, falls es einen
+#  Treffer gibt wird die Fehlerzeile und die beiden Zeilen davor ausgegeben! Die URLs sollten im Falle
+#  eines Fehlers ja noch gespeichert sein, also einfach noch einmal mit den alten URLs starten.
+
+# -------------------------------------------------------------------
+# -ABLAGE: Alte Befehle:
+# `$checkBEFEHL` >> $dateiLOGS
+#`$checkBEFEHL` >> $dateiLOGS 2> `tty`
+#checkBEFEHLreturn=$?
+#echo -e "|- checkBEFEHL: $?"
+# -------------------------------------------------------------------
+
+# -die Original Archiv Datei aus der Config auslesen
+# -das temporäre Archiv an die Original Archiv Datei anhängen
+# -das temporäre Archiv löschen
+if ( [[ "$flagFORCE" == "true" ]] )
+then
+#     # +++++ START Config auslesen
+#     while read txtCONFIG
+#     do
+#         #nix=1
+#         if ( [[ "$txtCONFIG" == --download-archiv* ]] )
+#         then
+#             archivORIGINAL=${txtCONFIG//\-\-download\-archiv /}
+#             #echo $archivORIGINAL
+#             break
+#         fi
+#     done < ~/.config/youtube-dl/config
+#     # +++++ ENDE Config auslesen
+
+    # +++++ START archivTMP anhängen an archivORIGINAL
+    while read txtTMP
+    do
+        echo $txtTMP >> $archivORIGINAL
+    done < $archivTMP
+    # +++++ ENDE archivTMP anhängen an archivORIGINAL
+
+    # -das archivTMP löschen:
+    rm $archivTMP
+fi
+if ( [[ -f "$archivTMP" ]] )
+then
+    rm $archivTMP
+fi
+
+
+
+
+
+
+
+# -Die Ausgabe wieder auf den Bildschirm legen:
+#exec >`tty` 2>&1
+#exec >`tty` 2>>$dateiLOGS
+exec >`tty` 2>&1
+
+stty echo
+
+
+
+
+
+
+
+
+# -Ende: Zeit und Status anzeigen
+zeitENDE=`date`
+txtINFOende=$txtENDEzeit$zeitENDE\\n"|- Details:\t$dateiLOGS"
+echo -e $txtINFOende
+echo -e $txtINFOende >> $dateiLOGS
+
+#if ([[ "$eingabeTASTE" == "e" ]]  )
+if ([[ "$actionKONTROLLE" == "stop" ]]  )
+then
+    checkBEFEHLreturn="0"
+fi
+
+if ([[ "$checkBEFEHLreturn" != "0" ]]  )
+then
+    txtINFOende2="|-"\\n"|- FEHLER:"\\n"|- $datei wurde abgebrochen!"\\n"|-"
+    # -FEHLER Sound:
+    beep -l 200 -f 200 -r 2 -D 100 --new -l 600 -f 160 -D 100
+    echo -e $txtINFOende2
+    echo -e $txtINFOende2 >> $dateiLOGS
+else
+    txtINFOende2="|-"\\n"|- $datei wurde erfolgreich beendet!"\\n"|-"
+    # -Erfolgreich Sound:
+    beep -l 200 -f 400 -r 2 -D 100 --new -l 600 -f 600 -D 100
+    echo -e $txtINFOende2
+    echo -e $txtINFOende2 >> $dateiLOGS
+    rm $dateiURLS
+    if ( [[ -f "$datei.$$.cache.tmp" ]] )
+    then
+        rm "$datei.$$.cache.tmp"
+    fi
+    # -Shutdown Option
+    if ( [[ "$intOFFminuten" != "" ]] )
+    then
+        echo -e "|- Das System wird in $intOFFminuten min ausgeschaltet. Zum Abbrechen drücken Sie bitte: \"q\""
+        intOFFsekunden=`echo -e "$intOFFminuten*60" | bc`
+        #echo -e "--- sek: $intOFFsekunden"
+        #sleep $intOFFsekunden
+        #eingabeTASTE=`dd bs=1 count=1 2>/dev/null`
+        intUTCsekunden=`date '+%s'`
+        intOFFsekunden=`echo -e "$intUTCsekunden + $intOFFsekunden" | bc`
+        while ( [[ "$eingabeTASTE" != "q" ]] && [[ "$intOFFsekunden" -gt "$intUTCsekunden" ]] )
+        do
+            read -n 1 -t 1 -s eingabeTASTE
+            #tput cub 1
+            intUTCsekunden=`date '+%s'`
+        done
+        
+        if ( [[ "$eingabeTASTE" != "q" ]] )
+        then
+            echo -e "|- Ausschalten..."
+            `/bin/systemctl poweroff`
+        else
+            echo -e "|- Ausschalten wurde abgebrochen!"
+        fi
+    fi
+fi
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+txtbox_pfad="\n\nVerzeichnis:\n$pfad"
+
+if ( [ "$flag_update" != "true" ] )
+ then
+ flag_update=false
+fi
+
+if ( [ "$flag_aufruf_intern" != "true" ] )
+ then
+ flag_aufruf_intern=false
+fi
+
+
+
+
+echo -e "***************************************************************"
+echo -e "*** Playliste erstellen in: $pfad"
+#echo -e "***************************************************************"
+
+
+
+for ia in $(ls --group-directories-first $pfad)
+ do
+ nix=0
+ # DEBUG infos:
+ #echo -e "DEBUG-flag_aufruf_intern: $flag_aufruf_intern"
+ #echo -e "DEBUG-ia: $ia"
+ #echo -e "DEBUG-pfad: $pfad"
+
+if ( [ -d "$pfad" ] && [ $pfad!="" ] )
+ then
+ ia=$pfad$ia
+ zusatz=""
+ #echo -e "---PFAD KOMPLETT: $ia"
+ # zusatz ist inzwischen unnötig!!!
+ #else
+ #zusatz="../"
+ #echo -e "---PFAD KOMPLETT: $pfad"
+fi
+
+
+
+if ( [ -d $ia ] )
+ then
+ pfad_uvz="$ia/"
+ suchpfad=$ia/*$extension
+ datei=$ia"/"$name_datei_playliste
+ datei_update=$ia"/"$name_datei_update
+ #echo -e "DEBUG-VERZEICHNIS: $ia"
+ $0 "$pfad_uvz" "$flag_update" "true"
+ #flag_aufruf_intern=false
+ continue
+ elif ( [ -d $pfad ] )
+ then
+ suchpfad=$pfad*$extension
+ datei=$pfad$name_datei_playliste
+ datei_update=$pfad$name_datei_update
+ flag_stop=1
+ #flag_aufruf_intern=false
+ else
+ suchpfad=*$extension
+ datei=$name_datei_playliste
+ datei_update=$name_datei_update
+ flag_stop=1
+ #flag_aufruf_intern=false
+fi
+
+
+
+
+
+#echo -e "*** Check auf Inhalt: ***"
+#echo -e "-suchpfad: $suchpfad"
+# falls extension nicht passt, wird zum naechsten datensatz gesprungen:
+if [[ "$ia" != *$extension ]]
+  then
+  #echo -e "-INFO: $ia passt nicht zum Suchstring: \"*$extension\""
+  continue
+fi
+
+#for i in $suchpfad
+# for i in $(ls --group-directories-first $pfad)
+#  do
+#  echo -e "-i: $i"
+#  #nix=$[nix+1]
+# 
+#  #if ( [ -f $i ] && [ "$i" != "*$extension" ] )
+#  #if [ [ -f $i ] && [ "$i" = *.mp* ] ]
+#  #if ( [[ -f $i ]] && [[ "$i" = *.mp* ]] )
+#  # funktioniert: if [[ "$i" = *.mp* ]]
+#  if [[ "$i" == *.mp* ]]
+#   then
+#   echo -e "--- extension passt zum suchstring: \"$extension\""
+#   nix=$[nix+1]
+#   else
+#   # inhalt $i ist eine datei, aber endet nicht mit der korrekten
+#   # zeichenfolge. daher wird zum naechsten datensatz gesprungen!
+#   echo -e "--- FEHLER: extension der datei passt nicht zum suchstring: \"$extension\""
+#   continue
+#  fi
+# 
+#  #echo -e "RENAME $i" | sed "s/ /_/g"
+#  #echo -e "---RENAME: $i"
+#  #rename 's/[^abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_ \-\.\/]/\-/g' "$i"
+#  #rename  's/ /_/g' "$i"
+#  #echo -e "---RENAME new: $i"
+#  #echo -e "- $i -- $nix -"
+# done
+# 
+# #if( [ "$nix"<2 ] )
+# if (("$nix"<2))
+#  then
+#  echo -e "...Nichts zu tun."
+#  continue
+# fi
+# echo -e "...done"
+
+
+
+
+#echo -e "-INFO: Datei erstellen..."
+z_id=0
+# ein update script fuer diese playliste erstellen:
+touch $datei_update
+echo -e "#!/bin/bash" > $datei_update
+echo -e "# --- ein update script fuer die playliste" >> $datei_update
+#echo -e "" >> $datei_update
+echo -e "# aktueller ort wird als pfad angenommen:" >> $datei_update
+echo -e "pfad=\`pwd\`" >> $datei_update
+echo -e "pfad=\$pfad/" >> $datei_update
+echo -e "$0 \$pfad true" >> $datei_update
+chmod a+x $datei_update
+
+
+# die playliste als datei erstellen:
+#echo -e "$datei"
+touch $datei
+#text="#EXTM3U"
+echo -e "#EXTM3U" > $datei
+#mkdir tmplxfileorder
+for i in $suchpfad
+ do
+ #echo -e "RENAME $i" | sed "s/ /_/g"
+ #echo -e "---COPY $i"
+ #echo -e "---RM oder MOVE $i"
+ echo -e "#EXTINF:$z_id,$zusatz$i" >> $datei
+ echo -e "$zusatz$i" >> $datei
+ z_id=$[z_id+1]
+ #ffmpeg -i $i -acodec copy -f segment -segment_time 300 $outfile
+ #ffmpeg -i $i -acodec copy -t 00:30:00 -ss 00:00:00 $outfile
+ #echo -e "...done"
+done
+
+zeitENDE=`date`
+if (($flag_stop==1))
+ then
+ echo -e "-DONE: $suchpfad"
+# if ( [ ! $flag_aufruf_intern ] )
+ if [[ "$flag_aufruf_intern" != true ]]
+  then
+  if [[ "$flag_update" == true ]]
+   then
+   kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_01-"
+   else
+   #echo -e "-MSGBOX: flag_stop"
+   kdialog --title="INFO" --msgbox="Anlegen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:flag_stop-"
+  fi
+ fi
+ echo -e "-ENDE: flag_stop"
+ echo -e "-Gestartet: $zeitSTART"
+ echo -e "-Beendet  : $zeitENDE"
+ echo -e "----------------------------------------"
+ exit 0;
+fi
+
+echo -e "-DONE: $suchpfad"
+
+# ende der ia schleife
+done
+
+zeitENDE=`date`
+if ( [ "$flag_update" == true ] && [ "$flag_aufruf_intern" != true ] )
+ then
+ #echo -e "-MSGBOX: update"
+ kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_02-"
+ echo -e "-ENDE: update"
+ echo -e "-Gestartet: $zeitSTART"
+ echo -e "-Beendet  : $zeitENDE"
+ echo -e "----------------------------------------"
+ exit 0;
+fi
+
+zeitENDE=`date`
+if ( [ "$flag_aufruf_intern" != true ] )
+ then
+ #echo -e "-MSGBOX: normal"
+ kdialog --title="INFO" --msgbox="Anlegen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:normal-"
+ echo -e "-ENDE: normal"
+ echo -e "-Gestartet: $zeitSTART"
+ echo -e "-Beendet  : $zeitENDE"
+ echo -e "----------------------------------------"
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+

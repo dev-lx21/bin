@@ -1,0 +1,4425 @@
+#!/bin/bash
+# dies und das test skript von -lx-
+
+#clear
+
+
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+
+function fncYEAR1231 {
+    case "$1" in
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y%m%d'`
+            ;;
+    esac
+}
+
+
+echo -e "--- Zeit nurSS.mS3:\\t`fncHHMMSS 'nurSS.mS3'`"
+echo -e "--- Zeit norm.mS3:\\t`fncHHMMSS 'norm.mS3'`"
+echo -e "-"
+
+echo -e "--- Datum: `fncYEAR1231 '1231'`"
+
+
+exit 0;
+
+
+
+
+
+
+
+function fncDEBUGstart {
+    exec >`tty` 2>&1
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    #echo -e "--------------------------------------------------------------------------------" && echo -e "---------- START Debug: $txtDEBUGtitel" && echo -e "--------------------------------------------------------------------------------"
+    echo -e "--------------------------------------------------------------------------------" && echo -e "---------- START Debug: $txtDEBUGtitel"
+    set -x
+}
+
+function fncDEBUGstop {
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    #echo -e "--------------------------------------------------------------------------------" && echo -e "---------- ENDE Debug: $txtDEBUGtitel" && echo -e "--------------------------------------------------------------------------------"
+    echo -e "---------- ENDE Debug: $txtDEBUGtitel" && echo -e "--------------------------------------------------------------------------------"
+    exec >/dev/null 2>&1
+}
+
+
+
+
+# -Display testen:
+if [[ `tty` == *dev* ]]
+then
+    echo -e "Kein Cronjob!"
+fi
+
+
+# -SuperQuietMode aktivieren
+if [[ "$1" == "-qq" ]]
+then
+    shift
+    $0 $* > /dev/null
+    exit 0;
+fi
+
+
+
+
+# echo -e "${fmtFETT}text...blabla${fmtRESET}"
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+
+fmtCOLORfgBLAU=`tput setf 1`
+fmtCOLORfgGRUEN=`tput setf 2`
+fmtCOLORfgGELB=`tput setf 3`
+fmtCOLORfgROT=`tput setf 4`
+fmtCOLORbgBLAU=`tput setb 1`
+fmtCOLORbgGRUEN=`tput setb 2`
+fmtCOLORbgGELB=`tput setb 3`
+fmtCOLORbgROT=`tput setb 4`
+
+fmtRESET=`tput sgr0`
+
+
+
+
+datei=${0//*\//}
+titel="Test Datei!"
+beschreibung="|- Beschreibung: \\n|- $datei dient zum Testen von Shell Befehlen.\\n|-"
+
+benutzung="|- Benutzung: \\n|- '$datei'\\n|-"
+
+
+
+function fncANZAHLzeichen {
+    # -Die Anzahl der Zeichen in $1 ermitteln und mittels echo ausgeben!
+    [ ! "$1" ] && echo -e "0" && return
+    echo -e "${#1}"
+}
+
+
+function fncStringKontrolleEndeLeerzeichen {
+    # -Leerzeichen am Ende des Strings kontrollieren und ggf entfernen:
+    [ -z "$1" ] && return
+    strKontrolleKomplett="$1"
+    strKontrolleEnde="${strKontrolleKomplett: -1}"
+    [[ "$strKontrolleEnde" == " " ]] && strKontrolleFertig="${strKontrolleKomplett:0:-1}" || strKontrolleFertig="$strKontrolleKomplett"
+    echo -e "$strKontrolleFertig"
+}
+
+strTEST="friskee high hoo und so "
+echo -e ":$strTEST:"
+echo -e ":"`fncStringKontrolleEndeLeerzeichen "$strTEST"`":"
+
+
+
+echo -e "|-"
+echo -e "|- CP Befehl Test:"
+
+
+# -Der Befehl funktioniert in der Konsole:
+# cp -r -v /aa_daten/tmp/aa_Quellen/Friskee/von_baerbel_friskee.png /aa_daten/tmp/aa_Quellen/Friskee/von_lx_logo_felgen-spiegel_dunk-poster.png /aa_daten/tmp/aa_Quellen/Friskee/von_mike_friskee_4_colors.png /aa_daten/tmp/aa_Quellen/Friskee/von_trainer_logo6.png /aa_daten/tmp/aa_Quellen/Carrera /aa_daten/tmp/test-lxCP/02/ 2>/aa_daten/tmp/test-lxCP/02/00.lxCP.fehler.txt | tee -a /aa_daten/tmp/test-lxCP/02/00.lxCP.logs.txt
+
+#cp -r -v /aa_daten/tmp/aa_Quellen/Friskee/von_baerbel_friskee.png /aa_daten/tmp/aa_Quellen/Friskee/von_lx_logo_felgen-spiegel_dunk-poster.png /aa_daten/tmp/test-lxCP/02/
+
+#/aa_daten/tmp/aa_Quellen/Friskee/von_baerbel_friskee.png /aa_daten/tmp/aa_Quellen/Friskee/von_lx_logo_felgen-spiegel_dunk-poster.png /aa_daten/tmp/test-lxCP/02/
+
+
+#strQuelle="/aa_daten/tmp/aa_Quellen/Friskee/von_baerbel_friskee.png /aa_daten/tmp/aa_Quellen/Friskee/von_lx_logo_felgen-spiegel_dunk-poster.png"
+
+strQuelle="/aa_daten/tmp/aa_Quellen/Friskee/von_baerbel_friskee.png /aa_daten/tmp/aa_Quellen/Friskee/von_lx_logo_felgen-spiegel_dunk-poster.png /aa_daten/tmp/aa_Quellen/Friskee/aa_datei-mit-fehler.png"
+
+strZiel="/aa_daten/tmp/test-lxCP/02/"
+
+
+txtEingabeDateien=""
+arrDateien=($strQuelle)
+for iDateien in "${arrDateien[@]}"
+do
+    #echo -e "--- $iDateien"
+    [ -z "$txtEingabeDateien" ] && txtEingabeDateien="$iDateien" && continue
+    txtEingabeDateien="$txtEingabeDateien\\n|-\\t\\t\\t\\t$iDateien"
+done
+
+echo -e "|- Die gewählten Dateien:\\t$txtEingabeDateien"
+
+# -Funzt:
+#cp -r -v $strQuelle $strZiel
+#cp -r -v $strQuelle $strZiel 2>$strZiel"cp-logs-fehler.txt" | tee -a $strZiel"cp-logs.txt"
+
+
+
+
+
+exit 0;
+
+
+
+
+echo -e "|-"
+echo -e "|- HR Fullscreen Test:"
+
+
+function getCPos { 
+    local v=() t=$(stty -g)
+    stty -echo
+    printf "\033[6n"
+    IFS='[;' read -ra v -d R
+    stty $t
+    CPos=(${v[@]:1})
+    CPosSPALTE=(${v[@]:2})
+}
+getCPos
+
+
+
+
+
+
+
+
+
+
+typeset -i intLayoutMaxSpalten=0
+typeset -i intLayoutMaxSpaltenVorgabe=120
+function fncLayoutMaxSpalten {
+    # -Den Anzeigebereich des eigenen Layouts auf 80% der vorhandenen Bildschirmbreite
+    #  begrenzen: ($zSPALTEN/10)*8
+    
+    typeset -i zZEILEN=$LINES
+    typeset -i zSPALTEN=$COLUMNS
+
+    intLayoutMaxSpaltenSCALE1=`echo -e "scale=1 ; ($zSPALTEN/10)*8" | bc -l`
+    intLayoutMaxSpalten=${intLayoutMaxSpaltenSCALE1//\.*/}
+    [ "$intLayoutMaxSpalten" -le 0 ] && intLayoutMaxSpalten=$intLayoutMaxSpaltenVorgabe
+}
+fncLayoutMaxSpalten
+
+
+function fncAusgabeHRMaxSpalten {
+    # -HRMaxSpalten erstellen und ausgeben!
+    # -Argumente:
+    # --$1: Die Zeichen mit denen die Linie anfangen soll.
+    # --$2: Das Zeichen mit dem die Linie gefüllt wird.
+    # -Werden keine Argumente übergeben, wird Standard genutzt:
+    txtHRAnfang="|"
+    txtHRFuellen="-"
+    
+    typeset -i zHRAnfang=0
+    typeset -i zHRFuellen=0
+    typeset -i zHRMaxSpalten=0
+    
+    [ $1 ] && txtHRAnfang="$1"
+    zHRAnfang=${#txtHRAnfang}
+    [ $2 ] && txtHRFuellen="$2"
+    zHRFuellen=${#txtHRFuellen}
+    
+    txtHRMaxSpalten="$txtHRAnfang""$txtHRFuellen"
+    zHRMaxSpalten=intLayoutMaxSpalten-zHRAnfang-zHRFuellen
+    for ((zHR=0; zHR<$zHRMaxSpalten; zHR++))
+    do
+        #echo -en "$zzHR - "
+        txtHRMaxSpalten="$txtHRMaxSpalten""$txtHRFuellen"
+    done
+    echo -e "\\r$txtHRMaxSpalten"
+}
+
+
+
+function fncLayoutHRFullScreen {
+    # -Fullscreen HR erstellen und in $txtHRFullScreen speichern.
+    # -Argumente:
+    # --$1: txtHRFullScreenANFANG
+    # --$2: txtHRFullScreenENDE
+    
+    typeset -i zZEILEN=$LINES
+    typeset -i zSPALTEN=$COLUMNS
+    typeset -i zHRanfang=0
+    typeset -i zHRmitte=0
+    typeset -i zHRende=0
+    typeset -i zzHR=0
+    
+    #txtHRFullScreenANFANG="|- $datei "
+    txtHRFullScreenANFANG="|"
+    [ $1 ] && txtHRFullScreenANFANG="$1"
+    zHRanfang=${#txtHRFullScreenANFANG}
+    
+    #txtHRFullScreenENDE=" $datei -|"
+    txtHRFullScreenENDE="|"
+    [ $2 ] && txtHRFullScreenENDE="$2"
+    zHRende=${#txtHRFullScreenENDE}
+    
+    txtHRFullScreenMITTE=""
+    zHRmitte=zSPALTEN-zHRanfang-zHRende
+    for ((zzHR=0; zzHR<$zHRmitte; zzHR++))
+    do
+        #echo -en "$zzHR - "
+        txtHRFullScreenMITTE="$txtHRFullScreenMITTE""-"
+    done
+    txtHRFullScreen="$txtHRFullScreenANFANG""$txtHRFullScreenMITTE""$txtHRFullScreenENDE"
+    echo -e "\\r$txtHRFullScreen"
+}
+fncLayoutHRFullScreen >/dev/null
+
+
+
+echo -e "|-"
+echo -e "|-"
+echo -e "|- intLayoutMaxSpalten: $intLayoutMaxSpalten --- Spalten: $zSPALTEN --- $LINES - $COLUMNS"
+echo -e "|-"
+echo -e "|- fncAusgabeHRMaxSpalten:"
+fncAusgabeHRMaxSpalten
+echo -e "|-"
+echo -e "|- txtHRFullScreen:"
+echo -e "$txtHRFullScreen"
+echo -e "|-"
+echo -e "|- fncLayoutHRFullScreen: nur function:"
+fncLayoutHRFullScreen
+echo -e "|-"
+echo -e "|- fncLayoutHRFullScreen: echo function:"
+echo -e "`fncLayoutHRFullScreen`"
+echo -e "|-"
+
+
+
+
+
+
+
+
+
+echo -e "${fmtUNTERSTRICHEN}====================........${fmtRESET}"
+echo -e "${fmtUNTERSTRICHEN}------------------------....${fmtRESET}"
+echo -e "${fmtUNTERSTRICHEN}++++++++++++++++++++++......${fmtRESET}"
+echo -e "${fmtUNTERSTRICHEN}*******************.........${fmtRESET}"
+echo -e "|-"
+echo -e "${fmtRESET}====================........${fmtRESET}"
+echo -e "${fmtRESET}------------------------....${fmtRESET}"
+echo -e "${fmtRESET}++++++++++++++++++++++......${fmtRESET}"
+echo -e "${fmtRESET}*******************.........${fmtRESET}"
+echo -e "|-"
+echo -e "${fmtRESET}======================______${fmtRESET}"
+echo -e "${fmtRESET}================____________${fmtRESET}"
+echo -e "${fmtRESET}====================________${fmtRESET}"
+echo -e "|-"
+echo -e "${fmtRESET}================............${fmtRESET}"
+echo -e "${fmtRESET}==============..............${fmtRESET}"
+echo -e "${fmtRESET}=======================.....${fmtRESET}"
+
+echo -e "|-"
+
+echo -e "|- fncLayoutHRFullScreen:"
+echo -e "$txtHRFullScreen"
+
+echo -e "|-"
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Werte prozentual darstellen ---------------------------------------------------------
+function fncLayoutWerteProzentual {
+    intAnzZeichen100Prozent=$intLayoutMaxSpalten
+    intWert100Prozent=$RAMgesamt
+    intWertOriginal=$RAMfrei
+    
+    
+    RAMfreiVISUELL=${RAMfrei//M/}
+    RAMfreiVISUELL=`expr $RAMfreiVISUELL \/ 10`
+    RAMfreiVISUELL=`expr $RAMfreiVISUELL \/ 2`
+    RAMfreiVISUELLz=$RAMfreiVISUELL
+    RAMbalken=""
+    while ( [[ $RAMfreiVISUELLz -gt 0 ]] )
+    do
+        RAMbalken=$RAMbalken"_"
+        RAMfreiVISUELLz=`expr $RAMfreiVISUELLz - 1`
+    done
+    #echo -e "wert $RAMfrei $RAMfreiVISUELL $RAMbalken"
+}
+# ----- ENDE Werte prozentual darstellen ----------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#--------------------------------------------------------------------------------
+
+if ( [ "$1" != "-q" ] ) 
+then
+    # wird (fast) immer angezeigt:
+    echo -e "|-"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $datei ($$) -| $titel"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- "`date`
+    echo -e "|-"
+fi
+
+#set -x
+# -Bei Bedarf alle Argumente kontrollieren:
+typeset -i zz=0
+# for i in $@
+# do
+#     zz=zz+1
+#     echo -e "|- DEBUG: Argumente - @ - $zz.: $i"
+# done
+
+zz=0
+for i in "$@"
+do
+    arrARGUMENTE[$zz]="$i"
+    zz=zz+1
+    echo -e "|- DEBUG: Argumente -\"@\"- $zz.: $i"
+done
+
+# zz=0
+# for i in $*
+# do
+#     zz=zz+1
+#     echo -e "|- DEBUG: Argumente - * - $zz.: $i"
+# done
+
+# zz=0
+# for i in "$*"
+# do
+#     zz=zz+1
+#     echo -e "|- DEBUG: Argumente -\"*\"- $zz.: $i"
+# done
+
+vorgabePFAD=${2:-`pwd`}
+echo -e "|- vorgabePFAD:'$vorgabePFAD'"
+
+echo -e "|- arrARGUMENTE Aufruf: test1=(\${arrARGUMENTE[@]:1})"
+test0=(${arrARGUMENTE[@]:0})
+test1=(${arrARGUMENTE[@]:1})
+test3=("${arrARGUMENTE[@]:3}")
+test4="${test3:-XYZ}"
+test5="${arrARGUMENTE[3]:-XYZ}"
+echo -e "|- test0:'"$test0"' - test1:'"$test1"' - test3:'"$test3"' --- test4:'"$test4"' - test5:'"$test5"' - "
+echo -e "|- arrARGUMENTE-3: ${arrARGUMENTE[3]}"
+echo -e "|- arrARGUMENTE-@: ${arrARGUMENTE[@]:3}"
+
+
+
+
+
+
+
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Test Layout Zeitangaben mit Millisekunden"
+echo -e "|-"
+
+
+HMSmS=`date '+%H:%M:%S.%N'`
+HMSxyz=${HMSmS//.*/}
+mSxyz=${HMSmS//*:/}
+mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
+mSxyz=${mSxyz//*./}
+echo -e "|- $HMSxyz$mSxyz - Befehl... Status..."
+echo -e "|-"
+
+HMSmS=`date '+%H:%M:%S.%N'`
+HMSxyz=${HMSmS//.*/}
+mSxyz=${HMSmS//*:/}
+mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
+mSxyz=${mSxyz//*./}
+echo -e "|- $HMSxyz$mSxyz - Befehl... Status..."
+echo -e "|-"
+
+HMSmS=`date '+%H:%M:%S.%N'`
+HMSxyz=${HMSmS//.*/}
+mSxyz=${HMSmS//*:/}
+mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
+mSxyz=${mSxyz//*./}
+echo -e "|- $HMSxyz$mSxyz - Befehl... Status..."
+echo -e "|-"
+
+
+
+
+
+exit 0;
+
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Test Kdialog 'getopenfilename' multiple"
+echo -e "|-"
+
+
+function fncDateienAuslesenAusgabe {
+    # -Erwartet eine oder mehrere Dateien mittels $1, diese werden nacheinander
+    #  ausgelesen, am Ende wird der Inhalt aller Dateien komplett ausgegeben!
+    [[ "$1" == "" ]] && echo -e "(Argument nicht angegeben)" && return
+    
+    arrDateien=($1)
+    strTmpDateienAusgabe=""
+    
+    for i in "${arrDateien[@]}"
+    do
+        strTmpDateienInhalt=""
+        # -Inhalt auslesen und temporär speichern:
+        [[ -n `cat $i` ]] && strTmpDateienInhalt=`cat $i`
+        [[ -z `cat $i` ]] && continue
+        
+        [[ -z $strTmpDateienAusgabe ]] && strTmpDateienAusgabe="$strTmpDateienInhalt" && continue
+        [[ -n $strTmpDateienAusgabe ]] && strTmpDateienAusgabe="$strTmpDateienAusgabe $strTmpDateienInhalt"
+    done
+    
+    [[ -z $strTmpDateienAusgabe ]] && echo -e "Die gewählten Dateien haben keinen Inhalt!" && return
+    echo -en "$strTmpDateienAusgabe"
+    
+}
+
+
+vorgabePFAD=`pwd`
+vorgabeFILTER="Favoritendatei (*.FAV.*txt)"
+eingabeDATEI=$(kdialog --title="Favoriten wählen:" --getopenfilename --multiple "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+
+echo -e "|- Dateien auswählen:"
+echo -e "|- -Filter: $vorgabeFILTER"
+echo -e "|- -Pfad: $vorgabePFAD"
+echo -e "|-"
+echo -e "|- Auswahl: $eingabeDATEI"
+echo -e "|-"
+echo -e "|- Inhalt der Auswahl: `fncDateienAuslesenAusgabe \"$eingabeDATEI\"`"
+
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+typeset -i intLayoutMaxSpalten=0
+typeset -i intLayoutMaxSpaltenVorgabe=120
+function fncLayoutMaxSpalten {
+    # -Den Anzeigebereich des eigenen Layouts auf 80% der vorhandenen Bildschirmbreite
+    #  begrenzen: ($zSPALTEN/10)*8
+    
+    typeset -i zZEILEN=$LINES
+    typeset -i zSPALTEN=$COLUMNS
+
+    intLayoutMaxSpaltenSCALE1=`echo -e "scale=1 ; ($zSPALTEN/10)*8" | bc -l`
+    intLayoutMaxSpalten=${intLayoutMaxSpaltenSCALE1//\.*/}
+    [ "$intLayoutMaxSpalten" -le 0 ] && intLayoutMaxSpalten=$intLayoutMaxSpaltenVorgabe
+}
+fncLayoutMaxSpalten
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Test Terminal Zeilen und Spalten"
+echo -e "|-"
+
+echo -e "|- Zeilen: $LINES\\t\\tSpalten: $COLUMNS"
+echo -e "|-"
+echo -e "|- intLayoutMaxSpalten: $intLayoutMaxSpalten"
+#echo -e "|- intLayoutMaxSpaltenSCALE1: $intLayoutMaxSpaltenSCALE1"
+echo -e "|-"
+
+
+function fncAusgabeHRMaxSpalten {
+    # -HRMaxSpalten erstellen und ausgeben!
+    # -Argumente:
+    # --$1: Die Zeichen mit denen die Linie anfangen soll.
+    # --$2: Das Zeichen mit dem die Linie gefüllt wird.
+    # -Werden keine Argumente übergeben, wird Standard genutzt:
+    txtHRAnfang="|"
+    txtHRFuellen="-"
+    
+    typeset -i zHRAnfang=0
+    typeset -i zHRFuellen=0
+    typeset -i zHRMaxSpalten=0
+    
+    [ $1 ] && txtHRAnfang="$1"
+    zHRAnfang=${#txtHRAnfang}
+    [ $2 ] && txtHRFuellen="$2"
+    zHRFuellen=${#txtHRFuellen}
+    
+    txtHRMaxSpalten="$txtHRAnfang""$txtHRFuellen"
+    zHRMaxSpalten=intLayoutMaxSpalten-zHRAnfang-zHRFuellen
+    for ((zHR=0; zHR<$zHRMaxSpalten; zHR++))
+    do
+        #echo -en "$zzHR - "
+        txtHRMaxSpalten="$txtHRMaxSpalten""$txtHRFuellen"
+    done
+    echo -e "\\r$txtHRMaxSpalten"
+}
+fncAusgabeHRMaxSpalten
+
+
+echo -e "|- for-Schleife Testen:"
+echo -en "|-"
+zHRmitte=10
+for ((zzHR=0; zzHR<$zHRmitte; zzHR++))
+do
+    echo -en " $zzHR"
+    #echo -en "$zzHR - "
+done
+echo -e "\\n|-"
+
+
+
+echo -e "|- fncANZAHLzeichen '|- [09:31:37] ': "`fncANZAHLzeichen "|- [09:31:37] "`
+echo -e "|- fncANZAHLzeichen '|- [09:31:37] ': `fncANZAHLzeichen "|- [09:31:37] "`"
+echo -e "|- fncANZAHLzeichen '|- [09:31:37] ': `fncANZAHLzeichen '|- [09:31:37] '`"
+
+echo -e "|-"
+
+
+
+
+
+exit 0;
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Test Integer Vergleiche"
+echo -e "|-"
+
+
+varTEST="0"
+typeset -i intTestVergleich=$varTEST
+echo -en "|- Vergleich mit 0: '$varTEST'"
+[ "$intTestVergleich" -gt 0 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 0 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 0 ] && echo -e " ... Ist gleich!"
+echo -en "|- Vergleich mit 1: '$varTEST'"
+[ "$intTestVergleich" -gt 1 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 1 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 1 ] && echo -e " ... Ist gleich!"
+echo -e "|-"
+echo -e "|-"
+
+varTEST="1"
+typeset -i intTestVergleich=$varTEST
+echo -en "|- Vergleich mit 0: '$varTEST'"
+[ "$intTestVergleich" -gt 0 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 0 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 0 ] && echo -e " ... Ist gleich!"
+echo -en "|- Vergleich mit 1: '$varTEST'"
+[ "$intTestVergleich" -gt 1 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 1 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 1 ] && echo -e " ... Ist gleich!"
+echo -e "|-"
+echo -e "|-"
+
+varTEST="2"
+typeset -i intTestVergleich=$varTEST
+echo -en "|- Vergleich mit 0: '$varTEST'"
+[ "$intTestVergleich" -gt 0 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 0 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 0 ] && echo -e " ... Ist gleich!"
+echo -en "|- Vergleich mit 1: '$varTEST'"
+[ "$intTestVergleich" -gt 1 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 1 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 1 ] && echo -e " ... Ist gleich!"
+echo -e "|-"
+echo -e "|-"
+
+varTEST="str"
+typeset -i intTestVergleich=$varTEST
+echo -en "|- Vergleich mit 0: '$varTEST'"
+[ "$intTestVergleich" -gt 0 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 0 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 0 ] && echo -e " ... Ist gleich!"
+echo -en "|- Vergleich mit 1: '$varTEST'"
+[ "$intTestVergleich" -gt 1 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 1 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 1 ] && echo -e " ... Ist gleich!"
+echo -e "|-"
+echo -e "|-"
+
+varTEST=""
+typeset -i intTestVergleich=$varTEST
+echo -en "|- Vergleich mit 0: '$varTEST'"
+[ "$intTestVergleich" -gt 0 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 0 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 0 ] && echo -e " ... Ist gleich!"
+echo -en "|- Vergleich mit 1: '$varTEST'"
+[ "$intTestVergleich" -gt 1 ] && echo -e " ... Ist größer!"
+[ "$intTestVergleich" -lt 1 ] && echo -e " ... Ist kleiner!"
+[ "$intTestVergleich" -eq 1 ] && echo -e " ... Ist gleich!"
+echo -e "|-"
+echo -e "|-"
+
+
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+    echo -e "|- 'q':\\tDownload abbrechen und das Skript beenden.\\t\\t | 'f': URL/Playliste fertig downloaden und dann das Skript beenden."
+    #echo -e "|- 'q': Skript sofort beenden.\\t\\t\\t\\t-|-\\t'f': URL/Playliste fertigstellen und dann das Skript beenden."
+    echo -e "|- 'u':\\tDownload abbrechen und die nächste URL/Playliste\\t |"
+    echo -e "|-\\tbearbeiten.\\t\\t\\t\\t\\t\\t |"
+
+
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Kdialog Test Wert Status Return: yesnocancel"
+
+eingabeDATEI=$(kdialog --title="Logdatei wählen:" --yesnocancel "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+checkDIALOG=$(echo -e "$?")
+checkDIALOGreturn=$?
+checkDIALOGpid=$!
+echo -e "|-"
+echo -e "|- Status mittels Echo\$?:"
+echo -e "|- Wert: $eingabeDATEI"
+echo -e "|- Wert-Status: $checkDIALOG - Return: $checkDIALOGreturn - PID: $checkDIALOGpid"
+
+eingabeDATEI=$(kdialog --title="Logdatei wählen:" --yesnocancel "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+checkDIALOGreturn=$?
+checkDIALOG=$(echo -e "$?")
+checkDIALOGpid=$!
+echo -e "|-"
+echo -e "|- Status mittels Return:"
+echo -e "|- Wert: $eingabeDATEI"
+echo -e "|- Return: $checkDIALOGreturn - Wert-Status: $checkDIALOG - PID: $checkDIALOGpid"
+
+
+
+
+exit 0;
+
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Kdialog Test Wert Status Return: getopenfilename"
+
+eingabeDATEI=$(kdialog --title="Logdatei wählen:" --getopenfilename "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+checkDIALOG=$(echo -e "$?")
+checkDIALOGreturn=$?
+checkDIALOGpid=$!
+echo -e "|-"
+echo -e "|- Status mittels Echo\$?:"
+echo -e "|- Wert: $eingabeDATEI"
+echo -e "|- Wert-Status: $checkDIALOG - Return: $checkDIALOGreturn - PID: $checkDIALOGpid"
+
+eingabeDATEI=$(kdialog --title="Logdatei wählen:" --getopenfilename "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+checkDIALOGreturn=$?
+checkDIALOG=$(echo -e "$?")
+checkDIALOGpid=$!
+echo -e "|-"
+echo -e "|- Status mittels Return:"
+echo -e "|- Wert: $eingabeDATEI"
+echo -e "|- Return: $checkDIALOGreturn - Wert-Status: $checkDIALOG - PID: $checkDIALOGpid"
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Cursor Position auslesen:"
+
+function getCPos { 
+    local v=() t=$(stty -g)
+    stty -echo
+    printf "\033[6n"
+    IFS='[;' read -ra v -d R
+    stty $t
+    strCPosKOMPLETT="${v[@]}"
+    CPos=(${v[@]:1})
+    CPosSPALTE=(${v[@]:2})
+}
+
+echo -e "        10        20        30"
+echo -e "123456789012345678901234567890"
+echo -en "|- $$ getCPos -|"
+getCPos
+echo -e ""
+echo -e "|-"
+echo -e "|- Cursor Infos: '$strCPosKOMPLETT'"
+
+echo -e "|- Cursor Zeile: $CPos"
+echo -e "|- Cursor Spalte: $CPosSPALTE"
+
+
+echo -e "|-\\n|-"
+
+
+
+exit 0;
+
+
+
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Test Integer Berechnungen:"
+
+typeset -i intANZaufrufeGESAMT=20
+typeset -i intANZaufrufeINarchive=8
+typeset -i intANZaufrufeDOWNLOADjetzt=6
+typeset -i intANZaufrufeFEHLER=0
+
+echo -e "|- Anzahl:\\tVideos gesamt: $intANZaufrufeGESAMT - Bereits heruntergeladen: $intANZaufrufeINarchive - Neu heruntergeladen: $intANZaufrufeDOWNLOADjetzt"
+
+#intANZaufrufeFEHLER=intANZaufrufeGESAMT-intANZaufrufeINarchive+intANZaufrufeDOWNLOADjetzt
+intANZaufrufeFEHLER=`echo -e "scale=0 ; $intANZaufrufeGESAMT-($intANZaufrufeINarchive+$intANZaufrufeDOWNLOADjetzt)" | bc -l`
+
+echo -e "|- Fehler: $intANZaufrufeFEHLER"
+
+
+
+
+
+
+
+
+
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- fncANZAHLzeichen Test:"
+
+# function fncANZAHLzeichen {
+#     # -Die Anzahl der Zeichen in $1 ermitteln und mittels echo ausgeben!
+#     [ ! "$1" ] && echo -e "0" && return
+#     echo -e "${#1}"
+# }
+
+
+txtPLATZHALTER=""
+function fncANZAHLzeichenPLATZHALTER {
+    # -WICHTIG: This function is deprecated!
+    # -Die Anzahl der Zeichen in $1 ermitteln und mittels echo eine
+    # PLATZHALTER Linie ausgeben! maximale Zeichenanzahl: 80
+    # intZZmax=80
+    # --------------------------------------------------------------------------------
+    txtPLATZHALTER=""
+    typeset -i intZZmax=80
+    typeset -i intZZplatzhalter=0
+    [ ! "$1" ] && intZZplatzhalter=80
+    #echo -e "${#1}"
+    [ "$1" ] && intZZplatzhalter=intZZmax-${#1}
+    # -Den Platzhalter mittels Schleife zusammenbauen:
+    while ( [[ $intZZplatzhalter -gt 0 ]] )
+    do
+        txtPLATZHALTER="-"$txtPLATZHALTER
+        intZZplatzhalter=intZZplatzhalter-1
+    done
+    # -Platzhalter direkt ausgeben:
+    echo -e "$txtPLATZHALTER"
+}
+
+
+function fncECHOplatzhalter {
+    # -Die Anzahl der Zeichen in $1 ermitteln und damit eine Linie als
+    #  PLATZHALTER erstellen! Maximale Gesamtzeichenanzahl:
+    #  intZZmax=80
+    # -Am Ende werden $1 und $txtPLATZHALTER gemeinsam ausgegeben.
+    #  --------------------------------------------------------------------------------
+    txtPLATZHALTER=""
+    txtLEERZEICHEN=""
+    typeset -i intZZmax=80
+    typeset -i intZZplatzhalter=0
+    [ ! "$1" ] && intZZplatzhalter=$intZZmax
+    #echo -e "${#1}"
+    # -Damit zwischen $1 und $txtPLATZHALTER genau 1 Leerzeichen ist,
+    #  wird das letzte Zeichen von $1 entsprechend ausgeschnitten und
+    #  überprüft:
+    [ "$1" ] && [ -n "${1: -1}" ] && txtLEERZEICHEN=" "
+    [ "$1" ] && intZZplatzhalter=intZZmax-${#1}-${#txtLEERZEICHEN}
+    # -Den Platzhalter mittels Schleife zusammenbauen:
+    while ( [[ $intZZplatzhalter -gt 0 ]] )
+    do
+        txtPLATZHALTER=$txtPLATZHALTER"-"
+        intZZplatzhalter=intZZplatzhalter-1
+    done
+    # -$1 und $PLATZHALTER direkt ausgeben:
+    echo -e "$1""$txtLEERZEICHEN""$txtPLATZHALTER"
+}
+
+
+
+fncANZAHLzeichenPLATZHALTER
+echo -e "[$datei] "`fncHHMMSS`
+
+fncECHOplatzhalter "[$datei] "`fncHHMMSS`
+fncANZAHLzeichenPLATZHALTER
+
+
+
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Logdatei Fehlercheck:"
+
+txtSTATUS="Julian Madsen wird unter Waffengewalt von einem mysteriösen Mann entführt. Seine Empfangsdame Laura könnte als Augenzeugin entscheidende Hinweise liefern, wurde allerdings bei dem Angriff schwer verletzt. Die Umweltaktivisten haben offenbar eine neue Terrorzelle gebildet und bereiten sich auf einen neuen Anschlag vor. Saga und Martin machen Fortschritte in den Ermittlungen, doch die Kriminellen scheinen ihnen immer einen Schritt voraus zu sein. Martin führt seine Gespräche mit Jens im Gefängnis fort und stellt seinem ehemaligen Kollegen eine überraschende Bitte."
+
+if ( ( [[ "$txtSTATUS" == *ERROR* ]] || [[ "$txtSTATUS" == *Error* ]] || [[ "$txtSTATUS" == *error* ]] ) && [[ "$txtSTATUS" != *Terror* ]] && [[ "$txtSTATUS" != *terror* ]] )
+then
+    echo -e "|- FEHLER!!! T"
+else
+    echo -e "|- KEIN FEHLER!!! T"
+fi
+
+
+txtSTATUS="Der Fall scheint gelöst, doch Saga stößt auf Ungereimtheiten in der Ermittlungsakte: Vermutlich ist immer noch ein Mörder auf freiem Fuß. Was, wenn der in letzter Minute vereitelte Bioterroranschlag nur ein Vorgeschmack auf das große Finale gewesen wäre? Kurz vor der Eröffnung des EU-Gipfels liefert sich das Ermittlerduo einen Wettlauf gegen die Zeit. Wird es Saga und Martin gelingen, eine Katastrophe ungeahnten Ausmaßes zu verhindern?"
+
+if ( ( [[ "$txtSTATUS" == *ERROR* ]] || [[ "$txtSTATUS" == *Error* ]] || [[ "$txtSTATUS" == *error* ]] ) && [[ "$txtSTATUS" != *Terror* ]] && [[ "$txtSTATUS" != *terror* ]] )
+then
+    echo -e "|- FEHLER!!! t"
+else
+    echo -e "|- KEIN FEHLER!!! t"
+fi
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+fncDEBUGstart "Auswahl Favoriten"
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- Datei (Favoriten) auswählen (mit Filter) Test:"
+
+function fncEINGABEdateiFAVORITEN {
+    # -Falls es mehrere Dateien gibt, wird ein Auswahlfenster für Dateien geöffnet!
+    
+    #vorgabePFAD=`pwd`"/"*"lxDOWNLOAD.URLS.FAV"*
+    vorgabePFAD=`pwd`
+    vorgabeFILTER="Favoritendatei (*URLS.FAV*.txt)"
+    eingabeDATEI=$(kdialog --title="Logdatei wählen:" --getopenfilename "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+    checkDIALOG=$(echo -e "$?")
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+            checkDIALOGfehler="" ;;
+        (1)
+            # -abbruchBENUTZER
+            checkDIALOGfehler="|- Sie haben die Auswahl der Logdatei abgebrochen. Das Skript wird daher beendet." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER:"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+    "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+    "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+    "|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        echo -e $checkDIALOGfehler
+        echo -e "|-"
+        exit $checkDIALOG;
+    fi
+    
+}
+
+# -Check auf gespeicherte URLS und FAVORITEN:
+flagFAVORITEN="false"
+dateiURLS="00_lxDOWNLOAD.URLS.txt"
+dateiURLSfav="00_lxDOWNLOAD.URLS.FAV.txt"
+if ( [[ ! -f "$dateiURLS" ]] && [[ -f "$dateiURLSfav" ]] )
+then
+    echo -e "--- mindestens eine Datei vorhanden!"
+    iaLSarray=(`ls *"lxDOWNLOAD.URLS.FAV"*"txt" 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    if ( [[ $iaLSarrayANZAHL -gt 1 ]] )
+    then
+        echo -e "--- mindestens zwei Dateien vorhanden, daher Auswahlfenster!"
+        fncEINGABEdateiFAVORITEN
+    fi
+    
+    
+    #cp -b $dateiURLSfav $dateiURLS
+    flagFAVORITEN="true"
+fi
+
+
+fncDEBUGstop "Auswahl Favoriten"
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function fncBEFEHL {
+    # -Argumente:
+    # --$1: Befehl zum Ausführen
+    # --$2: Text oder Zeichen am Anfang der Ausgabe
+    
+    # -Der Name der Datei:
+    [ -z "$datei" ] && datei=${0//*\//}
+    # -Befehl zum Ausführen: $txtBEFEHL oder $1
+    [ -n "$1" ] && txtBEFEHL="$1"
+    [ -n "$2" ] && txtAUSGABEanfang="$2" || txtAUSGABEanfang="--- $datei."
+    
+    if ( [[ "$flagTESTDRIVE" != "true" ]] )
+    then
+        echo -e "$txtAUSGABEanfang""AUSFÜHREN: '$txtBEFEHL'"
+        actionBEFEHL="echo -e $txtBEFEHL"
+        `$actionBEFEHL` 2>/dev/null
+        stsBEFEHL=$?
+        # -Exit-Status auswerten:
+        [ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""KEIN FEHLER: '$stsBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: '$stsBEFEHL'"
+    else
+        echo -e "$txtAUSGABEanfang""TESTMODUS: '$txtBEFEHL'"
+        stsBEFEHL=$?
+    fi
+    return $stsBEFEHL;
+}
+
+
+
+
+
+
+
+
+echo -e "|-"
+echo -e "$txtHRFullScreen"
+echo -e "|- CPUlimit Test:"
+
+iQUELLE="/usr/share/doc/util-linux/"
+extension=".txt"
+#iaLSarray=(`ls $iQUELLE"*"$extension`)
+dirAKTUELL=`pwd`
+#cd $iQUELLE
+
+#iaLSarray=(`ls $iQUELLE*$extension`)
+#iaLSarray=(`ps -C cpulimit -o pid=`)
+iaTERMINAL=`tty`
+iaTERMINAL="/dev/pts/6"
+vorgabeTTY="pts/6"
+#iaLSarray=(`ps -C cpulimit --tty $iaTERMINAL -o pid=`)
+iaLSarray=(`ps -C cpulimit -o pid=`)
+typeset -i zz=0
+typeset -i zzTTY=0
+for ia in ${iaLSarray[@]}
+do
+    [ $zz -eq 0 ] && echo -e "+++ Anzahl: ${#iaLSarray[@]}"
+    echo -en "+ $zz - PS: $ia + "
+    
+    iaTTY=`ps -p $ia -o tty=`
+    #[[ "$iaTTY" == "$vorgabeTTY" ]] && zzTTY=zzTTY+1 && echo -en "+ TTY: $iaTTY --- "
+    [[ "$iaTTY" == "$vorgabeTTY" ]] && zzTTY=zzTTY+1 && echo -en " fncKILLpid $ia --- "
+    
+    
+    #[ $zz -eq 0 ] && echo -e "+++ Anzahl: ${#iaLSarray[@]}"
+    #echo -en "+++ Index $zz: $ia "
+    #[ $zz -lt ${#iaLSarray[@]} ] && echo -e "--- $zz -lt ${#iaLSarray[@]}"
+    #[ 17 -eq ${#iaLSarray[@]} ] && echo -e "--- -eq ${#iaLSarray[@]}"
+    zz=zz+1
+done
+
+
+echo -e \\n"|-"
+echo -e "$txtHRFullScreen"
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+echo -e "$txtHRFullScreen"
+echo -e "- Array Test:"
+
+iQUELLE="/usr/share/doc/util-linux/"
+extension=".txt"
+#iaLSarray=(`ls $iQUELLE"*"$extension`)
+dirAKTUELL=`pwd`
+#cd $iQUELLE
+iaLSarray=(`ls $iQUELLE*$extension`)
+typeset -i zz=0
+for ia in ${iaLSarray[@]}
+do
+    echo -e "+++ $ia"
+    echo -e "+++ ${#iaLSarray[@]}"
+    [ $zz -lt ${#iaLSarray[@]} ] && echo -e "--- $zz -lt ${#iaLSarray[@]}"
+    [ 17 -eq ${#iaLSarray[@]} ] && echo -e "--- -eq ${#iaLSarray[@]}"
+    zz=zz+1
+done
+
+
+echo -e "-"
+echo -e "$txtHRFullScreen"
+
+exit 0;
+
+
+
+
+
+
+
+
+# -Status bzw Exit- bzw Return-Code bei gleichem Befehl, aber unterschiedlichen Aufrufen!
+echo -e "|-"
+echo -e "|- Status bei gleichem Befehl, aber unterschiedlichen Aufrufen:"
+echo -e "|- -Befehl: 'lxDOWNLOAD -l'"
+echo -e "|- -strBEFEHL='lxDOWNLOAD -l'"
+echo -e "|-"
+echo -e "|-"
+strBEFEHL="lxDOWNLOAD -l"
+
+# DEBUG CAT echo -e "--------------------" > gibts.txt || echo -e "-FEHLER- -Bitte die Rechtevergabe prüfen!-"
+# DEBUG CAT [ ! -f gibts.txt ] && exit 2;
+# DEBUG CAT echo -e "- Hallo Welt!" >> gibts.txt
+# DEBUG CAT echo -e "--------------------" >> gibts.txt
+
+
+
+echo -e "|- 'lxDOWNLOAD -l'"
+lxDOWNLOAD -l
+intCHECKstatus=$?
+[ $intCHECKstatus -eq 0 ] && echo -e "|- -KEIN FEHLER-" || echo -e "|- -FEHLER-"
+#intCHECKstatus=$?
+echo -e "|- Status: $intCHECKstatus"
+echo -e "|-"
+
+echo -e "|- 'echo -e \"lxDOWNLOAD -l\"'"
+`echo -e "lxDOWNLOAD -l"`
+intCHECKstatus=$?
+[ $intCHECKstatus -eq 0 ] && echo -e "|- -KEIN FEHLER-" || echo -e "|- -FEHLER-"
+#intCHECKstatus=$?
+echo -e "|- Status: $intCHECKstatus"
+echo -e "|-"
+
+echo -e "|- \`echo -e \$strBEFEHL\`"
+`echo -e $strBEFEHL`
+intCHECKstatus=$?
+[ $intCHECKstatus -eq 0 ] && echo -e "|- -KEIN FEHLER-" || echo -e "|- -FEHLER-"
+#intCHECKstatus=$?
+echo -e "|- Status: $intCHECKstatus"
+echo -e "|-"
+
+echo -e "|- 'fncBEFEHL \"\$strBEFEHL\"'"
+fncBEFEHL "$strBEFEHL"
+echo -e "|-"
+
+echo -e "|- 'fncBEFEHL \"echo -e \$COLUMNS\"'"
+fncBEFEHL "echo -e $COLUMNS"
+echo -e "|-"
+
+echo -e "|-"
+#echo -e "|-"
+exit 0;
+# DEBUG CAT mv gibts.txt gibts-nicht.txt
+
+echo -e "|- 'lxDOWNLOAD -l'"
+lxDOWNLOAD -l
+intCHECKstatus=$?
+[ $intCHECKstatus -eq 0 ] && echo -e "|- -KEIN FEHLER-" || echo -e "|- -FEHLER-"
+#intCHECKstatus=$?
+echo -e "|- Status: $intCHECKstatus"
+echo -e "|-"
+
+echo -e "|- 'echo -e \"lxDOWNLOAD -l\"'"
+`echo -e "lxDOWNLOAD -l"`
+intCHECKstatus=$?
+[ $intCHECKstatus -eq 0 ] && echo -e "|- -KEIN FEHLER-" || echo -e "|- -FEHLER-"
+#intCHECKstatus=$?
+echo -e "|- Status: $intCHECKstatus"
+echo -e "|-"
+
+echo -e "|- 'echo -e \$strBEFEHL'"
+`echo -e $strBEFEHL`
+intCHECKstatus=$?
+[ $intCHECKstatus -eq 0 ] && echo -e "|- -KEIN FEHLER-" || echo -e "|- -FEHLER-"
+#intCHECKstatus=$?
+echo -e "|- Status: $intCHECKstatus"
+echo -e "|-"
+
+echo -e "|- 'fncBEFEHL \"\$strBEFEHL\" \"|- \"'"
+fncBEFEHL "$strBEFEHL" "|- "
+echo -e "|-"
+
+#echo -e "|-"
+#echo -e "|-"
+
+
+# DEBUG CAT rm gibts-nicht.txt
+
+exit 0;
+
+
+
+
+
+#while [ `youtube-dl --get-id https://de.pornhub.com/playlist/97212271` ]
+
+
+strPLAYLISTflatJSON=`youtube-dl --flat-playlist --dump-single-json https://de.pornhub.com/playlist/97212271`
+
+#intPLAYLISTitemsMAX=`grep -o '{"url"' $strPLAYLISTflatJSON | wc -l`
+
+intPLAYLISTitemsMAX=`echo -e $strPLAYLISTflatJSON | grep -o '{"url"' | wc -l`
+
+
+echo -e "--- $intPLAYLISTitemsMAX"
+
+
+
+
+exit 0;
+
+
+
+
+
+
+echo -e "$*"
+echo -e ""
+echo -e "|- shift:\\tString Argumente \$1,\$2,... bearbeiten, d.h. die Werte verschieben."
+echo -e "|- \\t\\t \$1 wird überschrieben von \$2, \$2 von \$3, \$3 von \$4,..."
+echo -e "|-"
+zz=0
+for i in "$@"
+do
+    [ $zz -eq 0 ] && echo -e "|- DEBUG: test-normal"
+    zz=zz+1
+    echo -e "|- DEBUG: Argumente -\"@\"- $zz.: $i"
+    echo -e "|- DEBUG: Argumente $# - $*"
+    [ $zz -eq $# ] && echo -e "|-"
+done
+
+zz=0
+intANZargumente=0
+for i in "$@"
+do
+    [ $zz -eq 0 ] && echo -e "|- DEBUG: test-mit-shift (\$2=zwei, dann shift)" && intANZargumente=$#
+    zz=zz+1
+    echo -e "|- DEBUG: Argumente -\"@\"- $zz.: $i"
+    echo -e "|- DEBUG: Argumente $# - $*"
+    [ $zz -eq $intANZargumente ] && echo -e "|-"
+    [[ "$i" == "zwei" ]] && shift && echo -e "|-" && break
+done
+
+zz=0
+for i in "$@"
+do
+    [ $zz -eq 0 ] && echo -e "|- DEBUG: test-nach-shift"
+    zz=zz+1
+    echo -e "|- DEBUG: Argumente -\"@\"- $zz.: $i"
+    echo -e "|- DEBUG: Argumente $# - $*"
+    [ $zz -eq $# ] && echo -e "|-"
+done
+#set +x
+
+
+
+
+echo -e "|- PID \$\$: $$"
+echo -e "|- BASHPID: $BASHPID"
+
+function fncDOhauptprozess {
+    echo -e "|- innerhalb der Funktion BASHPID: $BASHPID"
+    typeset -i ii=0
+    pfad=`pwd`
+    echo -e "|- START fncDOhauptprozess"
+    while [ $ii -lt 60 ]
+    do
+        echo -en "- $ii - $BASHPID -"
+        ii=ii+1
+    done
+    echo -e "\\n|- ENDE fncDOhauptprozess"
+}
+
+
+( fncDOhauptprozess )
+echo -e "|- BASHPID: $BASHPID"
+
+
+echo -e "|-"
+
+
+echo -e "|- Ohne Subshell:"
+echo -e "|- PID \$\$: $$"
+echo -e "|- BASHPID: $BASHPID"
+fncDOhauptprozess
+
+exit 0;
+
+
+
+
+
+
+
+flagFFMPEGmakeTXTBOX="true"
+ [ "$flagFFMPEGmakeTXTBOX" == "true" ] && echo -e "+++ TEXTBOX"
+
+echo -e "+++++ Test Funktion Variablen +++++"
+function fncTESTvariablen {
+    echo -e "+++ Funktion läuft $0"
+    varTEST="hallo welt"
+}
+echo -e "+++ varTEST: '$varTEST'"
+fncTESTvariablen
+echo -e "+++ varTEST: '$varTEST'"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+|593| [download]  45.3% of 95.92MiB at 514.45KiB/s ETA 01:44[download]  45.8% of 95.92MiB at 514.17KiB/s ETA 01:43[download]  46.3% of 95.92MiB at 514.02KiB/s ETA 01:42[download]  46.8% of 95.92MiB at 513.85KiB/s ETA 01:41[download]  47.3% of 95.92MiB at 513.66KiB/s ETA 01:40[download]  47.8% of 95.92MiB at 513.47KiB/s ETA 01:39[download]  48.4% of 95.92MiB at 513.26KiB/s ETA 01:38[download]  48.9% of 95.92MiB at 513.02KiB/s ETA 01:37[download]  49.4% of 95.92MiB at 512.89KiB/s ETA 01:36[download]  49.9% of 95.92MiB at 512.73KiB/s ETA 01:36[download]  50.4% of 95.92MiB at 512.56KiB/s ETA 01:35[download]  50.9% of 95.92MiB at 512.38KiB/s ETA 01:34[download]  51.4% of 95.92MiB at 512.17KiB/s ETA 01:33[download]  51.9% of 95.92MiB at 512.06KiB/s ETA 01:32[download]  52.4% of 95.92MiB at 511.85KiB/s ETA 01:31[download]  52.9% of 95.92MiB at 511.68KiB/s ETA 01:30[download]  53.4% of 95.92MiB at 511.53KiB/s ETA 01:29[download]  53.9% of 95.92MiB at 511.46KiB/s ETA 01:28[download]  54.4% of 95.92MiB at 511.26KiB/s ETA 01:27[download]  54.9% of 95.92MiB at 511.12KiB/s ETA 01:26[download]  55.4% of 95.92MiB at 511.00KiB/s ETA 01:25[download]  55.9% of 95.92MiB at 510.88KiB/s ETA 01:24[download]  56.4% of 95.92MiB at 510.75KiB/s ETA 01:23[download]  56.9% of 95.92MiB at 510.59KiB/s ETA 01:22[download]  57.4% of 95.92MiB at 510.50KiB/s ETA 01:21[download]  58.0% of 95.92MiB at 510.38KiB/s ETA 01:20[download]  58.5% of 95.92MiB at 510.21KiB/s ETA 01:19[download]  59.0% of 95.92MiB at 510.09KiB/s ETA 01:19[download]  59.5% of 95.92MiB at 509.82KiB/s ETA 01:18[download]  60.0% of 95.92MiB at 511.66KiB/s ETA 01:16[download]  60.9% of 95.92MiB at 511.06KiB/s ETA 01:15[download]  61.4% of 95.92MiB at 512.85KiB/s ETA 01:13[download]  62.3% of 95.92MiB at 512.15KiB/s ETA 01:12[download]  62.8% of 95.92MiB at 510.17KiB/s ETA 01:11[download]  63.1% of 95.92MiB at 511.42KiB/s ETA 01:10[download]  63.8% of 95.92MiB at 510.07KiB/s ETA 01:09[download]  64.2% of 95.92MiB at 511.50KiB/s ETA 01:08[download]  65.1% of 95.92MiB at 510.69KiB/s ETA 01:07[download]
+65.5% of 95.92MiB at 512.26KiB/s ETA 01:06[download]  66.5% of 95.92MiB at 511.74KiB/s ETA 01:04[download]  66.9% of 95.92MiB at 509.81KiB/s ETA 01:03[download]  67.3% of 95.92MiB at 510.94KiB/s ETA 01:02[download]  68.0% of 95.92MiB at 509.66KiB/s ETA 01:01[download]  68.4% of 95.92MiB at 510.98KiB/s ETA 01:00[download]  69.2% of 95.92MiB at 510.25KiB/s ETA 00:59[download]  69.7% of 95.92MiB at 508.32KiB/s ETA 00:58[download]  70.0% of 95.92MiB at 509.41KiB/s ETA 00:57[download]  70.7% of 95.92MiB at 508.16KiB/s ETA 00:56[download]  71.1% of 95.92MiB at 509.37KiB/s ETA 00:55[download]  71.9% of 95.92MiB at 508.66KiB/s ETA 00:54[download]  72.4% of 95.92MiB at 510.07KiB/s ETA 00:53[download]  73.3% of 95.92MiB at 509.58KiB/s ETA 00:51[download]  73.8% of 95.92MiB at 507.86KiB/s ETA 00:50[download]  74.1% of 95.92MiB at 508.88KiB/s ETA 00:49[download]  74.8% of 95.92MiB at 507.76KiB/s ETA 00:48[download]  75.2% of 95.92MiB at 508.99KiB/s ETA 00:47[download]  76.0% of 95.92MiB at 508.30KiB/s ETA 00:46[download]  76.5% of 95.92MiB at 509.63KiB/s ETA 00:45[download]  77.4% of 95.92MiB at 509.19KiB/s ETA 00:43[download]  77.9% of 95.92MiB at 507.58KiB/s ETA 00:42[download]  78.2% of 95.92MiB at 508.48KiB/s ETA 00:42[download]  78.9% of 95.92MiB at 507.46KiB/s ETA 00:40[download]  79.4% of 95.92MiB at 508.45KiB/s ETA 00:39[download]  80.2% of 95.92MiB at 507.94KiB/s ETA 00:38[download]  80.6% of 95.92MiB at 509.21KiB/s ETA 00:37[download]  81.5% of 95.92MiB at 508.78KiB/s ETA 00:35[download]  82.0% of 95.92MiB at 507.26KiB/s ETA 00:34[download]  82.4% of 95.92MiB at 508.14KiB/s ETA 00:34[download]  83.0% of 95.92MiB at 507.18KiB/s ETA 00:32[download]  83.5% of 95.92MiB at 508.30KiB/s ETA 00:31[download]  84.3% of 95.92MiB at 507.71KiB/s ETA 00:30[download]
+84.8% of 95.92MiB at 508.89KiB/s ETA 00:29[download]  85.7% of 95.92MiB at 508.42KiB/s ETA 00:27[download]  86.1% of 95.92MiB at 507.00KiB/s ETA 00:26[download]  86.5% of 95.92MiB at 507.87KiB/s ETA 00:26[download]  87.2% of 95.92MiB at 506.88KiB/s ETA 00:24[download]  87.6% of 95.92MiB at 507.93KiB/s ETA 00:23[download]  88.4% of 95.92MiB at 507.37KiB/s ETA 00:22[download]  88.9% of 95.92MiB at 508.45KiB/s ETA 00:21[download]  89.8% of 95.92MiB at 508.04KiB/s ETA 00:19[download]  90.2% of 95.92MiB at 506.62KiB/s ETA 00:18[download]  90.6% of 95.92MiB at 507.47KiB/s ETA 00:18[download]  91.2% of 95.92MiB at 506.51KiB/s ETA 00:16[download]  91.7% of 95.92MiB at 507.53KiB/s ETA 00:16[download]  92.5% of 95.92MiB at 506.93KiB/s ETA 00:14[download]  92.9% of 95.92MiB at 508.01KiB/s ETA 00:13[download]  93.8% of 95.92MiB at 507.65KiB/s ETA 00:11[download]  94.3% of 95.92MiB at 506.35KiB/s ETA 00:11[download]  94.7% of 95.92MiB at 507.15KiB/s ETA 00:10[download]  95.4% of 95.92MiB at 506.28KiB/s ETA 00:09[download]  95.8% of 95.92MiB at 507.24KiB/s ETA 00:08[download]  96.6% of 95.92MiB at 506.76KiB/s ETA 00:06[download]  97.1% of 95.92MiB at 507.79KiB/s ETA 00:05[download]  98.0% of 95.92MiB at 507.37KiB/s ETA 00:03[download]  98.4% of 95.92MiB at 506.19KiB/s ETA 00:03[download]  98.8% of 95.92MiB at 506.94KiB/s ETA 00:02[download]  99.5% of 95.92MiB at 506.13KiB/s ETA 00:00[download]  99.9% of 95.92MiB at 507.06KiB/s ETA 00:00[download] 100.0% of 95.92MiB at 507.30KiB/s ETA 00:00[download] 100% of 95.92MiB in 03:13
+|594| [ffmpeg] Adding metadata to 'playlist_97212271/25_Sims_4_-_Passing_the_exam_correctly.mp4'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function fncSTRINGzeichenMAX {
+    # -Die Länge eines Strings, also die Anzahl Zeichen, kontrollieren und bei Bedarf die
+    #  Ausgabe des Strings auf mehrere Zeilen aufteilen!
+    #
+    # -Aufruf:
+    #  fncSTRINGzeichenMAX "$max01" "60" "|- \ \ \ "
+    # -- $1 - String zum Checken - aus einer Variablen oder Text in Anführungszeichen
+    # -- $2 - maximale Anzahl Zeichen - integer oder String
+    # -- $3 - Zeichen am Anfang einer neuen Zeile, damit die Einrückung auf einer Linie liegt
+    #
+    # -Teststring:
+    #1="ffmpeg -v info -i /media/usb-disc/zyx-tmp/mm_cd_FAV/aaTESThd_00/bak_lxVIDEO/Lily_Star_clitty_pressed_against_cage_back_door_open.mp4 -c:v h264 -s 1280x720 -acodec copy /media/usb-disc/zyx-tmp/mm_cd_FAV/aaTESThd_00/bak_lxVIDEO/Lily_Star_clitty_pressed_against_cage_back_door_open_HD.mp4"
+    #v1="ffmpeg -v info -i /media/usb-disc/zyx-tmp/mm_cd_FAV/aaTESThd_00/bak_lxVIDEO/Lily_Star_clitty_pressed_against_cage_back_door_open.mp4 -c:v h264 -s 1280x720 -acodec copy /media/usb-disc/zyx-tmp/mm_cd_FAV/aaTESThd_00/bak_lxVIDEO/Lily_Star_clitty_pressed_against_cage_back_door_open_HD.mp4 NOCHMAL ffmpeg -v info -i /media/usb-disc/zyx-tmp/mm_cd_FAV/aaTESThd_00/bak_lxVIDEO/Lily_Star_clitty_pressed_against_cage_back_door_open.mp4 -c:v h264 -s 1280x720 -acodec copy /media/usb-disc/zyx-tmp/mm_cd_FAV/aaTESThd_00/bak_lxVIDEO/Lily_Star_clitty_pressed_against_cage_back_door_open_HD.mp4"
+    
+    #v1="Jam I Am - all mixes Playlist: http://www.youtube.com/playlist?list=PLBF6CC7C4B231EDF5 1. Quivver - Space Manoeuvres pt3 (Breaks Mix) 0:00 2. Andy Page - Mr. Rush 07:29 3. Meat Katie & Justin Drake - I'm Still Here 11:49 4. Nectarios - Pheonix (Vigi & Nectarios Mix) 17:06 5. Move Ya! & Steve Lavers - Could Be Tha Sound 22:51 6. Tom Real v The Rogue Element - Resistance Is Futile 27:55 7. DJ Killer - Defcom 33:25 8. Blim - Crazy Things (Koma & Bones Remix) 38:38 9. Plump DJs - Soul Vibrates 42:24 10. Krafty Kuts - Get Funky 48:03 11. Move Ya! & Steve Lavers - Monkey Scratch 52:14 12. Pod & Bowser - Get Loose 57:09 13. The Slag Brothers - Old Spice 2005 Remix (Original 303 Mix) 1:01:16 14. Pod & Bowser - The Anti 1:06:52 15. Paul Reset - Wake Up (Amb Remix) 1:11:37 16. Plump DJs - Bullet Train 1:16:29 17. Fine Cut Bodies - Trekk Far (Original Mix) 1:20:40 18. 30Hz - Ghost In The Machine 1:25:39 19. The Autobots & Screwface - Flesh Eater (General Midi Remix) 1:30:18 20. Freestylers - The Slammer 1:35:37 21. DJ Zinc (Jammin) - Hello 1:40:56 22. Scam - So Good 1:46:20 23. Three Drives - Greece 2000 (Lucky 7 Breaks Remix) 1:51:11 bit of a random mix.. just for fun. i dug out loads of my old vinyls this weekend, and been feelin the breaks :) havnt played em for years.. but thought id do a mix, as i never got round to recordin these tunes in the past! mostly quite techy breaks, then gets a bit more heavy towards end ;) all tunes from around 2002-2005. hope the breakbeat heads enjoy ;) Follow Jam I Am on FB for mix updates and tunes - http://on.fb.me/1GB5CCM pic from this site - http://desktopography.net/"
+        
+    v1="Häufig will man neben der gewöhnlichen Ausgabe auch das Terminal oder den Bildschirm steuern: etwa den Bildschirm löschen, Farben verwenden oder die Höhe und Breite des Bildschirms ermitteln. Dies und noch vieles mehr können Sie mit tput realisieren. tput ist übrigens auch ein eigenständiges Programm (kein Builtin) und somit unabhängig von der Shell. Zum Glück kennt tput die Terminalbibliothek terminfo (früher auch /etc/termcap), in der viele Attribute zur Steuerung des Terminals abgelegt sind. Dort finden Sie eine Menge Funktionen, von denen Sie hier nur die nötigsten kennen lernen. Einen umfassenderen Einblick können Sie über die entsprechende Manual-Page von terminfo gewinnen."
+    v3="|--- "
+    typeset -i SCREENspalten=0 && typeset -i SCREENzeilen=0
+    SCREENspalten=`tput cols`
+    SCREENzeilen=`tput cols`
+    SCREENspaltenRAND=`echo -e "scale=0 ; $SCREENspalten/6" | bc -l`
+    intZEICHENtxt103=`echo $v3 | awk '{print length($v3)}'`
+    
+    ZEICHENmax=`echo -e "scale=0 ; $SCREENspalten-$SCREENspaltenRAND-$intZEICHENtxt103" | bc -l`
+    v2=$ZEICHENmax
+    
+    echo -e "DEBUG-Infos -- Zeilen: $intANZAHLzeilen/$zz - Zeichen max/ges/Rest: $v2 $intSTRGz $intZEICHENrest - Spalten: $SCREENspalten Rand: $SCREENspaltenRAND"
+#     function getCPos { 
+#         local v=() t=$(stty -g)
+#         stty -echo
+#         printf "\033[6n"
+#         IFS='[;' read -ra v -d R
+#         stty $t
+#         CPos=(${v[@]:1})
+#     }
+#     getCPos
+#     cursorZEILE=$CPos
+    
+    
+    
+    typeset -i intSTRGzKONTROLLE=0
+    typeset -i intSTRGzMAX=0
+    typeset -i intSTRGzMAXextension=0
+    typeset -i intSTRGzEXT=0
+    strSTRINGz="$v1"
+    intSTRGzMAX="$v2"
+    strZEICHENanfangZEILE="$v3"
+    
+    txtZEILE101="$strZEICHENanfangZEILE"
+    txtZEILE102=""
+    txtZEILE103=""
+    txtZEILE201=""
+    txtZEILE202=""
+    
+    intSTRGzMAXminus1=intSTRGzMAX-1
+    strSTRINGzBAK=$strSTRINGz
+    strSTRINGzEXT=""
+    txtAUSGABEfnc=""
+    if ( [[ "$strSTRINGzBAK" == *.* ]] )
+    then
+            # -Länge der Extensions:
+            strSTRINGzEXT=${strSTRINGz//*./}
+            intSTRGzEXT=`echo $strSTRINGzEXT | awk '{print length($strSTRINGzEXT)}'`
+    fi
+    # -Da Position mit null beginnt, muss der Kontrollwert intSTRGzKONTROLLE nicht
+    #  um eins erhöht werden.
+    # -Wenn nach der maximalen Anzahl Zeichen der String noch weitergeht, wird er gekürzt.
+    # -Wenn es sich um eine Datei handelt, wird die Extension nicht abgeschnitten.
+    intSTRGzKONTROLLE=$intSTRGzMAX
+    intSTRGz=`echo $strSTRINGz | awk '{print length($strSTRINGz)}'`
+    #strSTATUSzeichenKONTROLLE=${txtSTATUS:$intSTRGzKONTROLLE:1}
+    #if ( [[ "$strSTATUSzeichenKONTROLLE" != "" ]] )
+    if ( [[ "$intSTRGz" -gt $intSTRGzMAX ]] )
+    then
+        intANZAHLzeilen=`echo -e "scale=0 ; $intSTRGz/$intSTRGzMAX" | bc -l`
+        intZEICHENrest=`echo -e "scale=0 ; $intSTRGz-($intANZAHLzeilen*$intSTRGzMAX)" | bc -l`
+        [ $intZEICHENrest -gt 5 ] && txtZEILE202=${strSTRINGz: -$intZEICHENrest}
+        [ $intZEICHENrest -gt 5 ] || txtZEILE103=${strSTRINGz: -$intZEICHENrest}
+        intZEICHENrest=$intSTRGz
+        typeset -i zz=0
+        while ( [[ "$intANZAHLzeilen" -gt "$zz" ]] )
+        do
+            txtZEILE=${strSTRINGz:0:$intSTRGzMAX}
+            txtZEILEuebertrag=${txtZEILE//* /}
+            intZEICHENuebertrag=`echo $txtZEILEuebertrag | awk '{print length($txtZEILEuebertrag)}'`
+            echo -e "DEBUG-Infos -- txtZEILE: $txtZEILE - uebertrag: $txtZEILEuebertrag - $intZEICHENuebertrag"
+            intSTRGzMAXminusUEBERTRAG=intSTRGzMAX-intZEICHENuebertrag
+            #txtZEILE102=${txtZEILE: -$intZEICHENuebertrag}
+            txtZEILE102=${txtZEILE:0:$intSTRGzMAXminusUEBERTRAG}
+            strSTRINGz=${strSTRINGz:$intSTRGzMAXminusUEBERTRAG}
+            #strSTRINGz=$txtZEILEuebertrag$strSTRINGz
+            intZEICHENrest=intZEICHENrest-intSTRGzMAXminusUEBERTRAG
+            echo -e "DEBUG-Infos -- txtZEILE: $txtZEILE - uebertrag: $txtZEILEuebertrag - $intZEICHENuebertrag"
+            zz=zz+1
+            
+            # -REST-ZEICHEN hinten anhängen:
+            [ $intANZAHLzeilen -lt $zz ] && txtZEILE103=""
+            echo -e "$txtZEILE101$txtZEILE102$txtZEILE103"
+            echo -e "DEBUG-Infos -- Zeilen: $intANZAHLzeilen/$zz - Zeichen max/ges/Rest: $v2 $intSTRGz $intZEICHENrest - Spalten: $SCREENspalten Rand: $SCREENspaltenRAND"
+        done
+        # -REST-ZEICHEN in eigener Zeile:
+        txtZEILE201=$txtZEILE101
+        [ -n "$txtZEILE202" ] && echo -e "$txtZEILE201$txtZEILE202"
+    fi
+
+}
+
+
+fncSTRINGzeichenMAX
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#iaLSarray=(`ls --group-directories-first /tmp`)
+
+# /media/usb-disc/zyx-tmp/zzy_tmp/test_hd/01/00_lxFF/*.mp4
+iQUELLE="/media/usb-disc/zyx-tmp/zzy_tmp/test_hd/01/00_lxFF/"
+extension=".mp4"
+
+#iaLSarray=(`ls $iQUELLE"*"$extension`)
+
+dirAKTUELL=`pwd`
+#cd $iQUELLE
+iaLSarray=(`ls $iQUELLE*$extension`)
+for ia in ${iaLSarray[@]}
+do
+    echo -e "+++ $ia"
+    echo -e "+++ ${#iaLSarray[@]}"
+done
+
+
+
+
+
+
+
+
+
+
+function fncFFMPEGbefehlAUFLOESUNGFRAMERATE {
+    i=$1
+    # -HD Standard Werte:
+    intHDresolutionWIDTH=1280
+    intHDresolutionHEIGHT=720
+    intMAXframerate=30
+
+    # -Dateiname ohne Pfad:
+    i_Dateiname=${i//*\//}
+    # -aufloesung usw. auslesen:
+    #  mediainfo --Inform='Video;%Width%' video.mp* 
+    i_width=`mediainfo --Inform='Video;%Width%' $i`
+    i_height=`mediainfo --Inform='Video;%Height%' $i`
+    i_BitRate=`mediainfo --Inform='Video;%BitRate%' $i`
+    i_FrameRate=`mediainfo --Inform='Video;%FrameRate%' $i`
+    i_FrameRate=${i_FrameRate//\.*/}
+    #echo -e "--- aufloesung: $i_width x $i_height"
+    #echo -e "--- Bitrate: $i_BitRate - Framerate: $i_FrameRate"
+    txtBEFEHLaufloesung=""
+    txtBEFEHLframerate=""
+
+    if ( [[ "$i_width" -gt "$intHDresolutionWIDTH" ]] || [[ "$i_height" -gt "$intHDresolutionHEIGHT" ]] )
+    then
+        # seitenverhaeltnis ermitteln und beibehalten
+        # varINT=`echo -e "(8+5)*2" | bc`
+        verhaeltnis=`echo -e "$i_width/$i_height" | bc -l`
+        max_width=$intHDresolutionWIDTH
+        max_height=`echo -e "scale=0 ; $intHDresolutionWIDTH/$verhaeltnis" | bc -l`
+        max_height_check=`echo -e "scale=1 ; $max_height/2" | bc -l`
+        #echo -e "--- max_height: $max_height --- max_height_check: $max_height_check"
+        if ( [[ "$max_height_check" != *.0 ]] )
+        then
+            max_height=`echo -e "scale=0 ; $max_height+1" | bc -l`
+        fi
+        #echo -e "--- NEUE aufloesung: $max_width x $max_height"
+        aufloesung=$max_width"x"$max_height
+        txtBEFEHLaufloesung=" -s $aufloesung"
+    fi
+    if ( [[ "$i_FrameRate" -gt "$intMAXframerate" ]] )
+    then
+        txtBEFEHLframerate=" -r $intMAXframerate"
+    fi
+}
+
+
+
+
+fncFFMPEGbefehlAUFLOESUNGFRAMERATE "/media/usb-disc/zyx-tmp/zzy_tmp/test_hd/01/MollyMae_3.mp4"
+
+echo -e "fncFFMPEGbefehlAUFLOESUNGFRAMERATE: $txtBEFEHLaufloesung - $txtBEFEHLframerate"
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+# while read txtEINLESEN
+# do
+#     txtNEU="$txtNEU$txtEINLESEN, "
+# done < /aa_daten/zz_work/friskee/aa-test.txt
+# 
+# echo -e "$txtNEU"
+# echo -e "$txtNEU" > /aa_daten/zz_work/friskee/aa-test.neu.txt
+
+
+
+
+
+
+
+
+
+typeset -i intTESTLAEUFE=10
+intSLEEP="0.01"
+echo -e "!!\\n!! `fncHHMMSS 'norm.mS3'` - Ausgabe VOR Sleep Befehl"
+while ( [[ "$intTESTLAEUFE" -gt 0 ]] )
+do
+    intTESTLAEUFE=intTESTLAEUFE-1
+    sleep $intSLEEP
+    #echo -e "!! `fncHHMMSS 'norm.mS3'` - Ausgabe NACH Sleep Befehl mit $intSLEEP Sekunden"
+    
+    echo -e `date '+%H:%M:%S.%N'`
+    mSxyz=0.`date '+%N'`
+    mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
+    mSxyz=${mSxyz//0./}
+    echo -e `date '+%H:%M:%S'`"."$mSxyz
+    echo -e "-----"
+    
+done
+
+
+
+
+# typeset -i intTESTLAEUFE=10
+# intSLEEP="0.01"
+# echo -e "!!\\n!! `fncHHMMSS 'norm.mS3'` - Ausgabe VOR Sleep Befehl"
+# while ( [[ "$intTESTLAEUFE" -gt 0 ]] )
+# do
+#     intTESTLAEUFE=intTESTLAEUFE-1
+#     sleep $intSLEEP
+#     #echo -e "!! `fncHHMMSS 'norm.mS2'` - `fncHHMMSS 'norm.mS3'` - Ausgabe NACH Sleep Befehl mit $intSLEEP Sekunden"
+#     
+#     echo -e `date '+%H:%M:%S.%N'`
+#     HMSmS=`date '+%H:%M:%S.%N'`
+#     echo -e $HMSmS
+#     HMSxyz=${HMSmS//.*/}
+#     mSxyz=${HMSmS//*:/}
+#     mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
+#     mSxyz=${mSxyz//*./}
+#     echo -e $HMSxyz"."$mSxyz
+#     echo -e "-----"
+#     
+# done
+
+
+
+
+typeset -i intTESTLAEUFE=10
+intSLEEP="0.01"
+echo -e "!!\\n!! `fncHHMMSS 'norm.mS3'` - Ausgabe VOR Sleep Befehl"
+while ( [[ "$intTESTLAEUFE" -gt 0 ]] )
+do
+    intTESTLAEUFE=intTESTLAEUFE-1
+    sleep $intSLEEP
+    echo -e "!! `fncHHMMSS 'norm.mS2'` - `fncHHMMSS 'norm.mS3'` - Ausgabe NACH Sleep Befehl mit $intSLEEP Sekunden"
+done
+echo -e "!! ---"
+
+typeset -i intTESTLAEUFE=10
+intSLEEP="0.01"
+echo -e "!!\\n!! `fncHHMMSS 'norm.mS2'` - Ausgabe VOR Sleep Befehl"
+while ( [[ "$intTESTLAEUFE" -gt 0 ]] )
+do
+    intTESTLAEUFE=intTESTLAEUFE-1
+    sleep $intSLEEP
+    echo -e "!! `fncHHMMSS 'norm.mS2'` - Ausgabe NACH Sleep Befehl mit $intSLEEP Sekunden"
+done
+echo -e "!! ---"
+
+typeset -i intTESTLAEUFE=10
+intSLEEP="0.01"
+echo -e "!!\\n!! `fncHHMMSS 'norm.mS3'` - Ausgabe VOR Sleep Befehl"
+while ( [[ "$intTESTLAEUFE" -gt 0 ]] )
+do
+    intTESTLAEUFE=intTESTLAEUFE-1
+    sleep $intSLEEP
+    echo -e "!! `fncHHMMSS 'norm.mS3'` - Ausgabe NACH Sleep Befehl mit $intSLEEP Sekunden"
+done
+echo -e "!! ---"
+
+
+
+
+
+
+# echo -e "\\n----------\\n"
+# 
+# echo -e `date '+%H:%M:%S.%N'`
+# HMSmS=`date '+%H:%M:%S.%N'`
+# echo -e $HMSmS
+# HMSxyz=${HMSmS//.*/}
+# mSxyz=${HMSmS//*:/}
+# mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
+# mSxyz=${mSxyz//*./}
+# echo -e $HMSxyz"."$mSxyz
+# 
+# echo -e "\\n----------\\n"
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+eingabeQUELLEarray=(eeeeins zweiiiiii dreiiii vieeeeer)
+if ( [[ "${#eingabeQUELLEarray[@]}" -gt 1 ]] )
+then
+    echo -e "|- Anzahl der Arrayfelder: ${#eingabeQUELLEarray[@]}"
+fi
+
+
+
+#beep -l 200 -f 500 -r 2 -D 20 --new -l 200 -f 800 -r 1 -D 20 --new -l 200 -f 500 -r 2 -D 20
+
+#sleep 2
+
+#beep -l 200 -f 500 -r 2 -D 20 #--new -l 300 -f 900 -r 1 -D 20
+
+#sleep 2
+
+
+#beep -l 200 -f 500 -r 2 -D 20 --new -l 300 -f 900 -r 1 -D 20
+
+
+
+#beep -l 200 -f 500 -r 2 -D 20 --new -l 200 -f 900 -r 2 -D 20 --new -l 200 -f 300 -r 2 -D 20 --new -l 400 -f 300 -r 1 -D 20
+
+
+
+exit 0;
+
+
+
+
+
+pfad="/aa_bak/zyxtmp/zzz_download/aa_test/LQ-test/08/videos_01"
+if ( [[ "$pfad" == "" ]] )
+then
+    pfad=`pwd`
+fi
+pfadURSPRUNG="$pfad"
+echo -e " -Pfad Ursprung: $pfadURSPRUNG"
+mkdir -p $pfadURSPRUNG
+for i in $pfad/*.*
+do
+    #if ( [[ -f "$i" ]] )
+    #then
+    #    nix=1
+    #fi
+    echo -e " -Quelle $i"
+    cp $i $pfadURSPRUNG
+    #rm $i
+done
+
+
+
+echo -e "--- Vergleich Dateilistings: $pfad"
+echo -e "--- Vergleich Dateilistings: 'suchpfad/*.*' - 'ls --gdf pfad'"
+echo -e "--- -for i in suchpfad/*.*"
+echo -e "--- -for i in ls --gdf pfad"\\n"---"
+
+
+echo -e "--- -for i in suchpfad/*.*"
+#for i in $pfad"/*.*"
+for i in $pfad/*.*
+do
+    if ( [[ -f "$i" ]] )
+    then
+        nix=1
+    fi
+    echo -e "--- $i"
+done
+
+echo -e "---"
+
+echo -e "--- -for ia in ls --group-directories-first pfad"
+for ia in $(ls --group-directories-first $pfad)
+do
+    if ( [[ -d "$pfad/$ia" ]] )
+    then
+        nix=1
+        continue
+    fi
+    echo -e "--- $ia"
+done
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+function fncSTRINGzeichenMAX {
+    # -Die Länge eines Strings, also die Anzahl Zeichen, kontrollieren und bei Bedarf die
+    #  Ausgabe des Strings verkürzen oder den String selbst kürzen!
+    #
+    # -Aufruf:
+    #  fncSTRINGzeichenMAX "$max01" "60" "kuerzenStringAusgabe" "max01"
+    # -- $1 - String zum Checken - aus einer Variablen oder Text in Anführungszeichen
+    # -- $2 - maximale Anzahl Zeichen - integer oder String
+    # -- $3 - Action: kuerzenString, kuerzenStringAusgabe, kuerzenAusgabe - wenn kuerzenString* muss $4 der Name des Strings sein
+    # -- $4 - wenn der String gekürzt werden soll, muss der Name des Strings ($1) gesetzt sein
+    
+    typeset -i intSTRGzKONTROLLE=0
+    typeset -i intSTRGzMAX=0
+    typeset -i intSTRGzMAXextension=0
+    typeset -i intSTRGzEXT=0
+    strSTRINGz="$1"
+    intSTRGzMAX="$2"
+    actionSTRGzMAX="$3"
+    strSTRINGzNAME="$4"
+    
+    strSTRINGzBAK=$strSTRINGz
+    strSTRINGzEXT=""
+    txtAUSGABEfnc=""
+    if ( [[ "$strSTRINGzBAK" == *.* ]] )
+    then
+            strSTRINGzEXT=${strSTRINGz//*./}
+            intSTRGzEXT=`echo $strSTRINGzEXT | awk '{print length($strSTRINGzEXT)}'`
+    fi
+    # -Da Position mit null beginnt, muss der Kontrollwert intSTRGzKONTROLLE nicht
+    #  um eins erhöht werden.
+    # -Wenn nach der maximalen Anzahl Zeichen der String noch weitergeht, wird er gekürzt.
+    # -Wenn es sich um eine Datei handelt, wird die Extension nicht abgeschnitten.
+    intSTRGzKONTROLLE=$intSTRGzMAX
+    intSTRGz=`echo $strSTRINGz | awk '{print length($strSTRINGz)}'`
+    #strSTATUSzeichenKONTROLLE=${txtSTATUS:$intSTRGzKONTROLLE:1}
+    #if ( [[ "$strSTATUSzeichenKONTROLLE" != "" ]] )
+    if ( [[ "$intSTRGz" -gt $intSTRGzMAX ]] )
+    then
+        if ( [[ "$strSTRINGzEXT" != "" ]] )
+        then
+            intSTRGzMAXextension=intSTRGzMAX-intSTRGzEXT
+            strSTRINGz=${strSTRINGzBAK:0:$intSTRGzMAXextension}"..."
+            #echo -e $strSTRINGzEXT
+            txtAUSGABEfnc="$strSTRINGz$strSTRINGzEXT"
+        else
+            strSTRINGz=${strSTRINGzBAK:0:$intSTRGzMAX}"..."
+            txtAUSGABEfnc="$strSTRINGz"
+        fi
+    fi
+
+    if ( [[ "$actionSTRGzMAX" != *kuerzen* ]] )
+    then
+        echo -e "FEHLER: Kein korrekter Actionbefehl gesetzt!"\\n"Gültige Befehle: kuerzenString, kuerzenStringAusgabe, kuerzenAusgabe"
+        return 20;
+    fi
+    
+    if ( [[ "$actionSTRGzMAX" == *Ausgabe* ]] )
+    then
+        echo -e "$txtAUSGABEfnc"
+    fi
+    
+    if ( [[ "$actionSTRGzMAX" == *String* ]] )
+    then
+        #"echo -e $strSTRINGzNAME=$txtAUSGABEfnc"
+        #${strSTRINGzNAME}=$txtAUSGABEfnc
+        #echo $strSTRINGzNAME="$txtAUSGABEfnc"
+        #"echo $strSTRINGzNAME"='$txtAUSGABEfnc'
+        testNAME="$strSTRINGzNAME"
+        #echo -e "original: $strSTRINGzNAME"
+        #echo -e "testNAME: $testNAME"
+        #echo -e "testNAME {!}: ${!testNAME}"
+        #IFS= read -r -d '' "$name" <<< 'babibab'
+        #IFS= read -r -d '' "$testNAME" <<< '$txtAUSGABEfnc'
+        IFS= read -r -d '' "$testNAME" <<< $txtAUSGABEfnc
+        #echo -e "neuer Wert..."
+        #echo -e "testNAME: $testNAME"
+        #echo -e "testNAME {!}: ${!testNAME}"
+    fi
+}
+
+max01="Indian_Film_Unrequited_Love_Aishwarya_Rai_Ranbir_Kapoor_Anushka_Sharma_Ae_Dil_Hai_Mushkil.mp4"
+max02="Jodie_Gasson_and_Elle_Richie_in_NaughtyNaughtyNaughty_Inception_Part_One"
+max03="17_Jodie_Gasson_and_Elle_Richie_in_Naughty_Inception_Part_One.mp4"
+
+max01="Indian_Film_Unrequited_Love_Aishwarya_Rai_Ranbir_Kapoor_Anushka_Sharma_Ae_Dil_Hai_Mushkil.mp4"
+echo -e "|-"
+echo -e "|- kuerzenAusgabe"
+echo -e "|- $max01"
+fncSTRINGzeichenMAX "$max01" "60" "kuerzenAusgabe" "max01"
+echo -e "|-"
+echo -e "|- Kontrolle: $max01"
+echo -e "|--------------------------------------------------"\\n
+
+max01="Indian_Film_Unrequited_Love_Aishwarya_Rai_Ranbir_Kapoor_Anushka_Sharma_Ae_Dil_Hai_Mushkil.mp4"
+echo -e "|-"
+echo -e "|- kuerzenString"
+echo -e "|- $max01"
+fncSTRINGzeichenMAX "$max01" "60" "kuerzenString" "max01"
+echo -e "|-"
+echo -e "|- Kontrolle: $max01"
+echo -e "|--------------------------------------------------"\\n
+
+max01="Indian_Film_Unrequited_Love_Aishwarya_Rai_Ranbir_Kapoor_Anushka_Sharma_Ae_Dil_Hai_Mushkil.mp4"
+echo -e "|-"
+echo -e "|- kuerzenStringAusgabe"
+echo -e "|- $max01"
+fncSTRINGzeichenMAX "$max01" "60" "kuerzenStringAusgabe" "max01"
+echo -e "|-"
+echo -e "|- Kontrolle: $max01"
+echo -e "|--------------------------------------------------"\\n
+
+
+
+
+#fncSTRINGzeichenMAX "$max03" "60" "kuerzenAusgabe"
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+# # Funktion mit return-Kommando
+# # Ein Exit-Status 0 zeigt den Erfolg der Funktion an.
+# # Ein Exit-Status größer 0 benennt das Kommando, das fehlschlug.
+# function putzen() {
+#     echo -e "hallo welt"   || return 10
+#     #rm *.bak.foo    || return 2 
+# }
+# 
+# # Funktion putzen aufrufen und Exit-Status auswerten
+# #putzen 2>/dev/null
+# putzen
+# exit_status=$?
+# ((exit_status)) && echo -e "Fehler bei Kommando $exit_status"
+
+
+
+
+
+
+
+
+function echoCHECK {
+    # -Checkt ob die Ausgabe mittels echo erfolgen darf!
+    # --Wenn der QUIETMODUS aktiv ist, wird nichts am DISPLAY ausgegeben.
+    # --Ausgabe in die Logdatei erfolgt auf jeden Fall.
+    if ( [[ "$#" -lt 2 ]] )
+    then
+        echo -e "FEHLER: Die Funktion benötigt 2 Argumente!"
+        return 2;
+    fi
+    if ( [[ "$flagQUIET" != "true" ]] )
+    then
+        echo -e "$1" "$2"
+    fi
+    #echo -e "$1" "$2" >> $AKTUELLEdateiLOGS
+}
+
+
+echo -e "-"\\n"--"\\n"---"
+echo -en "--- TEST echoCHECK "
+echo -e "1.2.3."
+echo -e "---"
+
+echo -e "- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
+
+#echoCHECK -e "-"\\n"--"\\n"---"\\n"--- TEST echoCHECK"\\n"---"\\n
+echoCHECK ".:!!:."
+
+echoCHECK -e "-"\\n"--"\\n"---"
+echoCHECK -en "--- TEST echoCHECK"
+echoCHECK -e " 1.2.3."
+echoCHECK -e "---"
+
+
+
+
+
+exit 0;
+
+
+
+
+pfadNEU="/aa_bak/backup"
+cd $pfadNEU
+echo -e "Pfad Variable: "$pfadNEU
+echo -e "...waiting 3 seconds..."
+sleep 3
+echo -e "Pfad Abfrage: "`pwd`
+echo -e "...waiting 3 seconds..."
+sleep 3
+echo -e "...exit..."
+sleep 1
+exit 0;
+
+
+
+
+
+
+function fncTESTbreak {
+    echo -en "-+ Argumente: "
+    for var in "$@"
+    do
+        echo -en $var" "
+    done
+    echo -e "\\b"
+    echo -e "-+"
+    echo -e "--+ break:"
+    i=1
+    for var in $@
+    do
+        while [ $i -lt 5 ]
+        do
+            echo $i" - "$var
+            i=`expr $i + 1`
+            break
+            echo -e "Wird nie ausgegeben"
+        done
+    echo $var
+    done
+    echo -e "-+"
+    echo -e "--+ continue:"
+    i=1
+    for var in $@
+    do
+        while [ $i -lt 5 ]
+        do
+            echo $i" - "$var
+            i=`expr $i + 1`
+            continue
+            echo -e "Wird nie ausgegeben"
+        done
+    echo $var
+    done
+    echo -e "-+"
+}
+
+
+
+echo -e "+ Test Break:"
+fncTESTbreak "w1 w2 w3 w4"
+fncTESTbreak "w1 w2 w3 w4 w5"
+fncTESTbreak "w1 w2 w3 w4 w5 w6 w7"
+fncTESTbreak "w1 w2 w3"
+
+
+exit 0;
+
+
+
+
+# strPSalleTHREADSalleCHILDS=`ps -e -T | grep $$`
+# echo -e "$strPSalleTHREADSalleCHILDS"
+# 
+# 
+# strPSalleTHREADSalleCHILDS=`ps -e -T | grep lxDOWNLOAD`
+# echo -e "$strPSalleTHREADSalleCHILDS"
+
+
+allePIDsKILL=""
+arrPROZESSE=(lxDOWNLOAD youtube-dl)
+
+
+
+function fncKILLallePROZESSE {
+    # -Alle Instanzen der genutzten Programme auslesen und beenden!
+    # --WICHTIG: Nur im eigenen Terminal! Wenn $1==""
+    # --WICHTIG: Nur im eigenen Terminal! Wenn $1=="EIGENESTTY"
+    # --WICHTIG: Nur im eigenen Terminal! Wenn $1=="*"
+    # --WICHTIG: In allen Terminals! Wenn $1=="ALLETTY"
+    #
+    for i in "${arrPROZESSE[@]}"
+    do
+        if ( [[ "$1" == "" ]] || [[ "$1" == "EIGENESTTY" ]] )
+        then
+            arrTERMINALS=`tty`
+        elif ( [[ "$1" == "ALLETTY" ]] )
+        then
+            arrTERMINALS=(`ps -C $i -o tty=`)
+        else
+            arrTERMINALS=`tty`
+        fi
+        iTalle=""
+        for iT in "${arrTERMINALS[@]}"
+        do
+            if ( [[ "$iTalle" != *$iT* ]] )
+            then
+                echo -e "- Prozess: $i"
+                echo -e "- Terminal: "$iT
+
+                #strTERMINAL=`tty`
+                #strTERMINAL="pts/5"
+                strTERMINAL=$iT
+                strLISTEtoKILL=""
+                ausgabePIDs=""
+                ausgabeCHILDPIDs=""
+                #ausgabe=`lxPS -qs $i`
+                #ausgabe=`ps -All --tty "/dev/pts/5" | grep $1`
+                ausgabeLISTEdisplay=`ps --tty $strTERMINAL -o pid=`
+                ausgabeLISTEname=`ps -C $i -o pid=`
+                #ausgabeLISTEkombiniert=`ps --tty $strTERMINAL -l | grep $i`
+                #ausgabeLISTEkombiniert=`ps --tty "pts/5" -l | grep $i`
+                ausgabeLISTEkombiniert=`ps --tty $strTERMINAL -o pid= -o tty= -o comm= | grep $i`
+                arrLISTEpid=($ausgabeLISTEkombiniert)
+                #echo -e "- Kombiniert: "$ausgabeLISTEkombiniert
+                
+                typeset -i zL=0
+                #echo -e "- PIDs:"
+                while ( [[ "${arrLISTEpid[$zL]}" != "" ]] )
+                do
+                    ausgabePIDsTMP="${arrLISTEpid[$zL]}"
+                    #echo -en "-- "$ausgabePIDsTMP
+                    if ( [[ "$ausgabePIDsTMP" != "" ]] )
+                    then
+                        if ( [[ "$strLISTEtoKILL" == "" ]] )
+                        then
+                            strLISTEtoKILL=$ausgabePIDsTMP
+                        else
+                            strLISTEtoKILL=$strLISTEtoKILL" "$ausgabePIDsTMP
+                        fi
+                    fi
+                    ausgabeCHILDPIDsTMP=`ps --ppid ${arrLISTEpid[$zL]} -o pid=`
+                    if ( [[ $ausgabeCHILDPIDsTMP != "" ]] )
+                    then
+                        #echo -en " "$ausgabeCHILDPIDsTMP
+                        strLISTEtoKILL=$strLISTEtoKILL" "$ausgabeCHILDPIDsTMP
+                    fi
+                    zL=zL+3
+                done
+                #echo -e "\\n---"
+
+                if ( [[ "$ausgabeLISTEkombiniert" != "" ]] )
+                then
+                    #echo -e "- PIDs: "$ausgabePIDs
+                    #echo -e "- CPIDs:"$ausgabeCHILDPIDs
+                    if ( [[ "$strLISTEtoKILL" != "" ]] )
+                    then
+                        #echo -e "kill -9 oder -14... "$strLISTEtoKILL
+                        #kill -9 $ausgabePIDs $ausgabeCHILDPIDs
+                        #echo -e "- Komplette Liste:"\\n$strLISTEtoKILL\\n"---"
+                        
+                        # -Doppelte PIDs in der Liste führen zu unnötigen Fehlermeldungen, daher
+                        #  werden diese erkannt und entfernt!
+                        echo -e "- Komplette Liste (bereinigt):"
+                        arrLISTEtoKILL=($strLISTEtoKILL)
+                        typeset -i zLK=0
+                        strLISTEpidBENUTZT=""
+                        while ( [[ "${arrLISTEtoKILL[$zLK]}" != "" ]] )
+                        do
+                            if ( [[ "$strLISTEpidBENUTZT" != *${arrLISTEtoKILL[$zLK]}* ]] )
+                            then
+                                strLISTEpidBENUTZT=$strLISTEpidBENUTZT" "${arrLISTEtoKILL[$zLK]}
+                                echo -en "${arrLISTEtoKILL[$zLK]} "
+                            fi
+                            zLK=zLK+1
+                        done
+                        echo -e \\b
+                        echo -e "- Der Kill Befehl:"\\n"'kill -9 $strLISTEpidBENUTZT'"
+                        #kill -9 $strLISTEpidBENUTZT
+                        
+                    else
+                        echo -e "- INFO: Keine Prozesse zum Beenden gefunden!"
+                    fi
+                else
+                    echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+                fi
+                echo -e "-"
+
+            fi
+            iTalle=$iTalle" "$iT
+        done
+    done
+}
+
+
+#fncKILLallePROZESSE "EIGENESTTY"
+
+echo -e "-----"
+
+fncKILLallePROZESSE "ALLETTY"
+
+
+
+
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+for i in "${arrPROZESSE[@]}"
+do
+    arrTERMINALS=(`ps -C $i -o tty=`)
+    iTalle=""
+    for iT in "${arrTERMINALS[@]}"
+    do
+        if ( [[ "$iTalle" != *$iT* ]] )
+        then
+            echo -e "- Prozess: $i"
+            echo -e "- Terminal: "$iT
+
+            #strTERMINAL=`tty`
+            #strTERMINAL="pts/5"
+            strTERMINAL=$iT
+            strLISTEtoKILL=""
+            ausgabePIDs=""
+            ausgabeCHILDPIDs=""
+            #ausgabe=`lxPS -qs $i`
+            #ausgabe=`ps -All --tty "/dev/pts/5" | grep $1`
+            ausgabeLISTEdisplay=`ps --tty $strTERMINAL -o pid=`
+            ausgabeLISTEname=`ps -C $i -o pid=`
+            #ausgabeLISTEkombiniert=`ps --tty $strTERMINAL -l | grep $i`
+            #ausgabeLISTEkombiniert=`ps --tty "pts/5" -l | grep $i`
+            ausgabeLISTEkombiniert=`ps --tty $strTERMINAL -o pid= -o tty= -o comm= | grep $i`
+            arrLISTEpid=($ausgabeLISTEkombiniert)
+            #echo -e "- Kombiniert: "$ausgabeLISTEkombiniert
+            
+            typeset -i zL=0
+            #echo -e "- PIDs:"
+            while ( [[ "${arrLISTEpid[$zL]}" != "" ]] )
+            do
+                ausgabePIDsTMP="${arrLISTEpid[$zL]}"
+                #echo -en "-- "$ausgabePIDsTMP
+                if ( [[ "$ausgabePIDsTMP" != "" ]] )
+                then
+                    if ( [[ "$strLISTEtoKILL" == "" ]] )
+                    then
+                        strLISTEtoKILL=$ausgabePIDsTMP
+                    else
+                        strLISTEtoKILL=$strLISTEtoKILL" "$ausgabePIDsTMP
+                    fi
+                fi
+                ausgabeCHILDPIDsTMP=`ps --ppid ${arrLISTEpid[$zL]} -o pid=`
+                if ( [[ $ausgabeCHILDPIDsTMP != "" ]] )
+                then
+                    #echo -en " "$ausgabeCHILDPIDsTMP
+                    strLISTEtoKILL=$strLISTEtoKILL" "$ausgabeCHILDPIDsTMP
+                fi
+                zL=zL+3
+            done
+            #echo -e "\\n---"
+
+            if ( [[ "$ausgabeLISTEkombiniert" != "" ]] )
+            then
+                #echo -e "- PIDs: "$ausgabePIDs
+                #echo -e "- CPIDs:"$ausgabeCHILDPIDs
+                if ( [[ "$strLISTEtoKILL" != "" ]] )
+                then
+                    #echo -e "kill -9 oder -14... "$strLISTEtoKILL
+                    #kill -9 $ausgabePIDs $ausgabeCHILDPIDs
+                    #echo -e "- Komplette Liste:"\\n$strLISTEtoKILL\\n"---"
+                    
+                    # -Doppelte PIDs in der Liste führen zu unnötigen Fehlermeldungen, daher
+                    #  werden diese erkannt und entfernt!
+                    echo -e "- Komplette Liste (bereinigt):"
+                    arrLISTEtoKILL=($strLISTEtoKILL)
+                    typeset -i zLK=0
+                    strLISTEpidBENUTZT=""
+                    while ( [[ "${arrLISTEtoKILL[$zLK]}" != "" ]] )
+                    do
+                        if ( [[ "$strLISTEpidBENUTZT" != *${arrLISTEtoKILL[$zLK]}* ]] )
+                        then
+                            strLISTEpidBENUTZT=$strLISTEpidBENUTZT" "${arrLISTEtoKILL[$zLK]}
+                            echo -en "${arrLISTEtoKILL[$zLK]} "
+                        fi
+                        zLK=zLK+1
+                    done
+                    echo -e \\b
+                    echo -e "- Der Kill Befehl:"\\n"'kill -9 $strLISTEpidBENUTZT'"
+                    kill -9 $strLISTEpidBENUTZT
+                    
+                else
+                    echo -e "- INFO: Keine Prozesse zum Beenden gefunden!"
+                fi
+            else
+                echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+            fi
+            echo -e "-"
+
+        fi
+        iTalle=$iTalle" "$iT
+    done
+done
+
+#echo -e "--- strLISTEtoKILL:\\t$strLISTEtoKILL"
+
+
+echo -e "|--------------------------------------------------------------------------------"
+
+
+
+
+
+
+
+
+function fncKILLallePROZESSEtestmode {
+    # -Alle Instanzen der genutzten Programme (innerhalb des eigenen Terminals)
+    #  auslesen und beenden:
+    #  ps --tty /dev/pts/123 -o pid= | grep `ps -C lxDOWNLOAD -o pid=`
+    strTERMINAL=`tty`
+    txtCHECKpsKILL=""
+    for i in "${arrPROZESSE[@]}"
+    do
+        txtCHECKpsKILL=$txtCHECKpsKILL"--checkPS-$i-"
+        strCHECKpsPROZESSE=`ps -C $i -o pid=`
+        echo -e "--- Prozess:\\t$i"
+        echo -e "--- PIDs:\\t$strCHECKpsPROZESSE"
+        if ( [[ "$i" == "$datei" ]] )
+        then
+            #echo -e "$$ - $strCHECKpsPROZESSE"
+            strCHECKpsPROZESSE=${strCHECKpsPROZESSE//$$/}
+            #echo -e "$$ - $strCHECKpsPROZESSE"
+        fi
+        checkPIDinstanzenTERMINAL=`ps --tty $strTERMINAL -o pid= -o comm=`
+        echo -e "--- PIDs Instanzen alle:\\t$checkPIDinstanzenTERMINAL"
+        checkPIDinstanzen=`echo $checkPIDinstanzenTERMINAL | grep $strCHECKpsPROZESSE`
+        echo -e "--- PIDs Instanzen grep:\\t$checkPIDinstanzen"
+        #checkBEFEHLpidYOUTUBEDL=`ps -C youtube-dl -o pid=`
+        if ( [[ "$checkPIDinstanzen" != "" ]] )
+        then
+            txtCHECKpsKILL=$txtCHECKpsKILL$checkPIDinstanzen
+            #kill -9 $checkPIDinstanzen
+        fi
+        echo -e "--- childPIDs:\\t$strCHECKpsPROZESSE"
+        checkPIDinstanzen=""
+    done
+
+    if ( [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` != "" ]] )
+    then
+        # -Beenden der fncBEFEHLaufrufen:
+        #kill -9 $checkBEFEHLpid
+        checkBEFEHLreturn="1"
+    fi
+}
+
+
+#fncKILLallePROZESSE
+
+
+
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+echo -e "--- Um das Skript mit den gleichen Einstellungen und URLs neu zu starten"
+echo -e "--- drücken Sie bitte 'y'."
+echo -e "--- Um das Skript zu beenden drücken Sie bitte 'q'."
+echo -e "---"
+
+echo -en "--- Ihre Eingabe (y/q): "
+
+function getCPos { 
+    local v=() t=$(stty -g)
+    stty -echo
+    printf "\033[6n"
+    IFS='[;' read -ra v -d R
+    stty $t
+    CPos=(${v[@]:1})
+}
+getCPos
+typeset -i cursorZEILE=0
+cursorZEILE=$CPos
+cursorZEILE=cursorZEILE-1
+cursorZEILEminus1=cursorZEILE-1
+cursorZEILEminus2=cursorZEILE-2
+zeileDELETE=`tput dl1`
+zeileINSERT=`tput il1`
+
+
+while ( [[ "$eingabeNEUSTART" != "q" ]] && [[ "$eingabeNEUSTART" != "y" ]] )
+do
+    read -n 1 -t 1 -s eingabeNEUSTART
+    #read -n 1 -s eingabeNEUSTART
+    
+    case "$eingabeNEUSTART" in
+        ("y")
+            echo -e $eingabeNEUSTART\\n"--- Neustart"
+            break ;;
+        ("q")
+            echo -e $eingabeNEUSTART\\n"--- Beendet"
+            break ;;
+        (*)
+            echo -en $zeileDELETE
+            tput cup $cursorZEILE 0
+            echo -en "--- Ihre Eingabe (y/q): " ;;
+    esac
+    
+#     case "$eingabeNEUSTART" in
+#         ("y")
+#             echo -e "--- Neustart" ;;
+#         ("q")
+#             echo -e "--- Beendet" ;;
+#         (*)
+#             echo -e "--- Ihre Eingabe (y/q)" ;;
+#     esac
+done
+
+
+# case "$eingabeNEUSTART" in
+#     ("y")
+#         echo -e $eingabeNEUSTART\\n"--- Neustart" ;;
+#     ("q")
+#         echo -e $eingabeNEUSTART\\n"--- Beendet" ;;
+#     (*)
+#         echo -e \\n"--- Ihre Eingabe (y/q)" ;;
+# esac
+
+
+exit 0;
+
+
+
+
+Benutzerabbruch mit q:
+|- Start:       Do 29. Okt 03:19:14 CET 2020
+|- Ende:        Do 29. Okt 03:20:04 CET 2020
+|- Details:     00_lxDOWNLOAD.LOGS.txt - TRUEq 1 0 - arbeitet.0
+|-
+|- FEHLER:      lxDOWNLOAD wurde vom Benutzer abgebrochen!
+
+--------------------------------------------------------------------------------
+
+Abbruch mittels kill youtube-dl Prozess
+|- Start:       Do 29. Okt 03:20:25 CET 2020
+|- Ende:        Do 29. Okt 03:22:22 CET 2020
+|- Details:     00_lxDOWNLOAD.LOGS.txt - TRUEpsflagQUITps_0 0 0 - beendet.0
+|- 
+|- lxDOWNLOAD wurde erfolgreich beendet!
+
+|- Start:       Do 29. Okt 03:36:43 CET 2020
+|- Ende:        Do 29. Okt 03:38:02 CET 2020
+|- Details:     00_lxDOWNLOAD.LOGS.txt - TRUEpsflagQUITps_0 0 0 - fertig.0
+|- 
+|- lxDOWNLOAD wurde erfolgreich beendet!
+
+--------------------------------------------------------------------------------
+
+Normal beendet ohne Fehler
+|- Start:       Do 29. Okt 03:28:20 CET 2020
+|- Ende:        Do 29. Okt 03:29:23 CET 2020
+|- Details:     00_lxDOWNLOAD.LOGS.txt - TRUEpsflagQUITps_0 0 0 - beendet.0
+|- 
+|- lxDOWNLOAD wurde erfolgreich beendet!
+
+|- Start:       Do 29. Okt 03:51:38 CET 2020
+|- Ende:        Do 29. Okt 03:53:59 CET 2020
+|- Details:     00_lxDOWNLOAD.LOGS.txt - TRUEpsflagQUITps_0 0 0 - fertig.0
+|- 
+|- lxDOWNLOAD wurde erfolgreich beendet!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+dateiLOGS="00_lxDOWNLOAD.LOGS.txt"
+dateiLOGStmp="00_lxDOWNLOAD.LOGS.txt.tmp"
+intANZAHLzeilenLOGS=`wc -l $dateiLOGS`
+echo -e "--- DEBUG-INFO: Anzahl Zeilen: $intANZAHLzeilenLOGS"
+intANZAHLzeilenLOGS=${intANZAHLzeilenLOGS// */}
+echo -e "--- DEBUG-INFO: Anzahl Zeilen: $intANZAHLzeilenLOGS"
+
+intANZAHLzeichenZEILEN=`echo $intANZAHLzeilenLOGS | wc -m`
+echo -e "--- DEBUG-INFO: Anzahl Zeichen: $intANZAHLzeichenZEILEN"
+
+
+
+
+typeset -i intZEILENNUMMER=1
+txtblabla="`date` und viele Infos"
+
+
+function fncLOGSzeilennummern {
+    # -Maximale Anzahl an Zeilen ermitteln, damit klar ist wieviele Stellen für die
+    #  Zeilennummern gebraucht werden.
+    typeset -i intANZAHLzeichenZEILEN=0
+    typeset -i intZEILENNUMMER=0
+    intANZAHLzeilenLOGS=`wc -l $dateiLOGS`
+    #echo -e "--- DEBUG-INFO: Anzahl Zeilen: $intANZAHLzeilenLOGS"
+    intANZAHLzeilenLOGS=${intANZAHLzeilenLOGS// */}
+    #echo -e "--- DEBUG-INFO: Anzahl Zeilen: $intANZAHLzeilenLOGS"
+    intANZAHLzeichenZEILEN=`echo $intANZAHLzeilenLOGS | wc -m`
+    intANZAHLzeichenZEILEN=intANZAHLzeichenZEILEN-1
+    #echo -e "--- DEBUG-INFO: Anzahl Zeichen: $intANZAHLzeichenZEILEN"
+
+    while read txtLOGS
+    do
+        intZEILENNUMMER=intZEILENNUMMER+1
+        case "$intANZAHLzeichenZEILEN" in
+            (1)
+                # -Zeilennummern haben maximal 1 Zeichen:
+                txtLOGS="|"`printf %01d $intZEILENNUMMER`"| "$txtLOGS ;;
+            (2)
+                # -Zeilennummern haben maximal 2 Zeichen:
+                txtLOGS="|"`printf %02d $intZEILENNUMMER`"| "$txtLOGS ;;
+            (3)
+                # -Zeilennummern haben maximal 3 Zeichen:
+                txtLOGS="|"`printf %03d $intZEILENNUMMER`"| "$txtLOGS ;;
+            (4)
+                # -Zeilennummern haben maximal 4 Zeichen:
+                txtLOGS="|"`printf %04d $intZEILENNUMMER`"| "$txtLOGS ;;
+            (5)
+                # -Zeilennummern haben maximal 5 Zeichen:
+                txtLOGS="|"`printf %05d $intZEILENNUMMER`"| "$txtLOGS ;;
+            (6)
+                # -Zeilennummern haben maximal 6 Zeichen:
+                txtLOGS="|"`printf %06d $intZEILENNUMMER`"| "$txtLOGS ;;
+        esac
+        echo $txtLOGS
+        echo $txtLOGS >> $dateiLOGStmp
+    done < $dateiLOGS
+    #rm $dateiLOGS
+    #mv $dateiLOGStmp $dateiLOGS
+}
+
+fncLOGSzeilennummern
+
+exit 0;
+
+# txtLOGS=" "`printf %03d $intZEILENNUMMER`" | "$txtblabla
+# echo -e "$txtLOGS"
+# txtLOGS=" "`printf %03d $intZEILENNUMMER`"|"$txtblabla
+# echo -e "$txtLOGS"
+# txtLOGS=""`printf %04d $intZEILENNUMMER`"|"$txtblabla
+# echo -e "$txtLOGS"
+# txtLOGS=""`printf %04d $intZEILENNUMMER`" | "$txtblabla
+# echo -e "$txtLOGS"
+# txtLOGS=""`printf %04d $intZEILENNUMMER`"| "$txtblabla
+# echo -e "$txtLOGS"
+
+txtLOGS="|"`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+txtLOGS="|"`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+txtLOGS="|"`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+txtLOGS="|"`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+10
+echo -e "$txtLOGS"
+txtLOGS="|"`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+
+
+txtLOGS=" "`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+txtLOGS=" "`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+txtLOGS=" "`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+txtLOGS=" "`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+10
+echo -e "$txtLOGS"
+txtLOGS=" "`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+
+txtLOGS=""`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+txtLOGS=""`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+txtLOGS=""`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+txtLOGS=""`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+10
+echo -e "$txtLOGS"
+txtLOGS=""`printf %04d $intZEILENNUMMER`"| "$txtblabla
+intZEILENNUMMER=intZEILENNUMMER+1
+echo -e "$txtLOGS"
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# function fncTESTwert ($txt) {
+#     echo -e "|-"
+#     echo -e "|------------------------------"
+#     echo -e "|--- $txt"
+#     echo -e "|------------------------------"
+#     echo -e "|- "
+#     echo -e "|- "
+# }
+# 
+# fncTESTwert ("Hallo")
+# fncTESTwert ("Welt!")
+# fncTESTwert ("PadKa")
+
+function fncTESTwert {
+    echo -e "|-"
+    echo -e "|------------------------------"
+    echo -e "|--- $txt"
+    echo -e "|------------------------------"
+    echo -e "|- "
+    echo -e "|- "
+}
+
+txt="Hallo"
+fncTESTwert
+txt="Welt!"
+fncTESTwert
+txt="PadKa"
+fncTESTwert
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -Neue Konsole öffnen, Bash Befehle ausführen, Konsole schließen:
+#konsole --background-mode -e "kquitapp plasmashell && plasmashell & disown"
+#konsole --background-mode -e "kdialog --title='INFO' --msgbox=Konsole im Hintergrund!"
+#konsole --new-tab -e "kdialog --title='INFO' --msgbox='Konsole in neuem Tab!'"
+
+#konsole --new-tab -e "kquitapp plasmashell" && plasmashell & disown && exit
+#konsole --new-tab -e "kdialog --title='INFO' --msgbox='Konsole in neuem Tab!'"
+
+#konsole --new-tab -e "kquitapp plasmashell"
+#konsole --new-tab -e "plasmashell & disown"
+#konsole --new-tab -e "exit"
+
+
+konsole --new-tab -e "kquitapp plasmashell"
+pidKONSOLE=$!
+echo $pidKONSOLE
+sleep 2
+kill $pidKONSOLE
+
+konsole --new-tab -e "plasmashell & disown"
+pidKONSOLE=$!
+echo $pidKONSOLE
+kill $pidKONSOLE
+
+exit 0;
+
+
+
+
+pidKONSOLE=$!
+echo $pidKONSOLE
+kill $pidKONSOLE
+
+exit 0;
+
+
+
+
+
+
+# -Eigene PID auslesen:
+strTERMINAL=`tty`
+strPIDSterminal=`ps --tty $strTERMINAL -o pid=`
+strPIDSdatei=`ps -C $datei -o pid=`
+#checkPID=`ps --tty $strTERMINAL -o pid= | grep ps -C $datei -o pid=`
+checkPID=`ps --tty $strTERMINAL -o pid= | grep $strPIDSdatei`
+
+echo -e "Terminal:\\t$strTERMINAL"
+echo -e "Terminal PID:\\t$strPIDSterminal"
+echo -e "Datei PID:\\t$strPIDSdatei"
+echo -e "PID:\\t$checkPID"
+echo -e "PPID:\\t$PPID"
+
+#kill -9 $checkPID
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -Eigene PID auslesen:
+strTERMINAL=`tty`
+strPIDSterminal=`ps --tty $strTERMINAL -o pid=`
+strPIDSdatei=`ps -C $datei -o pid=`
+#checkPID=`ps --tty $strTERMINAL -o pid= | grep ps -C $datei -o pid=`
+checkPID=`ps --tty $strTERMINAL -o pid= | grep $strPIDSdatei`
+
+echo -e "Terminal:\\t$strTERMINAL"
+echo -e "Terminal PID:\\t$strPIDSterminal"
+echo -e "Datei PID:\\t$strPIDSdatei"
+echo -e "PID:\\t$checkPID"
+echo -e "PPID:\\t$PPID"
+
+#kill -9 $checkPID
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -Bei Bedarf alle Argumente kontrollieren:
+typeset -i zz=0
+for i in $@
+do
+    zz=zz+1
+    echo -e "|- DEBUG: Argumente - @ - $zz.: $i"
+done
+
+zz=0
+for i in $*
+do
+    zz=zz+1
+    echo -e "|- DEBUG: Argumente - * - $zz.: $i"
+done
+
+zz=0
+for i in "$*"
+do
+    zz=zz+1
+    echo -e "|- DEBUG: Argumente -\"*\"- $zz.: $i"
+done
+
+
+echo -e "--- xls:"
+
+xls
+
+echo -e "--- cd - xls:"
+
+cd /aa_bak/zyxtmp/
+xls
+
+
+
+
+
+
+
+
+
+
+# Globale Variable
+val1=11
+# Funktion value
+function value {
+   value1
+}
+# Funktion value1
+function value1 {
+   val1=10
+}
+# Hauptprogramm
+echo $val1
+value
+echo $val1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit 0;
+
+
+#beep -l 800 -f 200 -D 100 -r 2 --new -l 400 -f 600 -r 2 -D 100 --new -l 350 -f 392 -D 100
+
+#beep -l 300 -f 200 -r 2 --new -l 600 -f 160
+
+# beep -l 300 -f 200 -r 2 --new -l 600 -f 120
+# echo -e "|-"
+# sleep 1
+# beep -l 300 -f 200 -r 2 --new -l 600 -f 160
+# echo -e "|-"
+# sleep 1
+# beep -l 300 -f 200 -r 2 -D 100 --new -l 600 -f 160
+# echo -e "|-"
+# sleep 1
+# beep -l 300 -f 200 -r 2 -D 100 --new -l 600 -f 160 -D 100
+# echo -e "|-"
+# sleep 1
+
+
+
+
+
+tail --lines=3 00_lxDOWNLOAD.LOGS.txt | while read txtZEILE
+do
+    echo -e "---\\n$txtZEILE\\n---"
+done
+
+
+
+
+
+
+
+
+
+# kdialog --title="Reihenfolge?" --yesno=\
+# "<h3><center>|--- $datei ---|</center></h3><br>\
+# Da Playlisten zum Herunterladen angegeben wurden, kann jetzt festgelegt<br>\
+# werden, mit welchen Videos innerhalb der Liste der Download starten soll.<br><br><br>\
+# -Von ALT zu NEU. (Standard)<br>\
+# -1., 2., 3., ... 14., 15., 16.<br>\
+# D.h. neu hinzugefügte Videos am Ende. (Sinnvoll bei Musik Alben!)<br><br>\
+# -Von NEU zu ALT.<br>\
+# -16., 15., 14., ... 3., 2., 1.<br>\
+# D.h. neu hinzugefügte Videos am Anfang.<br><br><br>\
+# <i>TIPP:</i> Standard bestätigen: [RETURN] - Andere Wahl: [ESC]<br>" \
+# --yes-label="Von ALT zu NEU!" --no-label="Von NEU zu ALT!"
+# echo -e "--- $?"
+
+
+# kdialog --title="Reihenfolge?" --warningyesnocancel=\
+# "<h3><center>|--- $datei ---|</center></h3><br>\
+# Da Playlisten zum Herunterladen angegeben wurden, kann jetzt festgelegt<br>\
+# werden, mit welchen Videos innerhalb der Liste der Download starten soll.<br><br><br>\
+# -Von ALT zu NEU. (Standard)<br>\
+# -1., 2., 3., ... 14., 15., 16.<br>\
+# D.h. neu hinzugefügte Videos am Ende. (Sinnvoll bei Musik Alben!)<br><br>\
+# -Von NEU zu ALT.<br>\
+# -16., 15., 14., ... 3., 2., 1.<br>\
+# D.h. neu hinzugefügte Videos am Anfang.<br><br><br>\
+# <i>TIPP:</i> Standard bestätigen: [RETURN] - Andere Wahl: [ESC]<br>" \
+# --yes-label="Von ALT zu NEU!" --no-label="Von NEU zu ALT!" --cancel-label="Beenden!"
+# echo -e "--- $?"
+
+
+# kdialog --title="Reihenfolge?" --warningcontinuecancel=\
+# "<h3><center>|--- $datei ---|</center></h3><br>\
+# Da Playlisten zum Herunterladen angegeben wurden, kann jetzt festgelegt<br>\
+# werden, mit welchen Videos innerhalb der Liste der Download starten soll.<br><br><br>\
+# -Von ALT zu NEU. (Standard)<br>\
+# -1., 2., 3., ... 14., 15., 16.<br>\
+# D.h. neu hinzugefügte Videos am Ende. (Sinnvoll bei Musik Alben!)<br><br>\
+# -Von NEU zu ALT.<br>\
+# -16., 15., 14., ... 3., 2., 1.<br>\
+# D.h. neu hinzugefügte Videos am Anfang.<br><br><br>\
+# <i>TIPP:</i> Standard bestätigen: [RETURN] - Andere Wahl: [ESC]<br>" \
+# --continue-label="Von ALT zu NEU!" --cancel-label="Von NEU zu ALT!"
+# echo -e "--- $?"
+
+
+exit 0;
+
+
+
+
+
+
+# -Variablen an Funktion übergeben:
+
+function getCPos { 
+    local v=() t=$(stty -g)
+    stty -echo
+    printf "\033[6n"
+    IFS='[;' read -ra v -d R
+    stty $t
+    CPos=(${v[@]:1})
+}
+
+function MOVEasciiKREISEL {
+    asciiKREISEL[0]="-"
+    asciiKREISEL[1]="\\"
+    asciiKREISEL[2]="|"
+    asciiKREISEL[3]="/"
+    tput cup $cursorZEILEkreisel 38
+    echo -n "${asciiKREISEL[0]}"
+    actionKONTROLLE="start"
+    intUTCsekunden=`date '+%s'`
+    intUTCreloadSTATUS=`echo -e "$intUTCsekunden + 2" | bc`
+    while ( [[ "$actionKONTROLLE" == "start" ]] )
+    do
+        intUTCsekunden=`date '+%s'`
+        if ( [[ "$intUTCsekunden" -ge "$intUTCreloadSTATUS" ]] && [[ "$intUTCsekunden" == *0 ]] )
+        then
+            #fncSTATUSauslesen
+            intUTCreloadSTATUS=`echo -e "$intUTCsekunden + 10" | bc`
+        fi
+        for i in "${asciiKREISEL[@]}"
+        do
+            tput cup $cursorZEILEkreisel 38
+            echo -ne "\b$i"
+            sleep 0.1
+            #CHECKeingabeTASTEaktuell
+        done
+        #if ( [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` == "" ]] )
+        if ( [[ "nix" == "" ]] )
+        then
+            #fg %
+            # -Das Quit-Flag-PS in TMP Datei schreiben:
+            echo -e "flagQUITps" > "$datei.$$.cache.tmp"
+            eingabeTASTE="e"
+            actionKONTROLLE="stop"
+            #beep -l 25 -f 466.2 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 250 -f 466.2 -D 100
+            break
+        fi
+        if ( [[ "$actionKONTROLLE" == "stop" ]] )
+        then
+            break
+        fi
+    done
+}
+
+function CHECKeingabeTASTEaktuell {
+    # -Variablen innerhalb der Funktion übernehmen:
+    strFNC1=$1
+    eingabeTASTEgesucht="q"
+    if ( [[ "$strFNC1" != "" ]] )
+    then
+        eingabeTASTEgesucht=$strFNC1
+    fi
+
+    while ( [[ "$eingabeTASTE" != "$eingabeTASTEgesucht" ]] )
+    do
+        read -n 1 -t 1 -s eingabeTASTE
+        #actionKONTROLLE="stop"
+        #break
+    done
+    # -zur Aktualisierung des Status
+    #fncSTATUSauslesen
+    kill $MOVEasciiKREISELpid
+    echo -e " -ENDE-"
+}
+
+getCPos
+cursorZEILE=$CPos
+cursorZEILEkreisel=$cursorZEILE
+tasteBEENDEN="x"
+
+echo -e "--- Beenden Taste: $tasteBEENDEN"
+echo -en "------------------ "
+
+MOVEasciiKREISEL &
+MOVEasciiKREISELpid=$!
+
+CHECKeingabeTASTEaktuell $tasteBEENDEN
+
+
+
+
+
+
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+# function fncLISTmedia {
+#     # -Auslesen aus dem System...
+#     typeset -i z=0
+#     arrMEDIAaudio[$z]="AAC-Audio .aac"
+#     z=z+1
+#     arrMEDIAaudio[$z]="FLAC-Audio .flac"
+#     z=z+1
+#     arrMEDIAaudio[$z]="MP3-Audio .mp3"
+#     z=z+1
+#     arrMEDIAaudio[$z]="MPEG4-Audio .mp4"
+#     z=z+1
+#     arrMEDIAaudio[$z]="OGG-Audio .ogg"
+#     z=z+1
+#     arrMEDIAaudio[$z]="alle Audiodateien"
+#     z=z+1
+# 
+#     typeset -i z=0
+#     arrMEDIAvideo[$z]="AVI-Video .avi"
+#     z=z+1
+#     arrMEDIAvideo[$z]="MPEG-Video (2-3) .mpg"
+#     z=z+1
+#     arrMEDIAvideo[$z]="MPEG-Video (4) .mp4"
+#     z=z+1
+#     arrMEDIAvideo[$z]="QuickTime-Video .mov"
+#     z=z+1
+#     arrMEDIAvideo[$z]="Matroska-Video .mkv"
+#     z=z+1
+#     arrMEDIAvideo[$z]="alle Videodateien"
+#     z=z+1
+# 
+#     typeset -i z=0
+#     arrMEDIAbild[$z]="BMP-Bild .bmp"
+#     z=z+1
+#     arrMEDIAbild[$z]="GIF-Bild .gif"
+#     z=z+1
+#     arrMEDIAbild[$z]="JPEG-Bild .jp*"
+#     z=z+1
+#     arrMEDIAbild[$z]="PNG-Bild .png"
+#     z=z+1
+#     arrMEDIAbild[$z]="SVG-Bild .svg"
+#     z=z+1
+#     arrMEDIAbild[$z]="TIFF-Bild .tif"
+#     z=z+1
+#     arrMEDIAbild[$z]="alle Bilddateien"
+#     z=z+1
+# }
+
+
+
+
+function fncLISTmedia {
+    # -Auslesen aus dem System...
+    typeset -i z=0
+    arrMEDIAaudio[$z]="aac Audio:AAC"
+    z=z+1
+    arrMEDIAaudio[$z]="flac Audio:FLAC"
+    z=z+1
+    arrMEDIAaudio[$z]="mp3 Audio:MP3"
+    z=z+1
+    arrMEDIAaudio[$z]="m4a Audio:MPEG4"
+    z=z+1
+    arrMEDIAaudio[$z]="ogg Audio:OGG"
+    z=z+1
+    arrMEDIAaudio[$z]="audio Audio:alle"
+    z=z+1
+
+    typeset -i z=0
+    arrMEDIAvideo[$z]="avi Video:AVI"
+    z=z+1
+    arrMEDIAvideo[$z]="mpg Video:MPEG2-3"
+    z=z+1
+    arrMEDIAvideo[$z]="mp4 Video:MPEG4"
+    z=z+1
+    arrMEDIAvideo[$z]="mov Video:QuickTime"
+    z=z+1
+    arrMEDIAvideo[$z]="mkv Video:Matroska"
+    z=z+1
+    arrMEDIAvideo[$z]="video Video:alle"
+    z=z+1
+
+    typeset -i z=0
+    arrMEDIAbild[$z]="bmp Bild:BMP"
+    z=z+1
+    arrMEDIAbild[$z]="gif Bild:GIF"
+    z=z+1
+    arrMEDIAbild[$z]="jp* Bild:JPEG"
+    z=z+1
+    arrMEDIAbild[$z]="png Bild:PNG"
+    z=z+1
+    arrMEDIAbild[$z]="svg Bild:SVG"
+    z=z+1
+    arrMEDIAbild[$z]="tif Bild:TIFF"
+    z=z+1
+    arrMEDIAbild[$z]="bild Bild:alle"
+    z=z+1
+}
+
+
+
+
+
+
+function fncRADIOLISTarrayANZEIGEN {
+    typeset -i z=0
+    while [[ ${strARRAY[$z]} != "" ]]
+    do
+        echo -e "${strARRAY[$z]}"
+        z=z+1
+    done
+    echo -e "-+---+-"
+}
+
+
+
+function fncRADIOLISTarray {
+    txtLISTEarray=""
+    txtLISTEchecked=" off"
+    typeset -i z=0
+    while [[ ${strARRAY[$z]} != "" ]]
+    do
+        txtLISTEarray=$txtLISTEarray"${strARRAY[$z]}"$txtLISTEchecked
+        txtLISTEarray=$txtLISTEarray" "
+        z=z+1
+    done
+}
+
+
+
+
+# -Die fast komplette Formatliste für Mediendateien:
+fncLISTmedia
+typeset -n strARRAY=arrMEDIAaudio
+fncRADIOLISTarrayANZEIGEN
+typeset -n strARRAY=arrMEDIAvideo
+fncRADIOLISTarrayANZEIGEN
+typeset -n strARRAY=arrMEDIAbild
+fncRADIOLISTarrayANZEIGEN
+
+
+# -txtLISTEarray mit Array Inhalten füllen:
+typeset -n strARRAY=arrMEDIAaudio
+fncRADIOLISTarray
+txtLISTEaudio=$txtLISTEarray
+
+typeset -n strARRAY=arrMEDIAvideo
+fncRADIOLISTarray
+txtLISTEvideo=$txtLISTEarray
+
+typeset -n strARRAY=arrMEDIAbild
+fncRADIOLISTarray
+txtLISTEbild=$txtLISTEarray
+
+
+echo -e "-+---+-"\\n"-+---+-"
+txtLISTEkomplett=$txtLISTEaudio$txtLISTEvideo$txtLISTEbild
+echo $txtLISTEkomplett
+
+
+echo -e "-+---+-"\\n"-+---+-"
+txtLISTEkomplettOHNEalle=${txtLISTEaudio//audio*/}${txtLISTEvideo//video*/}${txtLISTEbild//bild*/}
+echo $txtLISTEkomplettOHNEalle
+
+
+
+
+
+function fncEXTENSIONquelle {
+    #kdialog --title="FEHLER" --error="<h3>$datei</h3><br><b>Bitte wählen Sie das Dateiformat der Quelle?</b><br><br>Alle Dateien im gewählten Verzeichnis und in den Unterverzeichnissen,<br>die diesem Typ entsprechen, werden in das Ziel Dateiformat umgewandelt.<br><br>Verzeichnis:"`fncESCAPEkdialog $escT`"<b>$pfad</b><br>Format "`fncESCAPEkdialog $escN`"Quelle:<b>$extension</b><br>Format Ziel:"\\t"<b>$extensionZIEL</b><br><br>"
+    
+    #kdialog --title="FEHLER" --error="<h3>$datei</h3><br><b>Bitte wählen Sie das Dateiformat der Quelle?</b><br><br>Alle Dateien im gewählten Verzeichnis und in den Unterverzeichnissen,<br>die diesem Typ entsprechen, werden in das Ziel Dateiformat umgewandelt.<br><br>Verzeichnis:"\n"<b>$pfad</b><br>Format "`fncESCAPEkdialog $escN`"Quelle:<b>$extension</b><br>Format Ziel:<b>$extensionZIEL</b><br><br>"
+
+    #kdialog --title="$datei" --msgbox="<nobr>===== $datei ======================</nobr><br><br>Alle"$escT"Dateien"$escN"und$escT Ordner$escN am aktuellen Ort wurden erfolgreich überprüft.<br><br>-Status:<br>$XstatusANZAHLinsgesamt<br>$XstatusANZAHLbak<br>$XstatusANZAHiLsplitt<br><br>-Speicherort der neuen Unterverzeichnisse:<br>"$pfad"<br><br>Die komplette Liste der Sicherheitskopien und Unterverzeichnisse wird in der Konsole angezeigt."
+    
+    #txtKDIALOG="<h3>$datei</h3><br><b>Bitte wählen Sie das Dateiformat der Quelle?</b><br><br>Alle Dateien im gewählten Verzeichnis und in den Unterverzeichnissen,<br>die diesem Typ entsprechen, werden in das Ziel Dateiformat umgewandelt.<br><br>Verzeichnis:$escN<b>$pfad</b><br>Format "$escN"Quelle:<b>$extension</b><br>Format Ziel:<b>$extensionZIEL</b><br><br>"
+    
+    #kdialog --title="FEHLER" --error="$txtKDIALOG"
+    
+    
+    extension=$(kdialog --title="Dateiformat Quelle?" --radiolist="<hr><h3><center>$datei</center></h3><hr><br> \
+    Welcher Dateityp soll umgewandelt werden?<br><br> \
+    Alle Dateien im gewählten Verzeichnis die dem Typ entsprechen, werden in das<br>\
+    Zielformat umgewandelt. Unterverzeichnisse werden automatisch mitbearbeitet.<br><br>\
+    Quelle:<br>$eingabeQUELLEkomplett<br>" \
+    $txtLISTEkomplett)
+    checkDIALOG=$(echo -e "$?")
+    debugWERT=$extension
+    #fncFEHLERdialog
+}
+
+
+txtLISTEwert="mp4"
+txtLISTElabel="MPEG 4 Video"
+txtLISTEchecked="off"
+
+#txtLISTEoptionen='wert.1 '"label 1"' off'
+txtLISTEoptionen='LISTEwert LISTElabel 1 LISTEchecked'
+txtLISTEoptionen="LISTEwert LISTElabel"\ "1 LISTEchecked"
+txtLISTEoptionen="\"LISTEwert\" \"LISTElabel 1\" \"LISTEchecked\""
+
+txtLISTEoptionen2='$txtLISTEwert $txtLISTElabel $txtLISTEchecked'
+#txtLISTEoptionen2='"$txtLISTEwert" "$txtLISTElabel" "$txtLISTEchecked"'
+
+txtLISTEoptionen="$txtLISTEwert $txtLISTElabel $txtLISTEchecked"
+
+
+
+
+fncEXTENSIONquelle
+echo -e "--- Extension Quelle: $extension"
+
+
+
+
+
+
+# strARRAYname="arrMEDIAaudio"
+# 
+# echo ${arrMEDIAaudio[0]}
+# echo ${arrMEDIAaudio[1]}
+# echo ${arrMEDIAaudio[2]}
+# 
+# echo -e "---"
+# 
+# echo ${arrMEDIAaudio[*]}
+# echo -e "---"
+# 
+# strARRAYname="arrMEDIAaudio"
+# echo ${!strARRAYname[0]}
+# strARRAYname="arrMEDIAaudio"
+# echo ${!strARRAYname[1]}
+# strARRAYname="arrMEDIAaudio"
+# echo ${!strARRAYname[2]}
+
+
+
+# echo -e "---"
+# strARRAYname="arrMEDIAaudio"
+# fncRADIOLISTarray
+# strARRAYname="arrMEDIAvideo"
+# fncRADIOLISTarray
+# strARRAYname="arrMEDIAbild"
+# fncRADIOLISTarray
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+echo -e "|-"
+echo -e "|-"
+
+txtUEBERSCHRIFT="Bitte auswählen:"
+#strAUSWAHL="'Eins off' 'Zwei off' 'Drei off' 'Vier on'"
+strAUSWAHL="1 Eins off 2 Zwei off 3 Drei off 4 Vier off"
+strAUSWAHLmenu="1 Eins 2 Zwei 3 Drei 4 Vier"
+
+
+# strEINGABE=$(kdialog --radiolist "$txtUEBERSCHRIFT" $strAUSWAHL)
+# echo -e "|- Radiolist:"
+# echo -e "|- Auswahl: $strEINGABE"
+# echo -e "|-"
+
+
+strEINGABE=$(kdialog --checklist "$txtUEBERSCHRIFT" $strAUSWAHL --multiple)
+echo -e "|- Checklist:"
+echo -e "|- Auswahl: $strEINGABE"
+echo -e "|-"
+
+
+# strEINGABE=$(kdialog --combobox "$txtUEBERSCHRIFT" $strAUSWAHL)
+# echo -e "|- Combobox:"
+# echo -e "|- Auswahl: $strEINGABE"
+# echo -e "|-"
+
+
+strEINGABE=$(kdialog --menu "$txtUEBERSCHRIFT" $strAUSWAHLmenu)
+echo -e "|- Menu:"
+echo -e "|- Auswahl: $strEINGABE"
+echo -e "|-"
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+beep -l 200 -f 200 -r 2 -D 100 --new -l 600 -f 160 -D 100
+echo -e "|-"
+sleep 1
+beep -l 200 -f 400 -r 2 -D 100 --new -l 600 -f 600 -D 100
+echo -e "|-"
+sleep 1
+beep -l 200 -f 400 -r 2 -D 100 --new -l 600 -f 440 -D 100
+
+
+
+
+echo -e "--- Stern ohne Anführungszeichen"
+for i in $*
+do
+    echo -e "$\*:" $i
+done
+
+echo -e "--- Stern in Anführungszeichen"
+for i in "$*"
+do
+    echo -e "$\*:" $i
+done
+
+echo -e "--- At ohne Anführungszeichen"
+for i in $@
+do
+    echo -e "$\@:" $i
+done
+
+echo -e "--- At in Anführungszeichen"
+for i in "$@"
+do
+    echo -e "$\@:" $i
+done
+
+echo -e "--- Raute"
+for i in $#
+do
+    echo -e "$#:" $i
+done
+
+
+
+
+
+
+
+
+exit 0;
+
+
+# ----- START Cursor Position ermitteln --------------------------------------------
+echo -e "|-"
+echo -e "|- "`date`
+
+echo -e "|-"
+echo -ne "|-"
+
+typeset -i cursorZEILE=0
+typeset -i cursorZEILEminus2=0
+echo -ne "\033[6n"
+read -s -d\[ garbage
+read -s -d R cursorPOSITION
+cursorZEILE=${cursorPOSITION//;*/}
+#echo -e \\n
+echo -e " -Zeile: $cursorZEILE"
+sleep 2
+
+zeileDELETE=`tput dl1`
+zeileINSERT=`tput il1`
+
+cursorZEILEminus2=$cursorZEILE-2
+tput cup $cursorZEILEminus2 0
+echo $zeileDELETE
+#sleep 0.3
+#tput cup $cursorZEILEminus2 1
+echo $zeileDELETE
+#sleep 0.3
+tput cup $cursorZEILEminus2 0
+echo -e "|- -NEU:"
+#echo $zeileINSERT ":::"
+echo -e "|- -NEU: -Zeile: $cursorZEILE"
+#echo -e "|-"
+#tput cup $cursorZEILE 1
+# ----- ENDE Cursor Position ermitteln ---------------------------------------------
+
+
+
+
+# ----- START Funktion Cursor Position ermitteln --------------------------------------------
+echo -e "|-"
+echo -e "|-"
+echo -e "|- "`date`
+
+function getCPos { 
+    local v=() t=$(stty -g)
+    stty -echo
+    printf "\033[6n"
+    IFS='[;' read -ra v -d R
+    stty $t
+    CPos=(${v[@]:1})
+}
+
+getCPos
+echo $CPos
+# ----- ENDE Funktion Cursor Position ermitteln ---------------------------------------------
+
+
+
+
+exit 0;
+
+
+
+
+
+# ----- START Cursor Position ermitteln --------------------------------------------
+echo -e "|-"
+echo -e "|- "`date`
+
+echo -e "|-"
+echo -ne "|-"
+
+typeset -i cursorZEILE=0
+typeset -i cursorZEILEminus2=0
+echo -ne "\033[6n"
+read -s -d\[ garbage
+read -s -d R cursorPOSITION
+cursorZEILE=${cursorPOSITION//;*/}
+#echo -e \\n
+echo -e " -Zeile: $cursorZEILE"
+sleep 2
+
+zeileDELETE=`tput dl1`
+zeileINSERT=`tput il1`
+
+cursorZEILEminus2=$cursorZEILE-2
+tput cup $cursorZEILEminus2 1
+echo $zeileDELETE
+sleep 0.3
+tput cup $cursorZEILEminus2 1
+echo $zeileDELETE
+sleep 0.3
+tput cup $cursorZEILEminus2 0
+echo -e "|-"
+#echo $zeileINSERT ":::"
+echo -e "|- -NEU: "`date`
+#echo -e "|-"
+#tput cup $cursorZEILE 1
+# ----- ENDE Cursor Position ermitteln ---------------------------------------------
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+# Demonstriert den tput-Befehl
+# tput4
+Dline=`tput dl1`     # Zeile löschen
+Iline=`tput il1`     # Zeile einfügen
+Dscreen=`tput clear` # Bildschirm löschen
+# Bildschirm löschen
+echo $Dscreen
+tput cup 9 10
+echo -e "------------------------------"
+tput cup 10 10
+printf "|%28s|" ""
+tput cup 11 10
+printf "|%5s Ein Teststring %7s|" " " " "
+tput cup 12 10
+printf "|%28s|" ""
+tput cup 13 10
+echo -e "------------------------------"
+# Kurze Pause
+sleep 2
+tput cup 11 10
+# Zeile löschen
+echo $Dline
+sleep 2
+tput cup 11 10
+printf "${Iline}|%7s neuer String %7s|" " " " "
+sleep 2
+echo $Dscreen
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+# -Schleifen zum Kopieren:
+let a=0
+#for i in */*.jpg
+for i in $(ls --group-directories-first)
+do
+    #let a=a+1
+    #c=${i%/*.jpg}
+    #b=$c`printf _%03d.jpg $a`
+    #echo $i
+    a=0
+    # -Schleife um führende Null einzubauen:
+    for ia in $(ls --group-directories-first $i/?.jpg)
+    do
+        let a=a+1
+        c=${ia%/*.jpg}
+        b=$i/`printf %02d.jpg $a`
+        #echo $ia $b
+        #mv $ia $b
+    done
+    a=0
+    # -Schleife zum Verschieben:
+    for ia in $(ls --group-directories-first $i/*.jpg)
+    do
+        let a=a+1
+        c=${ia%/*.jpg}
+        b=$c`printf _%03d.jpg $a`
+        #echo $ia "00_alle/"$b
+        #cp $ia "00_alle/"$b
+    done
+    # -HTML und thumbs entfernen:
+    #rm $i/*.html
+    #rm -r $i/thumbs
+done
+
+
+
+
+
+exit 0;
+
+
+
+
+
+for i in $(ls --group-directories-first */*.jpg)
+do
+    let a=a+1
+    c=${i%/*.jpg}
+    b=$c`printf _%03d.jpg $a`
+    #echo $i $b
+done
+
+#for ia in $(ls --group-directories-first $pfad)...
+#let a=0; for i in */*.jpg; do let a=a+1; c=${i%/*.jpg}; b=$c`printf _%03d.jpg $a`; echo $i $b; done
+
+# -Mehrere Suchbegriffe mittels find verknüpfen:
+# --Pfad ist fehlerhaft:
+z=0; for i in $(find . -path "./zz_n*" -name "*teen*" -o -name "*cute*"); do let z=z+1; echo $z $i; done
+# --Pfad wird korrekt ausgewertet:
+z=0; for i in $(find . -path "./zz_n*" -name "*teen*" -o -path "./zz_n*" -name "*cute*"); do let z=z+1; echo $z $i; done
+
+# -lxFIND:
+# --1. Dateityp wählen
+# --2. Startverzeichnis wählen
+# --3. Suchbegriff für Verzeichnis oder leer
+# --4. Suchbegriff für Dateinamen
+# --5. Anzeigen der Treffer mit Multi-Auswahl
+# --6. Name für Playlist
+# --7. Nur Playlist erstellen oder Dateien auch Kopieren
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+actionGOTO="START"
+while ( [[ "$actionGOTO" == "START" ]] )
+do
+    clear
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- "`date` 
+    echo -e "|- Der Endlosschleifen-Test..."
+    sleep 3
+    continue
+done
+
+
+
+# -Innerhalb des while werden Zehntelsekunden verwendet, deshalp muss an die
+#  gewünschte Zeit in Sekunden noch eine 0 angehängt werden, oder die Zeit in
+#  Sekunden wird mit 10 multipliziert!
+intOFFsekunden=60
+intOFFvorgaenge=`echo -e "$intOFFsekunden*10" | bc`
+z=0
+strgLEERZEICHEN=""
+echo -e "--- Test: Sleep mit Tastenüberwachung ---"
+echo -e "--- Ausschalten in $intOFFsekunden Sekunden"
+sekundenSTART=`date '+%s'`
+echo -e "--- Sekunden: $sekundenSTART"
+echo -en "--- "
+wall "WARNUNG: Das System wird in $intOFFsekunden Sekunden herunterfahren!" 2>/dev/null
+#while ( [[ "$intOFFvorgaenge" -gt "0" ]] )
+while ( [[ "$intOFFvorgaenge" -gt "0" ]] && [[ `date '+%s'`-$sekundenSTART -lt "$intOFFsekunden" ]] )
+do
+    if ( [[ "$z" -lt "10" ]] )
+    then
+        echo -en "!"
+        #tput cuf $z
+#         if ( [[ "$z" -eq "0" ]] )
+#         then
+#             echo -en "!"\\b".!"
+#         else
+#             echo -en \\b"..!"
+#         fi
+       z=`echo -e "$z+1" | bc`
+    else
+        #while ( [[ "$z" -gt "0" ]] )
+        while ( [[ "$z" -gt "0" ]] && [[ `date '+%s'`-$sekundenSTART -lt "$intOFFsekunden" ]] )
+        do
+            echo -en \\b"."
+            tput cub 1
+#             if ( [[ "$z" -eq "10" ]] )
+#             then
+#                 echo -en \\b\\b"!."
+#                 tput cub 1
+#             else
+#                 echo -en \\b\\b\\b"!.."
+#                 tput cub 2
+#             fi
+            #echo -en \\b\\b"!."
+            #tput cub 1
+            #sleep 0.1
+            read -n 1 -t 0.1 eingabeTASTE
+            if ( [[ "$eingabeTASTE" == "q" ]] )
+            then
+                break
+            fi
+            intOFFvorgaenge=`echo -e "$intOFFvorgaenge-1" | bc`
+            z=`echo -e "$z-1" | bc`
+        done
+        z=0
+    fi
+    #sleep 0.1
+    if ( [[ "$eingabeTASTE" == "q" ]] )
+    then
+        break
+    fi
+    read -n 1 -t 0.1 eingabeTASTE
+    if ( [[ "$eingabeTASTE" == "q" ]] )
+    then
+        break
+    fi
+    intOFFvorgaenge=`echo -e "$intOFFvorgaenge-1" | bc`
+    #z=`echo -e "$z+1" | bc`
+done
+echo -e \\r
+if ( [[ "$eingabeTASTE" == "q" ]] )
+then
+    echo -e "--- INFO: Die 'q' Taste wurde gedrückt!"    
+fi
+echo -e "--- Erfolgreich Beendet! - $intOFFsekunden - "`date`
+sekundenENDE=`date '+%s'`
+zeitspanneIST=`echo -e "$sekundenENDE-$sekundenSTART" | bc`
+echo -e "--- Sekunden: $sekundenENDE"
+echo -e "---"
+echo -e "--- Zeitspanne: SOLL: $intOFFsekunden - IST: $zeitspanneIST"
+
+
+
+
+
+exit 0;
+
+
+
+
+
+echo -e "--- Funktion im Hintergrund schreibt in Standardeingabe im Vordergrund ---"
+
+echo -e "Wert an Standardeingabe übergeben"
+echo -e "12345" < /dev/stdin
+echo -e "wert="$wert
+
+
+function hintergrund {
+    sleep 5
+    
+}
+
+
+
+while ( [[ `read < /dev/stdin` != "q" ]] )
+do
+    nix=1
+    echo -en "."
+done
+
+
+
+
+exit 0;
+
+
+echo -e "VOR while"
+stty raw echo
+while ( [[ `dd bs=1 count=1 2>/dev/null` != "q" ]] )
+do
+    nix=1
+    echo -e "IM while"
+    echo -e "q"` < /dev/stdin
+    #/usr/bin/xvkbd -text "\[q]"
+    #echo -e "Tastenüberwachung: "`dd bs=1 count=1 2>/dev/null`
+    #tput cub 1
+    #echo -n ". "
+    #tput cub 3
+    #echo -ne \\c"|- $datei wird ausgeführt... "
+done
+stty -raw echo
+
+
+
+
+
+
+
+
+
+
+
+exit 0;
+
+
+
+# -Innerhalb des while werden Zehntelsekunden verwendet, deshalp muss an die
+#  gewünschte Zeit in Sekunden noch eine 0 angehängt werden, oder die Zeit in
+#  Sekunden wird mit 10 multipliziert!
+intOFFsekunden=10
+intOFFvorgaenge=`echo -e "$intOFFsekunden*10" | bc`
+z=0
+strgLEERZEICHEN=""
+echo -e "--- Test: Sleep mit Tastenüberwachung ---"
+echo -e "--- Ausschalten in $intOFFsekunden Sekunden"
+sekundenSTART=`date %s`
+echo -e "--- Sekunden: $sekundenSTART"
+while ( [[ "$intOFFvorgaenge" -gt "0" ]] )
+do
+    if ( [[ "$z" -lt "10" ]] )
+    then
+        #echo -en \\r""
+        #tput cuf $z
+        echo -en "."
+       # echo -en "-"
+       #strgLEERZEICHEN=$strgLEERZEICHEN" "
+       z=`echo -e "$z+1" | bc`
+    else
+        while ( [[ "$z" -gt "0" ]] )
+        do
+            echo -en \\b" "\\b
+            #sleep 0.1
+            read -n 1 -t 0.1 eingabeTASTE
+            if ( [[ "$eingabeTASTE" == "q" ]] )
+            then
+                break
+            fi
+            intOFFvorgaenge=`echo -e "$intOFFvorgaenge-1" | bc`
+            z=`echo -e "$z-1" | bc`
+        done
+        z=0
+    fi
+    #sleep 0.1
+    if ( [[ "$eingabeTASTE" == "q" ]] )
+    then
+        break
+    fi
+    read -n 1 -t 0.1 eingabeTASTE
+    if ( [[ "$eingabeTASTE" == "q" ]] )
+    then
+        break
+    fi
+    intOFFvorgaenge=`echo -e "$intOFFvorgaenge-1" | bc`
+    #z=`echo -e "$z+1" | bc`
+done
+echo -e "--- Erfolgreich Beendet! - $intOFFsekunden - "`date`\\n
+sekundenENDE=`date %s`
+zeitspanneIST=`echo -e "$sekundenENDE-$sekundenSTART" | bc`
+echo -e "--- Sekunden: $sekundenENDE"
+echo -e "---"
+echo -e "--- Zeitspanne: SOLL: $intOFFsekunden - IST: $zeitspanneIST"
+
+
+exit 0;
+
+
+
+
+
+
+intOFFsekunden=50
+z=0
+strgLEERZEICHEN=""
+echo -e "--- Test: Sleep mit Tastenüberwachung ---"
+while ( [[ "$intOFFsekunden" -gt "0" ]] )
+do
+    if ( [[ "$z" -lt "10" ]] )
+    then
+        echo -en \\r""
+        tput cuf $z
+        echo -en "-"
+       # echo -en "-"
+       strgLEERZEICHEN=$strgLEERZEICHEN" "
+       z=`echo -e "$z+1" | bc`
+    else
+        echo -en \\r$strgLEERZEICHEN
+        z=0
+    fi
+    sleep 0.1
+    intOFFsekunden=`echo -e "$intOFFsekunden-1" | bc`
+    #z=`echo -e "$z+1" | bc`
+done
+echo -en " Erfolgreich Beendet!"\\n
+
+
+
+
+exit 0;
+
+asciiKREISEL[0]="-"
+asciiKREISEL[1]="\\"
+asciiKREISEL[2]="|"
+asciiKREISEL[3]="/"
+
+echo -n "|- $datei wird ausgeführt... ${asciiKREISEL[0]}"
+    
+    for i in "${asciiKREISEL[@]}"
+    do
+        echo -ne "\b$i"
+        sleep 0.5
+    done
+
+echo -e ""
+echo -e "|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
+
+
+function MOVEasciiKREISEL () {
+    asciiKREISEL[0]="-"
+    asciiKREISEL[1]="\\"
+    asciiKREISEL[2]="|"
+    asciiKREISEL[3]="/"
+
+    echo -n "${asciiKREISEL[0]}"
+    action="start"
+    while ( [[ "$action" == "start" ]] )
+    do
+        for i in "${asciiKREISEL[@]}"
+        do
+            echo -ne "\b$i"
+            sleep 0.1
+        done
+    done
+}
+
+
+echo -e "|-"\\n"|- Um das Skript zu Beenden drücken Sie \"q\"."
+echo -n "|- $datei wird ausgeführt... "
+
+MOVEasciiKREISEL &
+MOVEasciiKREISELpid=$!
+
+stty raw echo
+while ( [[ `dd bs=1 count=1 2>/dev/null` != "q" ]] )
+do
+    nix=1
+    tput cub 1
+    echo -n "   "
+    tput cub 3
+    #echo -ne \\c"|- $datei wird ausgeführt... "
+done
+stty -raw echo
+
+tput cub 1
+echo -n "   "
+tput cub 3
+
+
+kill $MOVEasciiKREISELpid
+echo -e \\n"|- Das Skript wurde beendet!"
+
+
+exit 0;
+
+
+echo -e "|- Ausgabe der String Variablen:"
+echo -e "|- *:"
+echo -e "|- $*"
+echo -e "|- @"
+echo -e "|- $@"
+echo -e "|-"
+
+if ( [[ "$1" == -*f* ]] )
+then
+    echo -e "|- str1 Vergleich: -f gesetzt"
+fi
+
+
+
+
+echo -e "|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
+echo -e "|- TEST: mittels 'for i in \$*' und 'if \$i'"
+for i in $*
+do
+    if ( [[ "$i" == -*f* ]] && [[ "$i" != -off* ]] )
+    then
+        echo -e "|- \"$i\" * einzel Vergleich: -f gesetzt"
+    fi
+    if ( [[ "$i" == -*q* ]] )
+    #if ( [[ "$i" == -*q* ]] && [[ "$i" != -off* ]] )
+    then
+        echo -e "|- \"$i\" * einzel Vergleich: -q gesetzt"
+    fi
+    if ( [[ "$i" == "-off" ]] )
+    then
+        echo -e "|- \"$i\" * einzel Vergleich: -off gesetzt"
+    elif ( [[ "$i" == -off=* ]] )
+    then
+        echo -e "|- \"$i\" * einzel Vergleich: -off=* gesetzt"
+        intOFFminuten=${i//*=/}
+        echo -e "|- \"$intOFFminuten\" * einzel Vergleich: intOFFminuten"
+    elif ( [[ "$i" == -off* ]] )
+    then
+        echo -e "|- \"$i\" * einzel Vergleich: FEHLER -off* gesetzt"
+    elif ( [[ "$i" != -* ]] )
+    then
+        echo -e "|- \"$i\" * einzel Vergleich: FEHLER kein gültiges Argument"
+    fi
+done
+
+exit 0;
+
+
+
+
+
+
+echo -e "|- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -"
+echo -e "|- TEST: mittels 'for i in \$*' und 'case \$i'"
+for i in $*
+do
+    case "$i" in
+        ("-f")
+            echo -e "|- \"$i\" nur einzel Vergleich: -f gesetzt" ;;
+        #( [[ "$i" == -*f* ]] && [[ "$i" != -off* ]] )
+        ( -*f* )
+            echo -e "|- \"$i\" * einzel Vergleich: -f gesetzt" ;;
+        #( [[ "$i" == -*f* ]] && [[ "$i" != -off* ]] )
+# #     ( [[ "$i" == -*q* ]] )
+# #         echo -e "|- \"$i\" * einzel Vergleich: -q gesetzt" ;;
+# #     ( [[ "$i" == "-off" ]] )
+# #         echo -e "|- \"$i\" * einzel Vergleich: -off gesetzt" ;;
+#     elif ( [[ "$i" == -off=* ]] )
+#     then
+#         echo -e "|- \"$i\" * einzel Vergleich: -off=* gesetzt"
+#         intOFFminuten=${i//*=/}
+#         echo -e "|- \"$intOFFminuten\" * einzel Vergleich: intOFFminuten"
+#     elif ( [[ "$i" == -off* ]] )
+#     then
+#         echo -e "|- \"$i\" * einzel Vergleich: FEHLER -off* gesetzt"
+#     elif ( [[ "$i" != -* ]] )
+#     then
+#         echo -e "|- \"$i\" * einzel Vergleich: FEHLER kein gültiges Argument"
+#     fi
+        (*)
+            echo -e "|- \"$i\" * einzel Vergleich: irgendwas gesetzt" ;;
+        #( [[ "$i" == -*f* ]] && [[ "$i" != -off* ]] )
+    esac
+done
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+TMParchiv="ytdl.tmp"
+archiv="archiv.youtube-dl"
+
+while read txtTMP
+do
+    echo $txtTMP
+done < $TMParchiv
+
+echo -e "--------------"
+
+echo -e "die config datei komplet"
+while read txtCONFIG
+do
+    #nix=1
+    echo $txtCONFIG
+done < ~/.config/youtube-dl/config
+
+echo -e "--------------"
+
+echo -e "die config datei: nur archiv"
+while read txtCONFIG
+do
+    #nix=1
+    if ( [[ "$txtCONFIG" == --download-archiv* ]] )
+    then
+        echo $txtCONFIG
+        archivORIGINAL=${txtCONFIG//\-\-download\-archiv /}
+        echo $archivORIGINAL
+    fi
+done < ~/.config/youtube-dl/config
+
+
+
+
+
+exit 0;
+
+
+
+varTEST="teil1"
+varTEST=$varTEST"teil2"
+
+echo -e "|- Test: $varTEST"
+echo -e "|-"
+
+
+
+
+echo -e "|-"
+echo -e "|- ENDE -------------------------------------------------------------------------"
+
+
+
+
+
+
+# sound ausgeben:
+beep -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 700 -f 392 -D 100 --new -l 350 -f 587.32 -D 100
+
+
+# zeile: delete, insert - cls
+zeileD=`tput dl1`
+zeileI=`tput il1`
+screenC=`tput clear`
+
+
+echo -e "--- zeile 1"
+echo -e "--- zeile 2"
+echo -e "--- zeile 3"
+echo -e "--- zeile 4"
+sleep 2
+
+tput cup 8
+#echo $zeileD
+echo -e "--- zeile 4-1"
+sleep 2
+
+tput cup 8
+#echo $zeileD
+echo -e "--- zeile 4-2"
+
+
+
+
+
+
+
+exit 0;
+
+
+# Demonstriert den tput-Befehl
+# tput4
+Dline=`tput dl1`     # Zeile löschen
+Iline=`tput il1`     # Zeile einfügen
+Dscreen=`tput clear` # Bildschirm löschen
+# Bildschirm löschen
+echo $Dscreen
+tput cup 9 10
+echo -e "------------------------------"
+tput cup 10 10
+printf "|%28s|" ""
+tput cup 11 10
+printf "|%5s Ein Teststring %7s|" " " " "
+tput cup 12 10
+printf "|%28s|" ""
+tput cup 13 10
+echo -e "------------------------------"
+# Kurze Pause
+sleep 2
+tput cup 11 10
+# Zeile löschen
+echo $Dline
+sleep 2
+tput cup 11 10
+printf "${Iline}|%7s neuer String %7s|" " " " "
+sleep 2
+echo $Dscreen
+
+
+exit 0;
+
+
+
+
+zINSGESAMT=0
+zSPLIT=0
+zBAKdateien=0
+strBAKdateien=""
+
+
+txtINSGESAMT="Anzahl der Prüfvorgänge (Dateien und Ordner)"
+txtBAKdateien="Anzahl der Sicherheitskopien"
+txtSPLIT="Anzahl der neu erstellten Dateien"
+
+trennerC="\t - "
+trennerX="`echo -e "\t"`"
+trennerX2="\`echo -e "\t"\`"
+
+# fuer ausgabe in der konsole: $trennerC
+statusANZAHLinsgesamt=$zINSGESAMT$trennerC$txtINSGESAMT
+statusANZAHLbak=$zBAKdateien$trennerC$txtBAKdateien
+statusANZAHiLsplitt=$zSPLIT$trennerC$txtSPLIT
+
+# fuer ausgabe im Xserver: $trennerX
+XstatusANZAHLinsgesamt=$zINSGESAMT"$trennerX"$txtINSGESAMT
+XstatusANZAHLbak=$zBAKdateien"`echo -e "\t"`"$txtBAKdateien
+XstatusANZAHiLsplitt=$zSPLIT`echo -e "\t"`$txtSPLIT
+
+# statusANZAHLinsgesamt=$zINSGESAMT"\t - Anzahl der Prüfvorgänge (Dateien und Ordner)"
+# statusANZAHLbak=$zBAKdateien"\t - Anzahl der Sicherheitskopien (.bak)"
+# statusANZAHiLsplitt=$zSPLIT"\t - Anzahl der neu erstellten Dateien"
+
+
+# zahlen und namen auch auf der Konsole ausgeben, VORTEIL:
+# -kurzzeitig gespeichert, Infos lassen sich leichter kopieren als in einem normalen dialogfenster
+echo -e "|- $statusANZAHLinsgesamt"
+echo -e "|- $statusANZAHLbak"
+echo -e "|- $statusANZAHiLsplitt"
+echo -e "|- "
+echo -e "|- Die Sicherheitskopie und das dazu gehörige Verzeichnis:"
+echo -e "$strBAKdateien"
+echo -e "|- "
+
+
+if [[ "$zSPLIT" -gt "0" ]]
+then
+    kdialog --title="$datei" --caption="$titel" --msgbox="<nobr>===== $datei ======================</nobr><br><br>Alle Dateien`echo -e "\n"` und Ordner$trennerX am aktuellen Ort"`echo -e "\n"`" wurden erfolgreich überprüft.<br><br>-Status:<br>$XstatusANZAHLinsgesamt<br>$XstatusANZAHLbak<br>$XstatusANZAHiLsplitt<br><br>-Speicherort der neuen Unterverzeichnisse:<br>"$pfad"<br><br>Die komplette Liste der Sicherheitskopien und Unterverzeichnisse wird in der Konsole angezeigt."
+    
+    #kdialog --title="$datei" --caption="$titel" --msgbox="<nobr>===== "$datei" ======================</nobr><br><br>Alle Dateien und Ordner am aktuellen Ort wurden erfolgreich überprüft.<br><br>-Status:<br>"$statusANZAHLinsgesamt"<br>"$statusANZAHLbak"<br>"$statusANZAHiLsplitt"<br><br>-Speicherort der .bak Dateien und der neuen Unterverzeichnisse:<br>"$pfad"<br><br>Die komplette Liste der Sicherheitskopien und Unterverzeichnisse wird in der Konsole angezeigt."
+else
+    kdialog --title="$datei" --caption="$titel" --msgbox="<nobr>===== "$datei" ======================</nobr><br><br>Es wurde keine passende Datei unter<br>$pfad<br>gefunden. Bitte überprüfen Sie die Adresse,<br>die Bentzerrechte und die Ausgabe in der Konsole.<br>Hinweise zum Debug Modus finden Sie in der Hilfe (-h).<br>"
+fi
+
+
+
+
+exit 0;
+
+
+
+
+
+/home/lx21/bin/lxMP3split: Zeile 304: Syntaxfehler beim unerwarteten Wort `('
+/home/lx21/bin/lxMP3split: Zeile 304: `    Bei $zBAKdateien Dateien wurden Sicherheitskopien und alle entsprechenden Teildateien ($zSPLIT) erstellt. <br><br>Sppeicherort der Sicherheitskopien:<brpfad werden der Datei(en) wurden hier gespeichert:<br>$pfad<br><br>$strBAKdateien"'
+
+
+
+

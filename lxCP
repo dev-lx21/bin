@@ -1,0 +1,25 @@
+#!/bin/bash
+# skript von -lx-
+
+nutzer=`ps --pid $$ -o user=`
+
+
+
+
+
+
+# -Andere Shellskripte einbinden:
+#
+# lxTOOLS-cp war früher lxCP. Damit lxCP weiterhin funktioniert wird lxTOOLS-cp
+# als Source eingebunden:
+. /home/"$nutzer"/bin/lxTOOLS-cp
+
+
+
+
+
+exit 0;
+
+
+
+

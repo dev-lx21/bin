@@ -1,0 +1,809 @@
+#!/bin/bash
+# skript von -lx-
+
+
+
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVERSION=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiVERSIONkomplett=${iaLSarray[0]}
+    # -Bis zum letzten Slash abschneiden:
+    dateiVERSIONkomplett=${dateiVERSIONkomplett//*\//}
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVERSIONkomplett=${dateiVERSIONkomplett//`echo -e $datei`_/}
+    # -Unterstrich bis zum Ende abschneiden:
+    dateiVERSIONkomplett=${dateiVERSIONkomplett//_*/}
+    dateiVERSION="($dateiVERSIONkomplett)"
+}
+[ -z $dateiVERSION ] && fncAUSLESENversion
+
+
+
+
+
+
+
+zeitSTARTutc=`date '+%s'`
+zeitSTART=`date -d @$zeitSTARTutc`
+zeitSTARTdateiname=`date -d @$zeitSTARTutc '+%F_%T'`
+zeitSTARTdateiname=${zeitSTARTdateiname//\-/}
+zeitSTARTdateiname=${zeitSTARTdateiname//:/}
+zeitSTARTdateiname=${zeitSTARTdateiname//_/\-}
+
+
+datei=${0//*\//}
+titel="Playlisten für Audio- oder Videodateien erstellen!"
+benutzung="|- Benutzung: \\n|- '$datei [OPTIONEN] [PFAD]' \\n|-"
+txtEingabe="|- Eingabe: '$datei' \\n|-"
+[[ -n $* ]] && txtEingabe="|- Eingabe: '$datei $*' \\n|-"
+nutzer=`ps --pid $$ -o user=`
+
+
+
+pfad="$1"
+flag_update=$2
+flag_aufruf_intern=$3
+zeit_start=`date`
+flag_rename="false"
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+# -Sonderfälle UPDATE und AUFRUF_INTERN
+#if ( [[ "$flag_update" != "true" ]] && [[ "$flag_aufruf_intern" != "true" ]] )
+if ( [[ "$flag_update" != "true" ]] && [[ "$flag_aufruf_intern" != "true" ]] && [[ "$pfad" == "" ]] )
+then
+    # -Die Sicherheitsfrage:
+    # --1. Argument: die Vorbelegung: WEITER oder ABBRECHEN
+    # --2. Argument: die Datei die gestartet werden soll
+    # --3. Argument: der Titel der Datei die gestartet werden soll
+    flagSICHERHEITSFRAGE=`/home/$nutzer/bin/zz_inc_sicherheitsfrage.sh "WEITER" "$datei" "$titel"`
+    flagSICHERHEITSFRAGE=$?
+    # -Wenn der Rückgabewert nicht 0 ist, wurde entweder abgebrochen oder es gab einen Fehler!
+    if ( [[ "$flagSICHERHEITSFRAGE" != "0" ]] )
+    then
+        # -Die Sicherheitsfrage beendet das Skript!
+        #echo -e "--- Sicherheitsfrage: $flagSICHERHEITSFRAGE"
+        exit 0;
+    fi
+fi
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+# START pfad-kontrolle -----------------------------------
+# den pfad pruefen, ggf korrigieren, ggf FEHLER ausgeben!
+# -ist bei internem aufruf nicht erforderlich:
+if ( [ "$flag_aufruf_intern" != "true" ] )
+  then
+  if ( [ "$pfad" != "" ] )
+  then
+  #echo -e "--- pfad-nicht-leer ---"
+    if [[ "$pfad" != */ ]]
+        then
+        #echo -e "--- pfad-hat-kein-slash ---"
+        pfad="$pfad/"
+    fi
+  else
+    #echo -e "--- pfad-ist-leer ---"
+    # aktueller ort wird als pfad angenommen:
+    pfad="`pwd`"
+    [[ "$pfad" != */ ]] && pfad="$pfad/"
+    #kdialog --msgbox="Pfad: $pfad"
+  fi
+    # pfad pruefen und ggf FEHLER ausgeben:
+  if ( [ -d "$pfad" ] )
+    then
+    fehler=0
+  else
+    fehler=1
+    #kdialog --title="$datei.Info.Fehler" --error="== $datei: ================<br><br>FEHLER: Das Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.<br><br>Verzeichnis: $pfad<br><br>Das Script wird beendet." &
+    kdialog --title="$datei.Info.Fehler" --msgbox="== $datei: ================<br><br>FEHLER: Das Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.<br><br>Verzeichnis: $pfad<br><br>Das Script wird beendet." &
+    exit 0;
+  fi
+fi
+# ENDE pfad-kontrolle -----------------------------------
+
+
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Standard Parameter definieren: ------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+extension=".mp*"
+extension2=".avi"
+name_datei_playliste="00_alle_pls.m3u"
+name_datei_update="00_alle_pls_update.sh"
+#echo -e "$extension"
+suchpfad_speichern_pls=*$extension
+suchpfad=$pfad*$extension
+suchpfad2=$pfad*$extension2
+#echo -e "$suchpfad"
+flag_stop=0
+
+
+# -Extension in Array speichern und damit den Suchpfad automatisch erstellen!
+arrExtension=(.avi .m4a .mkv .mp* .wmv)
+arrSuchpfad=""
+
+function fncMakeArrSuchpfad {
+    txtSuchpfad=""
+    for i in "${arrExtension[@]}"
+    do
+        iSuchpfad=$pfad*$i
+        [ -z "$txtSuchpfad" ] && txtSuchpfad="$iSuchpfad" && continue
+        txtSuchpfad="$txtSuchpfad $iSuchpfad"
+    done
+    arrSuchpfad=("$txtSuchpfad")
+}
+fncMakeArrSuchpfad
+# -------------------------------------------------------------------------------------------------
+# ----- ENDE Standard Parameter definieren: -------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# wird nur beim ersten aufruf der datei ausgefuehrt:
+if ( [ "$flag_aufruf_intern" != "true" ] )
+then
+    # wird (fast) immer angezeigt:
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $datei -| $titel"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $zeit_start"
+    echo -e "|-"
+    echo -e "|- Unterstützte Dateiformate: ${arrExtension[*]}"
+    echo -e "$benutzung"
+    
+    # version, GPL, autor...
+
+    kdialog --title="lxRENAME starten?" --warningcontinuecancel="== $datei: ================<br><br>Das lxRENAME Script starten?<br>Verzeichnis:<br><b>$pfad</b><br><br>Falls die Dateinamen bzgl. Leer- und Sonderzeichen<br>kontrolliert und korrigiert werden sollen, wählen<br>Sie bitte <b>Mit RENAME</b>!<br>" --continue-label="Ohne RENAME" --cancel-label="Mit RENAME"
+    flag_rename=$(echo -e "$?")
+    #intSSpopup=15 && kdialog --title "$datei.Info" --passivepopup "<b>$datei:</b><br><br>flag_rename: $flag_rename<br><br>Info ausblenden nach $intSSpopup Sekunden.<br>" $intSSpopup
+  
+#   # -DEBUG:
+#   kdialog --title="INFO" --msgbox="DEBUG: $datei\n\n\
+#   Verzeichnis:\n$pfad\n\n\
+#   Rename Abfrage:\n$flag_rename\n\n"
+
+    if ( [[ "$flag_rename" == "2" ]] )
+    then
+        # -Abbruch durch Benutzer oder Fehler:
+        # --Fehlermeldung anzeigen und Skript beenden!
+        
+        #intSSpopup="15"
+        #kdialog --title="$datei.Info.Fehler" --msgbox="== $datei: ================<br><br>FEHLER: Das Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.<br><br>Verzeichnis: $pfad<br><br>Das Script wird beendet." &
+        
+        kdialog --title "$datei.Info.Fehler" --msgbox "== $datei: ================<br><br>FEHLER: Der Prozess wurde durch den Benutzer oder einen internen Fehler abgebrochen. Nähere Informationen erhalten Sie, wenn Sie die Ausgabe in der Konsole beachten.<br><br>Das Script wird beendet." &
+        exit 2;
+    fi
+
+    if ( [[ "$flag_rename" == "0" ]] )
+    then
+        # -Continue Button gewählt:
+        # --Nichts zu tun!
+        nix=1
+    fi
+    
+    txtbox_rename="NEIN"
+    zeit_ACTIONstart=`date`
+    if ( [[ "$flag_rename" == "1" ]] )
+    then
+        # -Cancel Button gewählt:
+        # --Rename wird gestartet.
+        #
+        #intSSpopup=15 && kdialog --title "$datei.Info" --passivepopup "<b>$datei:</b><br><br>lxRENAME wird gestartet... Bitte haben Sie einen Moment (10-20 Sek) Geduld!<br><br>Info ausblenden nach $intSSpopup Sekunden.<br>" $intSSpopup
+        intSSpopup=10 && kdialog --title "$datei.Info" --passivepopup "<br><br><b>lxRENAME wird gestartet...</b><br>Bitte haben Sie einen Moment (10-20 Sek) Geduld!<br><br>Diese Info wird nach $intSSpopup Sek automatisch ausgeblendet.<br>" $intSSpopup
+
+        txtbox_rename="JA"
+        echo -e "*** Sonder- und Leerzeichen in Dateinamen korrigieren:"
+        # eventuelle sonder- und leerzeichen aus den dateinamen loeschen:
+        /home/$nutzer/bin/lxRENAME "$pfad" "false" "true"
+        echo -e "***"
+    fi
+
+  # ein update script fuer diesen pfad erstellen:
+  touch $pfad$name_datei_update
+  echo -e "#!/bin/bash" > $pfad$name_datei_update
+  echo -e "# --- ein update script fuer die playliste LEVEL0 ---" >> $pfad$name_datei_update
+  #echo -e "" >> $pfad$name_datei_update
+  echo -e "# aktueller ort wird als pfad angenommen:" >> $pfad$name_datei_update
+  echo -e "pfad=\`pwd\`" >> $pfad$name_datei_update
+  echo -e "pfad=\$pfad/" >> $pfad$name_datei_update
+  echo -e "$0 \$pfad true" >> $pfad$name_datei_update
+  chmod a+x $pfad$name_datei_update
+
+fi
+
+
+
+txtbox_pfad="\n\nVerzeichnis:\n$pfad"
+txtbox_rename="\n\nRename gestartet: $txtbox_rename"
+txtbox_pfad=$txtbox_pfad$txtbox_rename
+
+
+if ( [ "$flag_update" != "true" ] )
+ then
+ flag_update=false
+fi
+
+if ( [ "$flag_aufruf_intern" != "true" ] )
+ then
+ flag_aufruf_intern=false
+fi
+
+
+
+
+#echo -e "***************************************************************"
+#echo -e "*** Playliste erstellen in: $pfad"
+#echo -e "***************************************************************"
+
+
+
+
+# -Zähler für Gesamtanzahl:
+typeset -i zPLAYLISTENgesamt=0
+
+# -Zähler für interne Durchläufe:
+typeset -i zPLAYLISTENintern=0
+
+
+
+
+
+
+
+# arrVERZEICHNISSE=""
+# flagAuslesenUVZ="false"
+# function fncAuslesenUVZ {
+#     pfadUVZ="$1"
+#     arrUVZ=(`ls --group-directories-first $1`)
+#     #for ia in "$(ls --group-directories-first $1)"
+#     #for ia in $1*
+#     for ia in "${arrUVZ[@]}"
+#     do
+#         nix=0
+#         iaOriginal="$ia"
+#         iaKomplett="$pfadUVZ""$ia"
+# 
+#         # DEBUG infos:
+#         #echo -e "DEBUG-pfad: \\t$pfad"
+#         #echo -e "DEBUG-ia: \\t$ia"
+#     
+#         if ( [ -f "$iaKomplett" ] )
+#         then
+#             # DEBUG infos:
+#             #echo -e "DEBUG-ia: \\t$ia"
+#             continue
+#         fi
+#         
+#         if ( [ -d "$iaKomplett" ] )
+#         then
+#             flagAuslesenUVZ="true"
+#             [[ "$iaKomplett" != */ ]] && iaKomplett="$iaKomplett""/"
+#             # DEBUG infos:
+#             echo -e "DEBUG-ia: \\t$iaKomplett"
+#             #echo -e "DEBUG-flag_aufruf_intern: $flag_aufruf_intern"
+#             #fncAuslesenUVZ "$ia"
+#             #[ -z "$arrVERZEICHNISSE" ] && arrVERZEICHNISSE="$ia" && continue
+#             arrVERZEICHNISSE="$arrVERZEICHNISSE\\n""$iaKomplett"
+#         fi
+#         
+#         while ( [[ "$flagAuslesenUVZ" == "true" ]] )
+#         do
+#             nix=0
+#             echo -e "DEBUG UVZ: $iaOriginal"
+#             echo -e "DEBUG iaKomplett: \\t$iaKomplett"
+#             #fncAuslesenUVZ "$iaKomplett"
+#             flagAuslesenUVZ="false"
+#         done
+#         
+#     done
+#     
+# }
+# 
+# [ -d "$pfad" ] && arrVERZEICHNISSE="$pfad"
+# fncAuslesenUVZ "$pfad"
+# 
+# # DEBUG Infos:
+# echo -e "DEBUG-arr:\\n$arrVERZEICHNISSE"
+# 
+# exit 0;
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# arrVERZEICHNISSE=""
+# function fncAuslesenUVZ_bak {
+#     ls --group-directories-first $1
+#     #for ia in "$(ls --group-directories-first $1)"
+#     #for ia in $1*
+#     for ia in "$(ls --group-directories-first $1)"
+#     do
+#         nix=0
+#         iaOriginal="$ia"
+# 
+#         # DEBUG infos:
+#         #echo -e "DEBUG-pfad: \\t$pfad"
+#         #echo -e "DEBUG-ia: \\t$ia"
+#     
+#         if ( [ -f "$ia" ] )
+#         then
+#             # DEBUG infos:
+#             #echo -e "DEBUG-ia: \\t$ia"
+#             continue
+#         fi
+#         
+#         if ( [ -d "$ia" ] )
+#         then
+#             # DEBUG infos:
+#             echo -e "DEBUG-ia: \\t$ia"
+#             #echo -e "DEBUG-flag_aufruf_intern: $flag_aufruf_intern"
+#             #fncAuslesenUVZ "$ia"
+#             #[ -z "$arrVERZEICHNISSE" ] && arrVERZEICHNISSE="$ia" && continue
+#             arrVERZEICHNISSE="$arrVERZEICHNISSE\\n""$ia"
+#         fi
+#         
+#         #fncAuslesenUVZ "$ia"
+#     done
+#     
+# }
+# 
+# [ -d "$pfad" ] && arrVERZEICHNISSE="$pfad"
+# fncAuslesenUVZ_bak "$pfad"
+# 
+# # DEBUG Infos:
+# echo -e "DEBUG-arr:\\n$arrVERZEICHNISSE"
+# 
+# exit 0;
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------------------------
+# ----- START Funktion fncMAKEplaylist --------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------------------------
+function fncMAKEplaylist {
+    pfad="$1"
+    [[ "$pfad" != */ ]] && pfad="$pfad""/"
+    #echo -e "DEBUG MAKEPLS: \\t$1"
+
+    arrDATEIEN=(`ls --group-directories-first "$pfad"`)
+
+#for ia in "$(ls -R --group-directories-first $pfad)"
+#for ia in "$(ls --group-directories-first $pfad)"
+#for ia in $pfad*
+
+#for ia in "$(find "$pfad" -type d)"
+#for ia in "${arrVERZEICHNISSE[@]}"
+#for ia in "$1*"
+
+#for ia in "$(find "$1" -type f)"
+for ia in "$pfad"*
+ do
+ nix=0
+ iaOriginal="$ia"
+ 
+#     # DEBUG infos:
+     #echo -e "DEBUG FNC pfad: \\t$pfad"
+     #echo -e "DEBUG FNC ia: \\t$ia"
+#     continue
+
+    if ( [ -d "$pfad$ia" ] )
+    then
+#         # DEBUG infos:
+#         echo -e "DEBUG-pfad: \\t$pfad"
+#         echo -e "DEBUG-ia: \\t$ia"
+#         echo -e "DEBUG-flag_aufruf_intern: $flag_aufruf_intern"
+        continue
+    fi
+
+    
+    
+    #echo -e "*** Check auf Inhalt: ***"
+    # falls extension nicht passt, wird zum naechsten datensatz gesprungen:
+#     if ( [[ "$ia" != *$extension ]] && [[ "$ia" != *$extension2 ]] )
+#     then
+#         #echo -e "DEBUG INFO: VOR uvz \\t$ia passt nicht zum Suchstring: \"*$extension\" \"*$extension2\""
+#         #echo -e "DEBUG MAKEPLS: \\t$ia - Suchstring: \"*$extension\" \"*$extension2\""
+#         continue
+#     fi
+    flagCheckExtensionVorhanden="false"
+    for iExtension in "${arrExtension[@]}"
+    do
+        if ( [[ "$ia" == *$iExtension ]] )
+        then
+            flagCheckExtensionVorhanden="true"
+        fi
+    done
+    [[ "$flagCheckExtensionVorhanden" == "false" ]] && continue
+    
+    
+
+    if ( [[ $flagPLAYLISTEdone != "egal-was-true" ]] )
+    then
+        if ( [ -d "$ia" ] )
+        then
+            zPLAYLISTENintern=zPLAYLISTENintern+1
+            pfad_uvz="$ia/"
+            suchpfad=$ia/*$extension
+            dateiPLS=$ia"/"$name_datei_playliste
+            datei_update=$ia"/"$name_datei_update
+            #echo -e "DEBUG-VERZEICHNIS: $ia"
+            $0 "$pfad_uvz" "$flag_update" "true"
+            #flag_aufruf_intern=false
+            continue
+        elif ( [ -d "$pfad" ] )
+        then
+            # -Array mit Suchpfad neu erstellen:
+            fncMakeArrSuchpfad
+            
+            suchpfad=$pfad*$extension
+            suchpfad2=$pfad*$extension2
+            dateiPLS=$pfad$name_datei_playliste
+            datei_update=$pfad$name_datei_update
+            flag_stop=1
+            #flag_aufruf_intern=false
+        else
+            # -Den Pfad sichern und kurzzeitig leeren:
+            pfadTmpBak="$pfad"
+            pfad=""
+            # -Array mit Suchpfad neu erstellen:
+            fncMakeArrSuchpfad
+            # -Den Pfad wieder herstellen:
+            pfad="$pfadTmpBak"
+            
+            suchpfad=*$extension
+            suchpfad2=*$extension2
+            dateiPLS=$name_datei_playliste
+            datei_update=$name_datei_update
+            flag_stop=1
+            #flag_aufruf_intern=false
+        fi
+    fi
+
+
+
+
+# if ( [ -d "$pfad" ] && [ $pfad!="" ] && [ ! -d "$ia" ] )
+#  then
+#  ia=$pfad$ia
+#  zusatz=""
+#  #echo -e "---PFAD KOMPLETT: $ia"
+#  # zusatz ist inzwischen unnötig!!!
+#  #else
+#  #zusatz="../"
+#  #echo -e "---PFAD KOMPLETT: $pfad"
+# fi
+# 
+# 
+# 
+# #echo -e "*** Check auf Inhalt: ***"
+# # falls extension nicht passt, wird zum naechsten datensatz gesprungen:
+# if ( [[ "$ia" != *$extension ]] && [[ "$ia" != *$extension2 ]] )
+#   then
+#   echo -e "DEBUG-INFO: VOR uvz \\t$ia passt nicht zum Suchstring: \"*$extension\" \"*$extension2\""
+#   continue
+# fi
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# #echo -e "*** Check auf Inhalt: ***"
+# #echo -e "-suchpfad: $suchpfad"
+# # falls extension nicht passt, wird zum naechsten datensatz gesprungen:
+# if ( [[ "$ia" != *$extension ]] && [[ "$ia" != *$extension2 ]] )
+#   then
+#   echo -e "DEBUG-INFO: NACH uvz: \\t$ia passt nicht zum Suchstring: \"*$extension\" \"*$extension2\""
+#   continue
+# fi
+
+
+zPLAYLISTENgesamt=zPLAYLISTENgesamt+1
+
+#echo -e "-INFO: Datei erstellen..."
+typeset -i z_id=0
+# ein update script fuer diese playliste erstellen:
+touch $datei_update
+echo -e "#!/bin/bash" > $datei_update
+echo -e "# skript von -lx-" >> $datei_update
+echo -e "#" >> $datei_update
+echo -e "# --- $datei: Update Skript für Playlisten" >> $datei_update
+echo -e "# --- $datei: Level-1" >> $datei_update
+echo -e "#" >> $datei_update
+echo -e "# -Aktuelles Verzeichnis wird als Pfad übernommen:" >> $datei_update
+echo -e "pfad=\`pwd\`" >> $datei_update
+echo -e "pfad=\$pfad/" >> $datei_update
+echo -e "$0 \$pfad true" >> $datei_update
+chmod a+x $datei_update
+
+
+# die playliste als datei erstellen:
+#echo -e "$datei"
+touch $dateiPLS
+#text="#EXTM3U"
+echo -e "#EXTM3U" > $dateiPLS
+#mkdir tmplxfileorder
+
+#echo -e "|--- iaOriginal: $iaOriginal"
+#echo -e "|--- ia: $ia"
+echo -e "|- Erstelle Playliste in: $pfad"
+#echo -e "|--- extension: $extension $extension2 - intern: $flag_aufruf_intern - $zPLAYLISTENintern"
+
+#sucheERGEBNIS=`ls $suchpfad $suchpfad2 2>/dev/null`
+sucheERGEBNIS=`ls ${arrSuchpfad[*]} 2>/dev/null`
+for i in $sucheERGEBNIS
+do
+    #echo -e "RENAME $i" | sed "s/ /_/g"
+    #echo -e "|--- z_id: $z_id\\ti: $i"
+    #i=$pfad$i
+    #echo -e "--- z_id: $z_id\\ti: $i"
+    echo -e "#EXTINF:$z_id,$zusatz$i" >> $dateiPLS
+    echo -e "$zusatz$i" >> $dateiPLS
+    z_id=z_id+1
+    #ffmpeg -i $i -acodec copy -f segment -segment_time 300 $outfile
+    #ffmpeg -i $i -acodec copy -t 00:30:00 -ss 00:00:00 $outfile
+    #echo -e "...done"
+done
+
+zeit_ende=`date`
+if (($flag_stop==1))
+ then
+ #echo -e "|- DONE: $suchpfad"
+# if ( [ ! $flag_aufruf_intern ] )
+ if [[ "$flag_aufruf_intern" != true ]]
+  then
+  if [[ "$flag_update" == true ]]
+   then
+   nix=1
+   #kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_01-"
+   else
+   nix=1
+   #echo -e "-MSGBOX: flag_stop"
+   #kdialog --title="INFO" --msgbox="Anlegen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:flag_stop-"
+  fi
+ fi
+ #echo -e "|- ENDE: $extension"
+ #echo -e "-Gestartet: $zeit_start"
+ #echo -e "-Beendet  : $zeit_ende"
+ echo -e "|---------------------------------------------- - $zPLAYLISTENintern"
+ #exit 0;
+ break
+fi
+
+#echo -e "-DONE: $suchpfad"
+
+# ende der ia schleife
+done
+
+# -------------------------------------------------------------------------------------------------------------------------------
+# ----- ENDE Funktion fncMAKEplaylist ---------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------------------------
+}
+
+
+
+
+
+
+#arrVERZEICHNISSE=(`ls --group-directories-first $pfad`)
+#arrVERZEICHNISSE=(`find "$pfad" -type d | sed -e's/ /\\ /g'`)
+#arrVERZEICHNISSE=(`find "$pfad" -type d -printf '"%p"'`)
+#arrVERZEICHNISSE=(`find "$pfad" -type d`)
+
+arrVERZEICHNISSE=(`find "$pfad" -type d`)
+
+
+#arrVERZEICHNISSE=${arrVERZEICHNISSE[@]// /___}
+#arrVERZEICHNISSE[1]=${arrVERZEICHNISSE[1]// /___}
+
+
+
+# echo -e "DEBUG ARRAY:\\n${arrVERZEICHNISSE[@]}"
+# 
+# echo -e "DEBUG ARRAY:\\n${arrVERZEICHNISSE[0]}"
+# echo -e "DEBUG ARRAY:\\n${arrVERZEICHNISSE[1]}"
+# echo -e "DEBUG ARRAY:\\n${arrVERZEICHNISSE[2]}"
+# echo -e "DEBUG ARRAY:\\n${arrVERZEICHNISSE[3]}"
+# exit 0;
+
+
+
+#for ia in "${arrVERZEICHNISSE[@]}"
+#for ia in `find "$pfad" -type d | sed -e's/ /\\ /g'`
+#for ia in "$pfad"*
+
+for ia in "${arrVERZEICHNISSE[@]}"
+do
+    nix=0
+    iaOriginal="$ia"
+
+#     # DEBUG infos:
+#     echo -e "DEBUG-pfad: \\t$pfad"
+     echo -e "DEBUG find: \\t$ia"
+     
+    fncMAKEplaylist "$ia"
+    continue
+ 
+    if ( [ -f "$ia" ] )
+    then
+        # DEBUG infos:
+        echo -e "DEBUG-pfad: \\t$pfad"
+        echo -e "DEBUG-ia: \\t$ia"
+        echo -e "DEBUG-flag_aufruf_intern: $flag_aufruf_intern"
+    fi
+    
+    
+    if ( [ -d "$ia" ] )
+    then
+        # DEBUG infos:
+        echo -e "DEBUG-pfad: \\t$pfad"
+        echo -e "DEBUG-ia: \\t$ia"
+        echo -e "DEBUG-flag_aufruf_intern: $flag_aufruf_intern"
+    fi
+
+done
+
+
+
+
+
+# # -Damit beim 2. Aufruf der Funktion die Dateien der Playliste hinzugefügt
+# #  werden und nicht eine neue Liste die 1. überschreibt, wird das Flag
+# #  flagPLAYLISTEdone genutzt:
+# flagPLAYLISTEdone="false"
+# # -1. Aufruf der Funktion:
+# fncMAKEplaylist
+
+
+
+# # -----------------------------------------------
+# # --- parameter liste beachten ------------------
+# extension=".avi"
+# name_datei_playliste="00_alle_pls.m3u"
+# name_datei_update="00_alle_pls_update.sh"
+# #echo -e "$extension"
+# suchpfad_speichern_pls=*$extension
+# suchpfad=$pfad*$extension
+# #echo -e "$suchpfad"
+# flag_stop=0
+# # -----------------------------------------------
+# # -----------------------------------------------
+# 
+# if ( [[ "$flag_aufruf_intern" != "true" ]] )
+# then
+#     echo -e "|-\\n|- - $zPLAYLISTENintern\\n|-"
+# fi
+# 
+# flagPLAYLISTEdone="true"
+# # -2. Aufruf der Funktion:
+# fncMAKEplaylist
+# 
+
+
+
+
+
+
+zPLAYLISTENgesamt=zPLAYLISTENgesamt+zPLAYLISTENintern
+zeit_ende=`date`
+txtbox_stats="\n\nAnzahl Playlisten: $zPLAYLISTENgesamt\n\n$zeit_start..INFO..Aufgerufen\n$zeit_ACTIONstart..INFO..Gestartet\n$zeit_ende..INFO..Beendet"
+
+
+
+if ( [[ "$flag_update" == "true" ]] && [[ "$flag_aufruf_intern" != "true" ]] )
+ then
+ #echo -e "-MSGBOX: update"
+ kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad$txtbox_stats\n\n\n-ende:update-"
+ echo -e "|- ENDE: update - $zPLAYLISTENgesamt"
+ echo -e "|- Aufgerufen: $zeit_start"
+ echo -e "|- Gestartet : $zeit_ACTIONstart"
+ echo -e "|- Beendet   : $zeit_ende"
+ echo -e "|- ---------------------------------------------"
+ exit 0;
+fi
+
+
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+ then
+ #echo -e "-MSGBOX: normal"
+ kdialog --title="INFO" --msgbox="Anlegen der Dateien erfolgreich!$txtbox_pfad$txtbox_stats\n\n\n-ende:normal-"
+ echo -e "|- ENDE: normal - $zPLAYLISTENgesamt"
+ echo -e "|- Aufgerufen: $zeit_start"
+ echo -e "|- Gestartet : $zeit_ACTIONstart"
+ echo -e "|- Beendet   : $zeit_ende"
+ echo -e "|- ---------------------------------------------"
+ exit 0;
+fi
+
+
+
+
+
+
+
+
+
+
+exit 0;
+
+

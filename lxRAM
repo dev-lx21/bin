@@ -1,0 +1,173 @@
+#!/bin/bash 
+# skript von -lx-
+
+
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Standard Parameter setzen ----------------------------------------------
+datei=${0//*\//}
+txtTITEL="RAM aufräumen und Speicher Auslastung anzeigen!"
+
+txtKOPF=\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $datei -| $txtTITEL"\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- "`date`\\n\
+"|-"
+
+txtBENUTZUNG=\\n\
+"|- Benutzung:"\\n\
+"|- '$datei [OPTION]...'"\\n\
+"|- Die HD Belegung und die RAM Auslastung anzeigen, den RAM Speicher aufräumen"\\n\
+"|- und erneut die RAM Auslastung ausgeben."\\n\
+"|-"
+
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Optionen:"\\n\
+"|- -h\\tDiesen Hilfetext anzeigen."\\n\
+"|- -s\\tNichts Aufräumen, nur die HD Belegung und die RAM Auslastung anzeigen."\\n\
+"|-"
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tKein zulässiges Argument übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+txtZEITSTEMPEL=`date '+%F %T:%N'`
+txtLOGinfo="$txtZEITSTEMPEL - $datei"
+# ----- ENDE  Standard Parameter setzen ----------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Wert visualisieren -----------------------------------------------------------
+function wertVISUALISIEREN {
+    RAMfreiVISUELL=${RAMfrei//M/}
+    RAMfreiVISUELL=`expr $RAMfreiVISUELL \/ 10`
+    RAMfreiVISUELL=`expr $RAMfreiVISUELL \/ 2`
+    RAMfreiVISUELLz=$RAMfreiVISUELL
+    RAMbalken=""
+    while ( [[ $RAMfreiVISUELLz -gt 0 ]] )
+    do
+        RAMbalken=$RAMbalken"_"
+        RAMfreiVISUELLz=`expr $RAMfreiVISUELLz - 1`
+    done
+    #echo -e "wert $RAMfrei $RAMfreiVISUELL $RAMbalken"
+}
+# ----- ENDE Wert visualisieren ------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+#arrWERTE=(`free -m`)
+#RAMfrei=${arrWERTE[9]}
+#wertVISUALISIEREN
+
+
+
+# -Display testen:
+if [[ `tty` != *dev* ]]
+then
+    if ( [[ "$1" == "-CRONnurAUFRAEUMEN-" ]] )
+    then
+        # -kein Display, also Cronjob, mit CRONnurAUFRAEUMEN flag, also nur Aufräumen!
+        arrWERTE=(`free -m`)
+        RAMfreiALT=${arrWERTE[9]}
+        #shift
+        sync ; sync ; sync ; echo 3 > /proc/sys/vm/drop_caches
+        # allgemeine Cron Daten loggen:
+        arrWERTE=(`free -m`)
+        RAMfrei=${arrWERTE[9]}
+        txtLOGcron=" - RAM Aufräumen Cron:\t-- $RAMfreiALT\t---> $RAMfrei"
+        echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
+        # -nach dem Aufräumen wieder loggen:
+        #/home/lx21/bin/lxCRON_RAM
+        exit 0;
+    else
+        # -kein Display, also Cronjob, kein CRONnurAUFRAEUMEN flag, also beenden!
+        # allgemeine Cron Daten loggen:
+        arrWERTE=(`free -m`)
+        RAMfrei=${arrWERTE[9]}
+        txtLOGcron=" - RAM Aufräumen Cron:\t-- FEHLER: Kein Flag übergeben!\t-- $RAMfrei"
+        echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
+        exit 0;
+    fi
+fi
+
+
+
+
+
+
+
+#echo -e "|-------------------------------------------------------------" 
+#echo -e "|- $txtZEITSTEMPEL --- "`tty`
+
+
+if ( [ "$1" == "" ] ) 
+    then
+    echo -e $txtKOPF$txtBENUTZUNG
+	echo -e "|- HD Belegung:"
+    df -m
+    echo -e "|- RAM Auslastung:"
+    free -m
+    echo -e "|- RAM aufräumen:"
+	echo -e "sync ; sync ; sync ; echo 3 > /proc/sys/vm/drop_caches"
+	#sync ; sync ; sync ; echo 3 > /proc/sys/vm/drop_caches	
+    
+    arrWERTE=(`free -m`)
+    RAMfreiALT=${arrWERTE[9]}
+    #shift
+    sync ; sync ; sync ; echo 3 > /proc/sys/vm/drop_caches
+    # allgemeine Cron Daten loggen:
+    arrWERTE=(`free -m`)
+    RAMfrei=${arrWERTE[9]}
+    txtLOGcron=" - RAM Aufräumen Konsole:\t-- $RAMfreiALT\t---> $RAMfrei"
+    echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
+    
+    echo -e "|- RAM Auslastung:"
+    free -m
+
+elif ( [ "$1" == "-s" ] ) 
+    then
+    echo -e $txtKOPF
+    echo -e "|- Nichts Aufräumen, nur die HD Belegung und die RAM Auslastung anzeigen."\\n"|-"
+	echo -e "|- HD Belegung:"
+    df -m
+    echo -e "|- RAM Auslastung:"
+    free -m
+elif ( [ "$1" == "-h" ] ) 
+    then
+    echo -e $txtKOPF$txtHILFE
+else
+	echo -e $txtKOPF$txtFEHLERargument
+fi 
+
+
+exit 0;
+
+
+
+

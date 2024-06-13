@@ -1,0 +1,601 @@
+#!/bin/bash
+# script von -lx-
+
+
+
+
+
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    #exec >`tty` 2>&1
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    #echo -e "--------------------------------------------------------------------------------" && echo -e "---------- START Debug: $txtDEBUGtitel" && echo -e "--------------------------------------------------------------------------------"
+    echo -e "--------------------------------------------------------------------------------"
+    #echo -e "---------- START Debug: $txtDEBUGtitel"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    #export PS4='+ ${LINENO}:'`echo -en '\\t'`
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    #[ ! "$flagFNCdebug" ] && echo -e "--- FEHLER: fncDEBUGstop ohne vorher fncDEBUGstart aufzurufen!" && return
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    #echo -e "--------------------------------------------------------------------------------" && echo -e "---------- ENDE Debug: $txtDEBUGtitel" && echo -e "--------------------------------------------------------------------------------"
+    #echo -e "---------- ENDE Debug: $txtDEBUGtitel"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+    #exec >/dev/null 2>&1
+}
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*:/}
+            mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
+            mSxyz=${mSxyz//*./}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*:/}
+            mSxyz=`echo $mSxyz | awk '{printf "%.2f", $mSxyz}'`
+            mSxyz=${mSxyz//*./}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*:/}
+            mSxyz=`echo $mSxyz | awk '{printf "%.3f", $mSxyz}'`
+            mSxyz=${mSxyz//*./}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+
+
+
+
+
+
+
+
+
+
+#fncDEBUGstart
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Format Parameter setzen ------------------------------------------------------------
+# -Display testen:
+if [[ `tty` != *dev* ]]
+then
+    # -Wenn KEIN Display vorhanden ist, handelt es sich um einen Cronjob!
+    # -da tput nur mit $TERM funktioniert werden die Format Variablen geleert:
+    fmtFETT=""
+    fmtINVERS=""
+    fmtUNTERSTRICHEN=""
+    fmtRESET=""
+else
+    fmtFETT=`tput bold`
+    fmtINVERS=`tput rev`
+    fmtUNTERSTRICHEN=`tput smul`
+    fmtRESET=`tput sgr0`
+fi
+# ----- ENDE Format Parameter setzen -------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+pfad=`pwd`
+pfad="$pfad/"
+zeitSTART=`date`
+flagACTION="false"
+flagKEINpfad="false"
+
+datei=${0//*\//}
+txtTITEL="Infos über Dateien, Verzeichnisse oder das System anzeigen!"
+nutzer=`ps --pid $$ -o user=`
+txtZeileStart="|- "
+
+
+
+
+
+# -------------------------------------------------------------------
+# ----- START Optionen Kontrolle ------------------------------------
+# -Falls einer der eingegebenen Stringparameter nicht mit "-" anfängt
+#  wird dieser als Pfad gesetzt!
+for i in "$@"
+do
+    # -Stringparameter einzeln prüfen:
+    if ( [[ "$i" != "" ]] )
+    then
+        if ( [[ "$i" != -* ]] )
+            then
+            #echo -e "--- String fängt nicht mit "-" an! ---"
+            #echo -e "--- String ist keine Option, also Pfad! ---"
+            pfad="$i"
+            flagKEINpfad="false"
+        else
+            flagKEINpfad="true"
+        fi
+    fi
+done
+# ----- ENDE Optionen Kontrolle -------------------------------------
+# -------------------------------------------------------------------
+
+
+
+
+# -------------------------------------------------------------------
+# ----- START pfad-kontrolle ----------------------------------------
+# -den pfad pruefen, ggf korrigieren, ggf FEHLER ausgeben!
+strSUCHBEGRIFF=""
+if ( [[ "$pfad" != "" ]] )
+then
+    strSUCHBEGRIFF=$pfad
+    #echo -e "--- pfad-nicht-leer --- $strSUCHBEGRIFF"
+    if ( [[ "$pfad" != */ ]] )
+        then
+        #echo -e "--- pfad-hat-kein-slash ---"
+        pfad="$pfad/"
+    fi
+else
+    #echo -e "--- pfad-ist-leer ---"
+    # aktueller ort wird als pfad angenommen:
+    pfad=`pwd`
+    pfad="$pfad/"
+    #kdialog --msgbox="Pfad: $pfad"
+fi
+# pfad pruefen und ggf FEHLER ausgeben:
+if ( [[ -d "$pfad" ]] )
+then
+    fehler=0
+else
+    fehler=1
+    #kdialog --title="FEHLER" --error="FEHLER:\nDas Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.\n\nVerzeichnis:\n$pfad\n\n\nDas Script wird beendet."
+    #exit 0;
+fi
+# ----- ENDE pfad-kontrolle -----------------------------------------
+# -------------------------------------------------------------------
+
+# -Falls Pfad ein Device ist, muss der Slash am Ende wieder entfernt werden:
+[[ "$pfad" == /dev/* ]] && [[ "$pfad" == */ ]] && pfad="${pfad:0: -1}"
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Prozess Option --------------------------------------------------------------------------
+# -Der Elternprozess und dessen Kindprozesse müssen gesucht werden!
+#arrPROZESSE=($datei youtube-dl)
+arrPROZESSE=($datei)
+
+if ( [[ "$1" == "-PS" ]] )
+then
+    echo -e "-"\\n"--- Eigene Prozesse anzeigen: ---------------------------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        echo -e "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            echo -e "$ausgabe"
+        else
+            echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        echo -e "-"
+    done
+    exit 0;
+fi
+
+if ( [[ "$1" == "-PSK" ]] )
+then
+    echo -e "-"\\n"--- Eigene Prozesse anzeigen und beenden (kill): --------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        echo -e "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            echo -e "$ausgabe"
+            ausgabePIDs=`lxPS -pid $i`
+            ausgabePIDs=${ausgabePIDs//$$/}
+            for ii in $ausgabePIDs
+            do
+                nix=1
+                #echo -e "- PIDs: "$ii
+                #ps -ppid $ii -o pid=
+                ausgabeCHILDPIDsTMP=`ps --ppid $ii -o pid=`
+                ausgabeCHILDPIDs=$ausgabeCHILDPIDs" "$ausgabeCHILDPIDsTMP
+            done
+            #echo -e "- PIDs: "$ausgabePIDs
+            #echo -e "- CPIDs:"$ausgabeCHILDPIDs
+            if ( [[ "$ausgabePIDs" != "" ]] )
+            then
+                echo -e "- kill -9 "$ausgabePIDs $ausgabeCHILDPIDs
+                kill -9 $ausgabePIDs $ausgabeCHILDPIDs
+            else
+                echo -e "- INFO: Keine Prozesse zum Beenden gefunden!"
+            fi
+        else
+            echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        echo -e "-"
+    done
+    exit 0;
+fi
+
+# ----- ENDE Prozess Option ---------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------
+# -------------------------------------------------------------------
+# ----- START Umwandeln Optionen zu Befehl --------------------------
+
+strBEFEHL=""
+
+# -Zähler initiieren:
+typeset -i Xarr=0
+
+# -Arrays mit Optionen und entsprechenden Befehlen füllen!
+arrOPTIONEN[$Xarr]=""
+arrBEFEHLE[$Xarr]=""
+arrOPTIONENtxtINFO[$Xarr]=""
+
+
+
+arrOPTIONEN[$Xarr]="-df"
+arrBEFEHLE[$Xarr]="df -hT"
+arrOPTIONENtxtINFO[$Xarr]="Die Speicherbelegung von Festplatten/Partitionen anzeigen. Keine Pfadangabe: alle - Mit Pfad: nur diese Festplatte anzeigen"
+Xarr=Xarr+1
+
+arrOPTIONEN[$Xarr]="-du"
+arrBEFEHLE[$Xarr]="du -h --max-depth 0"
+arrOPTIONENtxtINFO[$Xarr]="Die Speicherbelegung für das Verzeichnis anzeigen."
+Xarr=Xarr+1
+
+arrOPTIONEN[$Xarr]="-duR"
+arrBEFEHLE[$Xarr]="du -h --max-depth 1"
+arrOPTIONENtxtINFO[$Xarr]="Die Speicherbelegung für das Verzeichnis und die Unterverzeichnisse (1 Ebene) anzeigen."
+Xarr=Xarr+1
+
+arrOPTIONEN[$Xarr]="-duRR"
+arrBEFEHLE[$Xarr]="du -h --max-depth 2"
+arrOPTIONENtxtINFO[$Xarr]="Die Speicherbelegung für das Verzeichnis und die Unterverzeichnisse (2 Ebenen) anzeigen."
+Xarr=Xarr+1
+
+arrOPTIONEN[$Xarr]="-ls"
+arrBEFEHLE[$Xarr]="ls -lA --group-directories-first"
+arrOPTIONENtxtINFO[$Xarr]="Den Kompletten Inhalt des Verzeichnis als Liste anzeigen."
+Xarr=Xarr+1
+
+arrOPTIONEN[$Xarr]="-lsR"
+arrBEFEHLE[$Xarr]="ls -lAR --group-directories-first"
+arrOPTIONENtxtINFO[$Xarr]="Den Kompletten Inhalt des Verzeichnis und der Unterverzeichnisse (rekursiv) als Liste anzeigen."
+Xarr=Xarr+1
+
+arrOPTIONEN[$Xarr]="-ps"
+arrBEFEHLE[$Xarr]="lxPS"
+arrOPTIONENtxtINFO[$Xarr]="Die laufenden Prozesse anzeigen. Wurde kein Suchbegriff gesetzt werden alle aufgelistet."
+Xarr=Xarr+1
+
+
+
+
+
+# -Funktion zum Vergleichen der Eingabe mit den gespeicherten
+#  Optionen und zum Zusammenbau des Befehls!
+# -$i ist der eingegebene Stringparameter!
+strSORTIERUNG=""
+strSORT=""
+function fncOPTIONEN2BEFEHL {
+    intAnzArg="$1"
+    typeset -i intFELD=0
+    
+    # -Der einzige Stringparameter, bzw das einzige Argument ist ein Pfad. Daher wird die Standard
+    #  Option -df gesetzt:
+    [[ "$i" != -* ]] && [[ $intAnzArg -eq 1 ]] && i="-df"
+    #echo -e "--- DEBUG anzahl: $intAnzArg - i: $i"
+    
+    for strOPTION in ${arrOPTIONEN[@]}
+    do
+        # -Optionen aus Array einzeln prüfen:
+        if ( [[ "$strOPTION" != "" ]] )
+        then
+            # -Vergleich Stringparameter-Optionen
+            if ( [[ "$i" == "$strOPTION" ]] )
+            then
+                # -Sonderfälle: Option ist "-df" oder "-ps" und kein Pfad gesetzt:
+                if ( ( [[ "$i" == "-df" ]] ) || ( [[ "$i" == "-ps" ]] ) && ( [[ "$flagKEINpfad" == "true" ]] ) )
+                then
+                    if ( [[ "$strBEFEHL" == "" ]] )
+                    then
+                        strBEFEHL=${arrBEFEHLE[$intFELD]}
+                        txtBEFEHL="$strBEFEHL"
+                        #strBEFEHL=`$strBEFEHL`
+                        strBEFEHL="$txtBEFEHL"
+                        break
+                    else
+                        strBEFEHL2=${arrBEFEHLE[$intFELD]}
+                        txtBEFEHL2="$strBEFEHL2"
+                        txtBEFEHL="$txtBEFEHL && $txtBEFEHL2"
+                        strBEFEHL2=`$strBEFEHL2`
+                        strBEFEHL="$strBEFEHL\\n|====================\\n$strBEFEHL2"
+                        break
+                    fi
+                fi
+                # -Sonderfälle: Option ist "-ps" und Pfad/Suchbegriff gesetzt:
+                if ( ( [[ "$i" == "-ps" ]] ) && ( [[ "$flagKEINpfad" == "false" ]] ) )
+                then
+                    if ( [[ "$strBEFEHL" == "" ]] )
+                    then
+                        strBEFEHL=${arrBEFEHLE[$intFELD]}
+                        txtBEFEHL="$strBEFEHL $strSUCHBEGRIFF"
+                        #strBEFEHL=`$strBEFEHL $strSUCHBEGRIFF`
+                        strBEFEHL="$txtBEFEHL"
+                        break
+                    else
+                        strBEFEHL2=${arrBEFEHLE[$intFELD]}
+                        txtBEFEHL2="$strBEFEHL2 $strSUCHBEGRIFF"
+                        txtBEFEHL="$txtBEFEHL && $txtBEFEHL2"
+                        strBEFEHL2=`$strBEFEHL2 $strSUCHBEGRIFF`
+                        strBEFEHL="$strBEFEHL\\n|====================\\n$strBEFEHL2"
+                        break
+                    fi
+                fi
+                # -Sonderfall: Option ist "-duR*": Sortierung einbauen:
+                if ( [[ "$i" == -duR* ]] )
+                then
+                    strSORTIERUNG="| sort -h"
+                    strSORT="sort -h"
+                fi
+                # -Normalfall:
+                if ( [[ "$strBEFEHL" == "" ]] )
+                then
+                    strBEFEHL=${arrBEFEHLE[$intFELD]}
+                    txtBEFEHL="$strBEFEHL $pfad $strSORTIERUNG"
+                    #strBEFEHL=`$strBEFEHL $pfad`
+                    #strBEFEHL=`$strBEFEHL $pfad` | `$strSORT`
+                    strBEFEHL01="$strBEFEHL $pfad"
+                    strBEFEHL02="$strSORT"
+                    strBEFEHL="$txtBEFEHL"
+                    break
+                else
+                    strBEFEHL2=${arrBEFEHLE[$intFELD]}
+                    txtBEFEHL2="$strBEFEHL2 $pfad"
+                    txtBEFEHL="$txtBEFEHL && $txtBEFEHL2"
+                    strBEFEHL2=`$strBEFEHL2 $pfad`
+                    strBEFEHL="$strBEFEHL\\n|====================\\n$strBEFEHL2"
+                    break
+                fi
+            fi
+        fi
+        intFELD=intFELD+1
+    done
+}
+
+
+# -Schleife mit den Stringparametern!
+for i in "$@"
+do
+    # -Stringparameter einzeln prüfen:
+    if ( [[ "$i" != "" ]] && [[ "$i" != "-h" ]] )
+    then
+        # -Funktion zum Vergleichen:
+        fncOPTIONEN2BEFEHL ${#}
+    fi
+done
+# ----- ENDE Optionen Kontrolle -------------------------------------
+# -------------------------------------------------------------------
+# -------------------------------------------------------------------
+
+
+
+# -Standard Befehl setzen:
+if ( [[ "$strBEFEHL" == "" ]] )
+then
+    strBEFEHL=${arrBEFEHLE[0]}
+    txtBEFEHL="$strBEFEHL $pfad"
+    #strBEFEHL=`$strBEFEHL $pfad`
+fi
+
+
+
+
+
+
+
+
+# -die Namen der Dateien zum Zwischenspeichern und Loggen festlegen:
+#dateiURLS="00_$datei.URLS.txt"
+dateiLOGS="00_$datei.LOGS.txt"
+dateiLOGStmp="00_$datei.LOGS.txt.tmp"
+
+txtHR="|--------------------------------------------------------------------------------"
+
+txtKOPF=\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $datei -| "
+
+txtKOPFlogs=$txtKOPF"Logdatei"\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+txtKOPF=$txtKOPF$txtTITEL\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+
+
+
+
+txtBENUTZUNG=\
+"|- Benutzung:"\\n\
+"|- '$datei [OPTIONEN] [PFAD/SUCHBEGRIFF]'"\\n\
+"|- Informationen über Dateien, Verzeichnisse, Partitionen oder das komplette System"\\n\
+"|- anzeigen. Die Daten können unterschiedlich ausführlich ausgegeben werden und"\\n\
+"|- automatisch gespeichert werden."\\n\
+"|-"\\n\
+"|- Standard:"\\n\
+"|- -Ohne Option:"\\n\
+"|-  Festplattenbelegung anzeigen."\\n\
+"|- -Ohne Pfad bzw. ohne Suchbegriff:"\\n\
+"|-  Aktuelles Arbeitsverzeichnis wird als Pfad genutzt und der Suchbegriff bleibt leer."\\n\
+"|-"
+
+# -Die Optionen, Befehle und Infotexte für die Hilfe aus den Arrays auslesen:
+#
+# -Die Länge der Option ermitteln, für korrekte Tabs Anzahl:
+# --Standard Tab sind 8 Zeichen.
+# --Falls komplette Option gleich lang oder länger ist, wird Standard Tab entsprechend verlängert.
+typeset -i intStandardTab=8
+typeset -i intStandardTabNeu
+typeset -i intArrOptionLaenge
+typeset -i intArrOptionLaengeMax=0
+typeset -i intArrOptionLaengeKomplett
+typeset -i intZeileStartLaenge
+intZeileStartLaenge="${#txtZeileStart}"
+for txtARRoption in ${arrOPTIONEN[@]}
+do
+    intArrOptionLaenge=${#txtARRoption}
+    (( intArrOptionLaenge > intArrOptionLaengeMax )) && intArrOptionLaengeMax=$intArrOptionLaenge
+done
+# -Da Tab vielleicht geändert wurde: Standard Tab setzen
+tabs -$intStandardTab
+
+# -Länge ermitteln, ggf Tab verlängern und neu setzen:
+intArrOptionLaengeKomplett=intArrOptionLaengeMax+intZeileStartLaenge
+#[[ $intArrOptionLaengeKomplett -ge $intStandardTab ]] && intStandardTabNeu=intArrOptionLaengeKomplett+2 && tabs -$intStandardTabNeu
+[[ $intArrOptionLaengeKomplett -ge $intStandardTab ]] && intStandardTabNeu=intArrOptionLaengeKomplett+2
+
+typeset -i intFELD=0
+txtHILFEoptionen=""
+for txtARRoption in ${arrOPTIONEN[@]}
+do
+    # -Die restlichen Texte aus Array zuweisen:
+    txtARRbefehl=${arrBEFEHLE[$intFELD]}
+    txtARRinfo=${arrOPTIONENtxtINFO[$intFELD]}
+    txtHILFEoptionen=$txtHILFEoptionen"|- $txtARRoption\\t$txtARRinfo\\n|-\\tBefehl: \"$txtARRbefehl\"\\n"
+    intFELD=intFELD+1
+done
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Optionen:"\\n\
+"|- -h\\tDiesen Hilfetext anzeigen."\\n\
+$txtHILFEoptionen\
+"|-"
+
+
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tKein zulässiges Argument übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+txtENDEzeit=\\n\
+"|-"\\n\
+"|- Start:\t$zeitSTART"\\n\
+"|- Ende:\t"
+
+
+
+
+
+#fncDEBUGstop
+
+
+
+
+echo -e $txtKOPF
+
+# -Hilfe anzeigen:
+if ( [[ "$1" == "-h" ]] )
+then
+    [[ $intStandardTabNeu -gt $intStandardTab ]] && tabs -$intStandardTabNeu
+    echo -e "$txtHILFE"
+    # -Den Tab wieder auf Standard setzen:
+    tabs -$intStandardTab
+    exit 0;
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -Ausgabe der Befehle:
+#echo -e "|- Pfad: $pfad\\t\\tSuchbegriff: $strSUCHBEGRIFF"
+#echo -e "$strBEFEHL" `$strSORTIERUNG`
+#$strBEFEHL
+#echo -e "-----"
+
+#echo -e "|- Befehl: $txtBEFEHL"
+#`echo -e "$txtBEFEHL"`
+
+
+
+
+if ( [[ "$strSORT" != "" ]] )
+then
+    #echo -e "|-"
+    echo -e "|- Befehl:\\t$strBEFEHL01"
+    echo -e "|- Sortierung:\\t$strBEFEHL02"
+    `echo -e "$strBEFEHL01"` 2>/dev/null | `echo -e "$strBEFEHL02"`
+else
+    #echo -e "|-"
+    echo -e "|- Befehl:\\t$strBEFEHL"
+    #echo -e "|- Sortierung: $strBEFEHL02"
+    `echo -e "$strBEFEHL"` 2>/dev/null
+fi
+
+
+
+
+
+
+
+
+exit 0;
+
+

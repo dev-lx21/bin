@@ -1,0 +1,102 @@
+#!/bin/bash
+
+
+
+
+function fncKILLpid {
+#     if ( [[ "$1" == "" ]] )
+#     then
+#         return 10
+#     fi
+
+    # -EINSCHALTEN: Tastatureingaben ausgeben/darstellen:
+    #stty echo
+    
+    strKILLsignal=""
+    if ( [[ "$2" != "" ]] )
+    then
+        strKILLsignal="$2 "
+    fi
+    
+    if ( [[ "$1" != "" ]] )
+    then
+        intKILLpid="$1"
+#         if ( [[ `ps -p $intKILLpid | grep -i $intKILLpid` == $intKILLpid* ]] )
+#         then
+#             #kill $intKILLpid >/dev/null 2>&1
+#             # -Die Ausgabe wegen Fehlermeldungen nach Kill abschalten:
+#             #exec >/dev/null 2>&1
+#             # -Der Kill Befehl:
+#             #kill $intKILLpid >/dev/null 2>&1
+#             kill $intKILLpid >/dev/null 2>&1
+#             # -Die Ausgabe wieder auf den Bildschirm legen:
+#             #exec >`tty` 2>&1
+#         fi
+        typeset -i zKILL=0
+        flagDONEkill="false"
+        #while ( [[ `ps -p $intKILLpid | grep -i $intKILLpid` == $intKILLpid* ]] )
+        #while ( [[ `ps -p $intKILLpid -o pid=` == "$intKILLpid" ]] )
+        while ( [[ `ps -p $intKILLpid -o pid=` != "" ]] )
+        do
+            txtPROZESSname="`ps -p $intKILLpid -o comm=`"
+            if ( [[ "$flagDONEkill" != "true" ]] )
+            then
+                #fncECHOlx "|- "`fncHHMMSS`" INFO $intID: "\ "+- Befehl: Kill SIGTERM $intKILLpid Prozess $txtPROZESSname"
+                exec >/dev/null 2>&1
+                # -Die Ausgabe in /dev/null umleiten wegen Fehlermeldungen nach Kill Befehl:
+                kill $strKILLsignal$intKILLpid >/dev/null 2>&1 &
+                exec >`tty` 2>&1
+            fi
+            #kdialog --title "Status.KILL.`fncHHMMSS 'norm.mS2'`" --passivepopup "--- KILL PID: $intKILLpid<br><br>--- Taste: $eingabeTASTE" 10 --geometry=260x100 &
+            zKILL=zKILL+1
+            sleep 0.05
+            # -Maximale Wartezeit: 10 Sekunden
+            #  10 Sekunden / sleep 0.05 = 200 Durchläufe der while Schleife
+            #  8 Sekunden / sleep 0.05 = 160 Durchläufe der while Schleife
+            [ $zKILL -ge 199 ] && flagDONEkill="true"
+            #[ $zKILL -ge 40 ] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID: "\ "+- Befehl: Kill SIGKILL Prozess $txtPROZESSname"
+            [ $zKILL -ge 200 ] && kill -9 $intKILLpid >/dev/null 2>&1 &
+            [ $zKILL -ge 200 ] && break
+            
+        done
+    fi
+    #xset +dpms >/dev/null 2>&1
+}
+
+
+
+
+
+# -Jack Connection Kit starten:
+#jackd -d alsa --device hw:2 --rate 44100 --period 128 &
+#jackd -d alsa --device hw:MKII --rate 44100 --period 128 &
+#jackd -d alsa &
+#jackd -d alsa --rate 44100 --period 128 &
+
+
+#jackd -d alsa --rate 44100 --period 128 &
+#jackd -d alsa -d hw:1 &
+#jackd -d alsa -d hw:0,3 &
+jackd -d alsa &
+
+sleep 0.5
+
+
+
+# -Mixxx starten:
+# --Pulseaudio wird pausiert!
+# --Jack Dateien müssen noch entfernt werden.
+
+#sh -c "pasuspender -- mixxx & || mixxx &"
+#pasuspender -- mixxx & || mixxx &
+#[[ `sh -c pasuspender -- mixxx` ]] || mixxx
+
+#[[ `pasuspender -- mixxx` ]] || mixxx
+pasuspender -- /usr/bin/mixxx
+
+
+fncKILLpid `ps -C jackd -o pid=`
+
+
+
+exit 0;

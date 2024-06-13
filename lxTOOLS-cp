@@ -1,0 +1,1239 @@
+#!/bin/bash
+# script von -lx-
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+#
+# ----- DONE:
+#
+# ----- Bugs:
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+
+
+
+
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+    
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+    
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+    
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+    
+    # -Nur den Infotext ausschneiden: 
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+    
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+    
+}
+[ -z $dateiVersionInfoNr ] && fncAUSLESENversion
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+function fncYEAR1231 {
+    case "$1" in
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y%m%d'`
+            ;;
+    esac
+}
+
+function fncTime2SekSek2Time {
+    # -Zeitangaben vereinfacht umrechnen: 
+    # --Erwartet wird $1 mit einer Zeitangabe im Format HH:MM:SS oder
+    #   mit einer Zeitangabe in Sekunden (als Ganzzahl)
+    # -HH:MM:SS wird zu Sekunden und Sekunden werden zu HH:MM:SS
+    #
+    # -$1 Check:
+    local txtFncFehlerStart="FEHLER: fncTime2SekSek2Time:"
+    [ ! "$1" ] && echo -e "|- $txtFncFehlerStart Es wurde kein Argument übergeben!" && return
+    
+    local flagT2SS2T=""
+    local intT2SS2TOriginal="$1"
+    local intS2Tfertig=""
+    local intT2Sfertig=""
+    
+    # ---------------------------------------------------------------------------------------------
+    # ---------- Eingabe kontrollieren und entsprechende Flags setzen: ----------------------------
+    #if ( [[ "$intT2SS2TOriginal" == *:*:* ]] )
+    if ( [[ "$intT2SS2TOriginal" =~ ^[0-5][0-9]:[0-5][0-9]$ ]] )
+    then
+        # -Flag setzen: MM:SS zu Sekunden
+        flagT2SS2T="MMSStime2sek"
+    elif ( [[ "$intT2SS2TOriginal" =~ ^[0-9][0-9]:[0-5][0-9]:[0-5][0-9]$ ]] )
+    then
+        # -Flag setzen: HH:MM:SS zu Sekunden
+        flagT2SS2T="HHMMSStime2sek"
+    elif ( [[ "$intT2SS2TOriginal" =~ ^[1-9][0-9]*$ ]] )
+    then
+        # -Flag setzen: Sekunden zu HH:MM:SS
+        flagT2SS2T="sek2time"
+    else
+        # -$1 entspricht nicht den Anforderungen!
+        echo -e "|- $txtFncFehlerStart Das übergebene Argument ($1) ist fehlerhaft!"
+        echo -e "|- Gültige Zeitangaben sind MM:SS oder HH:MM:SS. Mit führender Null!"
+        echo -e "|- Die reine Sekundenangabe erfordert eine positive ganze Zahl. Ohne führende Null!"
+        return
+    fi
+    # ---------------------------------------------------------------------------------------------
+    
+    # ---------------------------------------------------------------------------------------------
+    # ---------- Umrechnen: HH:MM:SS zu Sekunden --------------------------------------------------
+    if ( [[ "$flagT2SS2T" == "MMSStime2sek" ]] )
+    then
+        # -MM:SS zu Sekunden:
+        intT2Sfertig=`echo -e "scale=0 ; ${intT2SS2TOriginal:0:2}*60 + ${intT2SS2TOriginal:3:2}" | bc -l`
+        echo -e "$intT2Sfertig"
+        return
+    fi
+    if ( [[ "$flagT2SS2T" == "HHMMSStime2sek" ]] )
+    then
+        # -HH:MM:SS zu Sekunden:
+        intT2Sfertig=`echo -e "scale=0 ; ${intT2SS2TOriginal:0:2}*3600 + ${intT2SS2TOriginal:3:2}*60 + ${intT2SS2TOriginal:6:2}" | bc -l`
+        echo -e "$intT2Sfertig"
+        return
+    fi
+    # ---------------------------------------------------------------------------------------------
+    
+    # ---------------------------------------------------------------------------------------------
+    # ---------- Umrechnen: Sekunden zu HH:MM:SS --------------------------------------------------
+    function fncTime2SekSek2TimeInternS2Ttmp {
+        # -Ergebnis der letzten Berechnung prüfen und zuweisen:
+        # --Bei Bedarf ':' als Abstandhalter einbauen:
+        [ "$intS2Tfertig" ] && intS2Tfertig="$intS2Tfertig"":"
+        # --Berechnung $intS2Ttmp einbauen:
+        intS2Tfertig="$intS2Tfertig""$intS2Ttmp"
+    }
+    if ( [[ "$flagT2SS2T" == "sek2time" ]] )
+    then
+        intS2Ttmp=`echo -e "scale=0 ; $intT2SS2TOriginal/3600" | bc -l`
+        intS2Ttmp=`printf '%02d' $intS2Ttmp`
+        fncTime2SekSek2TimeInternS2Ttmp
+        # -Sonderfall: Wenn HH gleich 00 ist, werden diese gar nicht angezeigt:
+        [ "$intS2Ttmp" -lt 1 ] && intS2Tfertig=""
+        
+        intS2Ttmp=`echo -e "scale=0 ; $intT2SS2TOriginal%3600/60" | bc -l`
+        intS2Ttmp=`printf '%02d' $intS2Ttmp`
+        fncTime2SekSek2TimeInternS2Ttmp
+        
+        intS2Ttmp=`echo -e "scale=0 ; $intT2SS2TOriginal%60" | bc -l`
+        intS2Ttmp=`printf '%02d' $intS2Ttmp`
+        fncTime2SekSek2TimeInternS2Ttmp
+        echo -e "$intS2Tfertig"
+        return
+    fi
+    # ---------------------------------------------------------------------------------------------
+}
+
+function fncZeitspanneStartEndeHHMMSS {
+    # -Zeitspanne zwischen Zeitpunkten berechnen und als HHMMSS ausgeben:
+    # -Zeitangaben in beliebigem Datumsformat, Start und Ende können dabei
+    #  auch unterschiedlich formatiert sein
+    # --$1 Start Zeitpunkt
+    # --$2 Ende Zeitpunkt
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+    [[ -z "$2" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+    local zeitpunktStart="$1"
+    local zeitpunktEnde="$2"
+    
+    echo -e "$(fncTime2SekSek2Time "$(echo -e $(date -d $zeitpunktEnde +%s)-$(date -d $zeitpunktStart +%s) | bc)")"
+}
+
+
+function fncECHOlx () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        echo -e "$1" >> "$dateiLOGS"
+    fi
+}
+
+function fncECHOlxD () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        #echo -e "$1" >> $dateiLOGS
+    fi
+}
+
+function fncECHOlxL () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        #echo -e "$1"
+        echo -e "$1" >> "$dateiLOGS"
+    fi
+}
+
+function fncECHOlxn () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -en "$1"
+        echo -en "$1" >> "$dateiLOGS"
+    fi
+}
+
+
+typeset -i intLayoutMaxSpalten=0
+typeset -i intLayoutMaxSpaltenVorgabe=120
+function fncLayoutMaxSpalten {
+    # -Den Anzeigebereich des eigenen Layouts auf 80% der vorhandenen Bildschirmbreite
+    #  begrenzen: ($zSPALTEN/10)*8
+    
+    typeset -i zZEILEN=$LINES
+    typeset -i zSPALTEN=$COLUMNS
+
+    intLayoutMaxSpaltenSCALE1=`echo -e "scale=1 ; ($zSPALTEN/10)*8" | bc -l`
+    intLayoutMaxSpalten=${intLayoutMaxSpaltenSCALE1//\.*/}
+    [ "$intLayoutMaxSpalten" -le 0 ] && intLayoutMaxSpalten=$intLayoutMaxSpaltenVorgabe
+}
+fncLayoutMaxSpalten
+
+
+function fncAusgabeHRMaxSpalten {
+    # -HRMaxSpalten erstellen und ausgeben!
+    # -Argumente:
+    # --$1: Die Zeichen mit denen die Linie anfangen soll.
+    # --$2: Das Zeichen mit dem die Linie gefüllt wird.
+    # -Werden keine Argumente übergeben, wird Standard genutzt:
+    txtHRAnfang="|"
+    txtHRFuellen="-"
+    
+    typeset -i zHRAnfang=0
+    typeset -i zHRFuellen=0
+    typeset -i zHRMaxSpalten=0
+    
+    [ $1 ] && txtHRAnfang="$1"
+    zHRAnfang=${#txtHRAnfang}
+    [ $2 ] && txtHRFuellen="$2"
+    zHRFuellen=${#txtHRFuellen}
+    
+    txtHRMaxSpalten="$txtHRAnfang""$txtHRFuellen"
+    zHRMaxSpalten=intLayoutMaxSpalten-zHRAnfang-zHRFuellen
+    for ((zHR=0; zHR<$zHRMaxSpalten; zHR++))
+    do
+        #echo -en "$zzHR - "
+        txtHRMaxSpalten="$txtHRMaxSpalten""$txtHRFuellen"
+    done
+    echo -e "\\r$txtHRMaxSpalten"
+}
+
+
+
+function fncLayoutHRFullScreen {
+    # -Fullscreen HR erstellen und in $txtHRFullScreen speichern.
+    # -Argumente:
+    # --$1: txtHRFullScreenANFANG
+    # --$2: txtHRFullScreenENDE
+    
+    typeset -i zZEILEN=$LINES
+    typeset -i zSPALTEN=$COLUMNS
+    typeset -i zHRanfang=0
+    typeset -i zHRmitte=0
+    typeset -i zHRende=0
+    typeset -i zzHR=0
+    
+    txtHRFullScreenANFANG="|- $datei "
+    #txtHRFullScreenANFANG="|"
+    [ $1 ] && txtHRFullScreenANFANG="$1"
+    zHRanfang=${#txtHRFullScreenANFANG}
+    
+    #txtHRFullScreenENDE=" $datei -|"
+    txtHRFullScreenENDE="|"
+    [ $2 ] && txtHRFullScreenENDE="$2"
+    zHRende=${#txtHRFullScreenENDE}
+    
+    txtHRFullScreenMITTE=""
+    zHRmitte=zSPALTEN-zHRanfang-zHRende
+    for ((zzHR=0; zzHR<$zHRmitte; zzHR++))
+    do
+        #echo -en "$zzHR - "
+        txtHRFullScreenMITTE="$txtHRFullScreenMITTE""-"
+    done
+    txtHRFullScreen="$txtHRFullScreenANFANG""$txtHRFullScreenMITTE""$txtHRFullScreenENDE"
+    echo -e "\\r$txtHRFullScreen"
+}
+fncLayoutHRFullScreen >/dev/null
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+
+
+
+
+
+
+# *************************************************************************************************
+# ***** START Kopierbefehl für EINE datei *********************************************************
+# -$1: die zu kopierende Datei
+# -$2: der Name der Kopie, bzw eine Endung, die an den eigentlichen Namen angehängt wird
+
+# -Argumente aus Kommandozeile übernehmen:
+strDateiQuelle=""
+strDateiZielEndung="_`fncYEAR1231`-`fncHHMMSS 'nurZAHLEN'`"
+typeset -i intAnzahlArgumente=0
+for i in "$@"
+do
+    intAnzahlArgumente=intAnzahlArgumente+1
+    (( "$intAnzahlArgumente" == 3 )) && break
+    #[[ -d "$i" ]] && echo -e "--- DEBUG Verzeichnis"
+    #[[ -f "$i" ]] && echo -e "--- DEBUG Datei"
+    #[[ -d "$i" ]] && pfad="$i" && continue
+    #[[ "$i" == */* ]] && continue
+    [[ -f "$i" ]] && (( "$intAnzahlArgumente" == 1 )) && strDateiQuelle="$i" && continue
+    [[ "$strDateiQuelle" != "" ]] && [[ "$i" != "" ]] && strDateiZielEndung="$i"
+done
+
+#[[ "$strDateiQuelle" != "" ]] && $(cp -v "$strDateiQuelle" "$strDateiQuelle$strDateiZielEndung")
+# if ( [[ "$strDateiQuelle" != "" ]] )
+# then
+#     $(cp -v "$strDateiQuelle" "$strDateiQuelle$strDateiZielEndung")
+# fi
+#[[ "$strDateiQuelle" != "" ]] && $(cp -v "$strDateiQuelle" "$strDateiQuelle$strDateiZielEndung")
+[[ "$strDateiQuelle" != "" ]] && cp -v "$strDateiQuelle" "$strDateiQuelle$strDateiZielEndung"
+
+[[ "$strDateiQuelle" != "" ]] && exit 0;
+
+# ***** ENDE Kopierbefehl für EINE datei **********************************************************
+# *************************************************************************************************
+
+
+
+
+
+
+
+
+
+
+
+
+pfad="$1"
+flag_update=$2
+flag_aufruf_intern=$3
+# -------------------------------------
+zeitSTARTutc=`date '+%s'`
+zeitSTART=`date -d @$zeitSTARTutc`
+zeitSTARTdateiname=`date -d @$zeitSTARTutc '+%F_%T'`
+zeitSTARTdateiname=${zeitSTARTdateiname//\-/}
+zeitSTARTdateiname=${zeitSTARTdateiname//:/}
+zeitSTARTdateiname=${zeitSTARTdateiname//_/\-}
+# -------------------------------------
+# `fncHHMMSS "norm.mS3"`
+txtZEITSTEMPEL=`fncHHMMSS "norm.mS3"`
+zeitSTART="$txtZEITSTEMPEL"
+zeitSTARTtitel=`date '+%c'`
+flagACTION="false"
+
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+fmtRESET=`tput sgr0`
+
+datei=${0//*\//}
+txtTITEL="Dateien oder Verzeichnisse kopieren!"
+#nutzer=`ps --pid $$ -o user=`
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Prozess Option --------------------------------------------------------------------------
+# -Der Elternprozess und dessen Kindprozesse müssen gesucht werden!
+#arrPROZESSE=($datei youtube-dl)
+arrPROZESSE=($datei)
+
+if ( [[ "$1" == "-PS" ]] )
+then
+    fncECHOlx "-"\\n"--- Eigene Prozesse anzeigen: ---------------------------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        fncECHOlx "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            fncECHOlx "$ausgabe"
+        else
+            fncECHOlx "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        fncECHOlx "-"
+    done
+    exit 0;
+fi
+
+if ( [[ "$1" == "-PSK" ]] )
+then
+    fncECHOlx "-"\\n"--- Eigene Prozesse anzeigen und beenden (kill): --------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        fncECHOlx "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            fncECHOlx "$ausgabe"
+            ausgabePIDs=`lxPS -pid $i`
+            ausgabePIDs=${ausgabePIDs//$$/}
+            for ii in $ausgabePIDs
+            do
+                nix=1
+                #fncECHOlx "- PIDs: "$ii
+                #ps -ppid $ii -o pid=
+                ausgabeCHILDPIDsTMP=`ps --ppid $ii -o pid=`
+                ausgabeCHILDPIDs=$ausgabeCHILDPIDs" "$ausgabeCHILDPIDsTMP
+            done
+            #fncECHOlx "- PIDs: "$ausgabePIDs
+            #fncECHOlx "- CPIDs:"$ausgabeCHILDPIDs
+            if ( [[ "$ausgabePIDs" != "" ]] )
+            then
+                fncECHOlx "- kill -9 "$ausgabePIDs $ausgabeCHILDPIDs
+                kill -9 $ausgabePIDs $ausgabeCHILDPIDs
+            else
+                fncECHOlx "- INFO: Keine Prozesse zum Beenden gefunden!"
+            fi
+        else
+            fncECHOlx "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        fncECHOlx "-"
+    done
+    exit 0;
+fi
+
+# ----- ENDE Prozess Option ---------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+# -Integer Variablen definieren:
+typeset -i intCheckAnzQuellen=1
+typeset -i intZ=1
+typeset -i intAnzQuellenVerzeichnisse=0
+
+
+
+if ( [[ "$1" != "" ]] )
+then
+    #intCheckAnzQuellen=$1
+    intCheckAnzQuellen=1
+    #clear
+else
+    intCheckAnzQuellen=1
+fi
+
+
+
+
+
+
+
+
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# -Die Namen der Dateien zum Zwischenspeichern und Loggen festlegen.
+# -Schreibrechte überprüfen.
+#
+dateiLOGS="00.$datei.logs.txt"
+dateiFEHLER="00.$datei.fehler.txt"
+dateiLOGStmp=$dateiLOGS".tmp"
+dateiLOGSsicherung="00.$datei.logs.$zeitSTARTdateiname.txt"
+
+BAKdateiLOGS="$dateiLOGS"
+BAKdateiFEHLER="$dateiFEHLER"
+BAKdateiLOGStmp="$dateiLOGStmp"
+BAKdateiLOGSsicherung="$dateiLOGSsicherung"
+
+pfadTMP="/home/$nutzer/"
+[[ -w `pwd` ]] && pfadTMP=""
+
+dateiLOGS="$pfadTMP$BAKdateiLOGS"
+dateiFEHLER="$pfadTMP$BAKdateiFEHLER"
+dateiLOGStmp="$pfadTMP$BAKdateiLOGStmp"
+
+TMPdateiLOGS="$dateiLOGS"
+TMPdateiFEHLER="$dateiFEHLER"
+TMPdateiLOGStmp="$dateiLOGStmp"
+
+[[ -f "$dateiLOGS" ]] && rm "$dateiLOGS"
+[[ -f "$dateiFEHLER" ]] && rm "$dateiFEHLER"
+[[ -f "$dateiLOGStmp" ]] && rm "$dateiLOGStmp"
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+
+
+
+# -Nur Starten wenn NICHT:
+# --Logs, Hilfe
+if ( [[ "$1" != -*l* ]] && [[ "$1" != -*h* ]] )
+then
+    # -Wegen Unterschieden beim Auslesen der aktuellen Cursorposition, wird clear
+    #  aufgerufen. Wenn die aktuelle Cursorposition in der untersten Zeile wäre, würde
+    #  ansonsten die getCPos Funktion nicht korrekt arbeiten!
+    #echo -e "...clear screen..."
+    fncClearX
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#txtHR="|--------------------------------------------------------------------------------"
+txtHR="`fncAusgabeHRMaxSpalten`"
+
+
+txtKOPF=\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $datei -| "
+
+txtKOPFlogs=$txtKOPF"Logdatei"\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTARTtitel"\\n\
+"|-"
+
+txtKOPF=$txtKOPF$txtTITEL\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTARTtitel"\\n\
+"|-"
+
+
+
+
+#"|- -6. Optionen beim Kopieren: rekursiv, update"\\n\
+
+txtBENUTZUNG=\
+"Benutzung:"\\n\
+"|- '$datei [OPTIONEN]'"\\n\
+"|- '$datei QUELLE [ZUSATZ-ENDUNG]'"\\n\
+"|- Komfortabel Dateien und/oder Verzeichnisse kopieren. Quelldateien auswählen"\\n\
+"|- oder direkt weiter zur Auswahl der Quellverzeichnisse, danach nur noch ein"\\n\
+"|- Verzeichnis als Ziel festlegen. Ausgabe des Befehls erfolgt am Bildschirm"\\n\
+"|- und in die Logdatei."\\n\
+"|-"
+
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Hinweise zur Benutzung:"\\n\
+"|- '$datei [OPTIONEN]'"\\n\
+"|- -1. Quelldatei(en) auswählen oder Abbrechen und weiter zur Verzeichnisauswahl"\\n\
+"|- -2. Quellverzeichnis auswählen oder Abbrechen und weiter zur Zielauswahl."\\n\
+"|-     Falls keine Datei(en) und kein Verzeichnis gewählt wurden, wird das Skript"\\n\
+"|-     beendet."\\n\
+"|- -3. Weiteres Quellverzeichnis auswählen oder Abbrechen um weiter zur Zielverzeichnis"\\n\
+"|-     Auswahl zu kommen."\\n\
+"|- -4. Zielverzeichnis auswählen oder Abbrechen um das Skript zu beenden."\\n\
+"|- -5. Kopieren der verschiedenen Quellen in das Zielverzeichnis!"\\n\
+"|-"\\n\
+"|- '$datei QUELLE [ZUSATZ-ENDUNG]'"\\n\
+"|- -1. Quelle ist eine Datei."\\n\
+"|- -2. Ziel ist die Quelle mit der eingegebenen Zusatz-Endung."\\n\
+"|-     Falls keine Zusatz-Endung angegeben wird, erstellt das Skript einen Zeitstempel und"\\n\
+"|-     hängt diesen an die Quelldatei."\\n\
+"|- -3. Wichtig: Die Datei wird hierbei immer im gleichen Verzeichnis kopiert."\\n\
+"|- -Beispiel: '$datei QUELLE [ZUSATZ-ENDUNG]'"\\n\
+"|-     '$datei /foo/bar/john-smith.who _bak_original'"\\n\
+"|-     -> Neue Datei: /foo/bar/john-smith.who_bak_original"\\n\
+"|-     '$datei /foo/bar/john-smith.who'"\\n\
+"|-     -> Neue Datei: /foo/bar/john-smith.who_JJJJMMTT_HHMMSS"\\n\
+"|-     -> Neue Datei: /foo/bar/john-smith.who$strDateiZielEndung"\\n\
+"|-"\\n\
+"|- Optionen:"\\n\
+"|- -h\\tDiesen Hilfetext anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- -l\\tDie Logdatei im aktuellen Verzeichnis anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- Manche Optionen können kombiniert werden. Dabei ist '-qf' das gleiche wie '-fq'."\\n\
+"|-"\\n\
+"|- Die Logdatei wird während der Auswahl der Quellen im aktuellen Arbeitsverzeichnis"\\n\
+"|- gespeichert. Falls der Benutzer in diesem Verzeichnis keine Schreibrechte hat, wird"\\n\
+"|- die Logdatei im Home Verzeichnis angelegt."\\n\
+"|- -Beispiel Logdatei während Quellen Auswahl: '/home/foo/$BAKdateiLOGS'"\\n\
+"|- Sobald das Ziel für den Kopiervorgang ausgewählt wurde, wird die Logdatei in das"\\n\
+"|- Zielverzeichnis verschoben und dort weiter abgespeichert. Nachdem das Skript alle Vorgänge"\\n\
+"|- abgeschlossen hat, wird die Logdatei kopiert und mit Zeitstempel im Namen gesichert."\\n\
+"|- -Beispiel Logdatei Zielverzeichnis: '/ziel/bar/$BAKdateiLOGS'"\\n\
+"|- -Beispiel Logdatei Sicherung: '/ziel/bar/$BAKdateiLOGSsicherung'"\\n\
+"|-"
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tKein zulässiges Argument übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+txtENDEzeitFEHLER=\\n\
+"|-"\\n\
+"|- Skript Start:\t$zeitSTART"\\n\
+"|- Skript Ende: \t"
+
+txtENDEzeit=\\n\
+"|- Skript Start:  \t$zeitSTART"\\n\
+"|- Kopieren Start:\t"
+
+
+
+
+
+
+
+
+
+
+flagMORE="false"
+# -Die Hilfe anzeigen:
+#if ( [[ "$strg1" == -*h* ]] )
+if ( [[ "$1" == -*h* ]] )
+then
+    #echo -e $txtKOPF
+    #echo -e $txtKOPF $txtHILFE | more
+    #echo -e $txtKOPF $txtHILFE $befehlAUSGABEmore
+    
+    if ( [[ "$flagMORE" == "false" ]] )
+    then
+        # -Normaler Aufruf ohne More-Option
+        echo -e "$txtKOPF $txtHILFE"
+    else
+        echo -e "$txtKOPF $txtHILFE" | more
+    fi
+    exit 0;
+fi
+
+
+
+
+
+
+
+
+
+
+function fncStringKontrolleEndeLeerzeichen {
+    # -Leerzeichen am Ende des Strings kontrollieren und ggf entfernen:
+    [ -z "$1" ] && return
+    strKontrolleKomplett="$1"
+    strKontrolleEnde="${strKontrolleKomplett: -1}"
+    [[ "$strKontrolleEnde" == " " ]] && strKontrolleFertig="${strKontrolleKomplett:0:-1}" || strKontrolleFertig="$strKontrolleKomplett"
+    echo -e "$strKontrolleFertig"
+}
+
+txtEingabeQuelleDateien="Keine Dateien ausgewählt."
+function fncAuslesenVerzeichnisAusDateien {
+    # -Das Verzeichnis aus einer Dateiauswahl (--getopenfilename --multiple)
+    #  auslesen.
+    # -eingabeDateien="/home/foo/disk.log /home/foo/info.txt"
+    # -eingabeDateien="/aa_backup/aa_1000-sata-ts/daten/musik_kinder/Die kleine Backwerkstatt/Die kleine Backwerkstatt/08_Leider alles verbrannt.mp3 /aa_backup/aa_1000-sata-ts/daten/musik_kinder/Die kleine Backwerkstatt/Die kleine Backwerkstatt/11_Die Geschenkepackerei.mp3"
+    [ -z "$1" ] && return
+    eingabeDateien="$1"
+    
+    # -Falls mehrere Dateien übergeben wurden, wird alles nach "LeerzeichenSlash" verworfen:
+    if ( [[ "$eingabeDateien" == *\ \/* ]] )
+    then
+        #nix=1
+        strAuslesenKomplett="${eingabeDateien//\ \/*/}"
+    else
+        strAuslesenKomplett="$eingabeDateien"
+    fi
+        
+    strAuslesenDatei="${strAuslesenKomplett//*\//}"
+    strAuslesenVerzeichnis="${strAuslesenKomplett//$strAuslesenDatei/}"
+    [[ "$strAuslesenVerzeichnis" != */ ]] && strAuslesenVerzeichnis="$strAuslesenVerzeichnis""/"
+    #echo -e "---DEBUG--- $strAuslesenDatei"
+    #echo -e "---DEBUG--- $strAuslesenVerzeichnis"
+    strVorgabeVerzeichnis="$strAuslesenVerzeichnis"
+    
+    # -Die Ausgabe der Dateien auf mehrere Zeilen aufteilen:
+    txtEingabeQuelleDateien=""
+    arrDateien=($eingabeDateien)
+    #echo -e "---DEBUG--- ${arrDateien[0]}"
+    for iDateien in "${arrDateien[@]}"
+    do
+        #echo -e "--- $iDateien"
+        [ -z "$txtEingabeQuelleDateien" ] && txtEingabeQuelleDateien="$iDateien" && continue
+        txtEingabeQuelleDateien="$txtEingabeQuelleDateien\\n|-\\t\\t\\t\\t$iDateien"
+    done
+    #echo -e "$txtEingabeQuelleDateien"
+}
+
+
+
+
+#fncECHOlx "$txtKOPF"
+fncECHOlxD "$txtKOPF"
+fncECHOlxL "$txtKOPFlogs"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+eingabeQUELLEkomplett=""
+eingabeQUELLEbak=""
+
+strVorgabeVerzeichnis="`pwd`"
+
+# *****************************************************************************
+# ***** START Eingabe Quellen Datei *******************************************
+txtInfoEingabeUeberschrift="|- 0$intZ Quelle - Dateie(n):\\t"
+#fncECHOlx "$txtInfoEingabeUeberschrift"
+
+# -Quelle auswählen:
+if ( [[ "$eingabeQUELLE" == "" ]] )
+then
+    eingabeQUELLE=$(kdialog --title="Quelle: DATEIEN wählen" --getopenfilename "$strVorgabeVerzeichnis" --multiple 2>/dev/null)
+    #eingabeQUELLE=$(kdialog --title="$intZ Quelle: DATEIEN wählen:" --getopenfilename $eingabeQUELLEbak --multiple --geometry=800x600 2>/dev/null)
+    #eingabeQUELLE=$(kdialog --title="Quelle wählen:" --getopenfilename "/" --multiple)
+    #checkDIALOG=$(echo -e "$?")
+    checkDIALOG=$(echo -e "$?")
+fi
+
+# -Dateienauswahl hat Leerzeichen am Ende, deshalb fncStringKontrolleEndeLeerzeichen
+#  aufrufen:
+eingabeQUELLE="`fncStringKontrolleEndeLeerzeichen "$eingabeQUELLE"`"
+fncAuslesenVerzeichnisAusDateien "$eingabeQUELLE"
+
+
+checkDIALOGfehler=""
+# -Case für Fensterüberwachung:
+case "$checkDIALOG" in
+    (0)
+        # -Case für Eingabeüberwachung:
+#         case "$eingabeQUELLE" in
+#             ( http://???* )
+#                 checkDIALOGfehler="" ;;
+#             ( https://???* )
+#                 checkDIALOGfehler="" ;;
+#             ( url:?? )
+#                 checkDIALOGfehler="" ;;
+#             (*)
+#                 checkDIALOGfehler="|- FEHLER:\\n|- Sie haben keine gültige URL eingegeben! Das Skript wird daher beendet." ;;
+#         esac ;;
+        checkDIALOGfehler="" ;;
+    (1)
+        # -abbruchBENUTZER
+        flagDIALOGfehler="--DATEIENauswahl--"
+        checkDIALOGfehler="|- Sie haben die Auswahl der Quelldateien abgebrochen. Das Skript startet jetzt die Verzeichnis Auswahl." ;;
+    (*)
+        # -abbruchFEHLER
+        flagDIALOGfehler="--DATEIENauswahl--"
+        checkDIALOGfehler="|- FEHLER:"\\n\
+"|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+"|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+"|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+"|-"\\n\
+"|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+"|- und die Ausgabe in der Konsole beachten." ;;
+esac
+
+#fncECHOlx "$txtInfoEingabeUeberschrift""$eingabeQUELLE"
+fncECHOlx "$txtInfoEingabeUeberschrift""$txtEingabeQuelleDateien"
+
+# -Fehlerausgabe und Skript beenden:
+if ( [[ "$checkDIALOGfehler" != "" ]] )
+then
+    # -Fehlermeldung ausgeben und Skript beenden:
+    fncECHOlx "$checkDIALOGfehler"
+    #fncECHOlx "|-"
+    # -Abbrechen oder weiter zum nächsten Schritt:
+    if ( [[ "$checkDIALOG" != "1" ]] )
+    then
+        [[ -f $dateiLOGS ]] && rm $dateiLOGS
+        exit "$checkDIALOG";
+    fi
+fi
+intZ=intZ+1
+
+# -Quellen zusammenbauen:
+[ -n "$eingabeQUELLE" ] && eingabeQUELLEkomplett="$eingabeQUELLEkomplett$eingabeQUELLE" && eingabeQUELLEbak="$eingabeQUELLE" && eingabeQUELLE=""
+# ***** ENDE Eingabe Quellen Datei ********************************************
+# *****************************************************************************
+
+
+
+
+
+
+
+
+
+
+# *****************************************************************************
+# ***** START Eingabe Quellen Verzeichnis *************************************
+while ( [[ "$intCheckAnzQuellen" -gt 0 ]] )
+do
+    # -Seltsamer Kontroll Wert:
+    intCheckAnzQuellen=intCheckAnzQuellen-1
+    
+    intAnzQuellenVerzeichnisse=intAnzQuellenVerzeichnisse+1
+    
+    [[ "$intZ" -lt 10 ]] && txtInfoEingabeUeberschrift="|- 0$intZ Quelle - Verzeichnis ($intAnzQuellenVerzeichnisse.):\\t" || txtInfoEingabeUeberschrift="|- $intZ Quelle - Verzeichnis ($intAnzQuellenVerzeichnisse.):\\t"
+
+    # -Quelle auswählen:
+    if ( [[ "$eingabeQUELLE" == "" ]] )
+    then
+        eingabeQUELLE=$(kdialog --title="Quelle: $intAnzQuellenVerzeichnisse. VERZEICHNIS wählen" --getexistingdirectory "$strVorgabeVerzeichnis" 2>/dev/null)
+        #eingabeQUELLE=$(kdialog --title="Quelle wählen:" --getopenfilename "/" --multiple)
+        #checkDIALOG=$(echo -e "$?")
+        checkDIALOG=$(echo -e "$?")
+    fi
+    
+    
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+    #         case "$eingabeQUELLE" in
+    #             ( http://???* )
+    #                 checkDIALOGfehler="" ;;
+    #             ( https://???* )
+    #                 checkDIALOGfehler="" ;;
+    #             ( url:?? )
+    #                 checkDIALOGfehler="" ;;
+    #             (*)
+    #                 checkDIALOGfehler="|- FEHLER:\\n|- Sie haben keine gültige URL eingegeben! Das Skript wird daher beendet." ;;
+    #         esac ;;
+            intCheckAnzQuellen=1
+            checkDIALOGfehler="" ;;
+        (1)
+            # -abbruchBENUTZER
+            if ( ( [[ "$flagDIALOGfehler" == "--DATEIENauswahl--" ]] ) && ( [[ "$intZ" -lt 3 ]] ) )
+            then
+                flagDIALOGfehler=$flagDIALOGfehler"--VERZEICHNISauswahl--"
+                checkDIALOGfehler="|- Sie haben die Auswahl des Quellverzeichnis abgebrochen. Da auch keine Dateien als Quelle gewählt wurden, wird das Skript beendet."
+            else
+                flagDIALOGfehler="--VERZEICHNISauswahl--"
+                checkDIALOGfehler="|- Sie haben die Auswahl der Quellverzeichnisse abgebrochen. Die schon gewählten Quellen werden zum Kopieren übernommen."
+            fi ;;
+        (*)
+            # -abbruchFEHLER
+            flagDIALOGfehler="--VERZEICHNISauswahl--"
+            checkDIALOGfehler="|- FEHLER:"\\n\
+"|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+"|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+"|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+"|-"\\n\
+"|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+"|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    
+    [ -n "$eingabeQUELLE" ] && fncECHOlx "$txtInfoEingabeUeberschrift""$eingabeQUELLE"
+    
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        fncECHOlx "$checkDIALOGfehler"
+        #fncECHOlx "|-"
+        # -Abbrechen oder weiter zum nächsten Schritt:
+        #if ( [[ "$checkDIALOG" != "1" ]] )
+        if ( [[ "$flagDIALOGfehler" == "--DATEIENauswahl----VERZEICHNISauswahl--" ]] )
+        then
+            [[ -f $dateiLOGS ]] && rm $dateiLOGS
+            exit "$checkDIALOG";
+        fi
+    fi
+
+    [ -n "$eingabeQUELLE" ] && intZ=intZ+1 && strVorgabeVerzeichnis="$eingabeQUELLE"
+#     # -Quellen zusammenbauen:
+#     eingabeQUELLEkomplett="$eingabeQUELLEkomplett$eingabeQUELLE "
+#     eingabeQUELLEbak="$eingabeQUELLE"
+#     eingabeQUELLE=""
+    
+    # -Quellen zusammenbauen:
+    [ -n "$eingabeQUELLEkomplett" ] && [ -n "$eingabeQUELLE" ] && eingabeQUELLEkomplett="$eingabeQUELLEkomplett "
+    [ -n "$eingabeQUELLE" ] && eingabeQUELLEkomplett="$eingabeQUELLEkomplett$eingabeQUELLE" && eingabeQUELLEbak="$eingabeQUELLE" && eingabeQUELLE=""
+
+done
+#fncECHOlx "|-"
+# ***** ENDE Eingabe Quellen Verzeichnis **************************************
+# *****************************************************************************
+
+
+
+
+
+
+# txtQUELLEN=$eingabeQUELLEkomplett
+# fncECHOlx "|-"
+# du -hsc "$eingabeQUELLEkomplett"
+
+
+
+
+
+
+
+# *****************************************************************************
+# ***** START Eingabe Ziel Verzeichnis ****************************************
+[[ "$intZ" -lt 10 ]] && txtInfoEingabeUeberschrift="|- 0$intZ Ziel   - Verzeichnis:\\t" || txtInfoEingabeUeberschrift="|- $intZ Ziel   - Verzeichnis:\\t"
+
+if ( [[ "$eingabeZIEL" == "" ]] )
+then
+    #eingabeZIEL=$(kdialog --title="VERZEICHNIS als Ziel wählen:" --getexistingdirectory "/" 2>/dev/null)
+    eingabeZIEL=$(kdialog --title="Ziel: VERZEICHNIS wählen" --getexistingdirectory "$strVorgabeVerzeichnis" 2>/dev/null)
+    #checkDIALOG=$(echo -e "$?")
+    checkDIALOG=$(echo -e "$?")
+fi
+checkDIALOGfehler=""
+# -Case für Fensterüberwachung:
+case "$checkDIALOG" in
+    (0)
+        # -Case für Eingabeüberwachung:
+#         case "$eingabeZIEL" in
+#             ( http://???* )
+#                 checkDIALOGfehler="" ;;
+#             ( https://???* )
+#                 checkDIALOGfehler="" ;;
+#             ( url:?? )
+#                 checkDIALOGfehler="" ;;
+#             (*)
+#                 checkDIALOGfehler="|- FEHLER:\\n|- Sie haben keine gültige URL eingegeben! Das Skript wird daher beendet." ;;
+#         esac ;;
+        checkDIALOGfehler="" ;;
+    (1)
+        # -abbruchBENUTZER
+        checkDIALOGfehler="|- Sie haben die Ziel Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+    (*)
+        # -abbruchFEHLER
+        checkDIALOGfehler="|- FEHLER:"\\n\
+"|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+"|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+"|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+"|-"\\n\
+"|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+"|- und die Ausgabe in der Konsole beachten." ;;
+esac
+
+fncECHOlx "$txtInfoEingabeUeberschrift""$eingabeZIEL"
+
+# -Fehlerausgabe und Skript beenden:
+if ( [[ "$checkDIALOGfehler" != "" ]] )
+then
+    # -Fehlermeldung ausgeben und Skript beenden:
+    fncECHOlx "$checkDIALOGfehler"
+    fncECHOlx "|-"
+    [[ -f $dateiLOGS ]] && rm $dateiLOGS
+    exit "$checkDIALOG";
+fi
+
+[[ "$eingabeZIEL" != */ ]] && eingabeZIEL=$eingabeZIEL"/"
+# ***** ENDE Eingabe Ziel Verzeichnis *****************************************
+# *****************************************************************************
+
+
+
+
+
+# -Logdateien an Ziel Verzeichnis anpassen:
+# --Logdatei ohne Pfad ist $BAKdateiLOGS.
+# --Logdatei mit Pfad ist $TMPdateiLOGS.
+# --1.: Ziel Verzeichnis $eingabeZIEL einbauen.
+# --2.: Bereits angelegte Logdateien an neuen Pfad verschieben.
+#
+dateiLOGS="$eingabeZIEL$BAKdateiLOGS"
+dateiFEHLER="$eingabeZIEL$BAKdateiFEHLER"
+dateiLOGStmp="$eingabeZIEL$BAKdateiLOGStmp"
+dateiLOGSsicherung="$eingabeZIEL$BAKdateiLOGSsicherung"
+
+[[ -f "$TMPdateiLOGS" ]] && mv "$TMPdateiLOGS" "$dateiLOGS"
+[[ -f "$TMPdateiFEHLER" ]] && mv "$TMPdateiFEHLER" "$dateiFEHLER"
+[[ -f "$TMPdateiLOGStmp" ]] && mv "$TMPdateiLOGStmp" "$dateiLOGStmp"
+
+
+
+
+
+
+
+
+
+#fncECHOlx "|- cp -ru $eingabeQUELLEkomplett $eingabeZIEL"
+fncECHOlx "|-"
+#fncECHOlx "|- Vorgang gestartet..."
+#fncECHOlx "|- cp -ru -v QUELLE ZIEL"
+#cp -ru -v $eingabeQUELLEkomplett "$eingabeZIEL"
+
+txtZEITSTEMPEL=`fncHHMMSS "norm.mS3"`
+zeitSTARTkopieren="$txtZEITSTEMPEL"
+txtENDEzeit=$txtENDEzeit$zeitSTARTkopieren\\n\
+"|- Kopieren Ende:   \t"
+
+
+#fncECHOlx "|- cp -r -v QUELLE ZIEL"
+fncECHOlx "|- Befehl: 'cp -arv $eingabeQUELLEkomplett $eingabeZIEL 2>$dateiFEHLER | tee -a $dateiLOGS'"
+fncECHOlx "|-"
+#fncECHOlx "|-"
+
+# -Ausgabe am Bildschirm und in Logdatei:
+#cp -r -v /aa_backup/aa_1000-sata-ts/daten/musik_kinder/aa_musik/01_OST_Musical_Der_König_Der_Löwen/ /aa_daten/ 2>&1 | tee -a /aa_daten/lxCP.01.logs.txt 2>/aa_daten/lxCP.01.fehler.txt
+# ->Bildschirm: stdout und stderr
+# ->Logdatei:   stdout und stderr
+# ->Fehlerlogs: ---
+#
+#cp -r -v /aa_backup/aa_1000-sata-ts/daten/musik_kinder/aa_musik/01_OST_Musical_Der_König_Der_Löwen/ /aa_daten/ 2>/aa_daten/lxCP.01.fehler.txt | tee -a /aa_daten/lxCP.01.logs.txt
+# ->Bildschirm: stdout
+# ->Logdatei:   stdout
+# ->Fehlerlogs: stderr
+#
+#cp -r -v "$eingabeQUELLEkomplett" "$eingabeZIEL"
+#cp -r -v /aa_backup/aa_1000-sata-ts/daten/musik_kinder/aa_musik/01_OST_Musical_Der_König_Der_Löwen/ /aa_daten/ 2>/aa_daten/lxCP.01.fehler.txt | tee -a /aa_daten/lxCP.01.logs.txt
+#
+#`cp -rv "$eingabeQUELLEkomplett" "$eingabeZIEL" 2>$dateiFEHLER | tee -a $dateiLOGS`
+
+fncECHOlx "$txtHRFullScreen"
+
+
+# -Einzelne Quellen in einfache Anführungszeichen setzen:
+arrQuellen=($eingabeQUELLEkomplett)
+eingabeQuelleAnfZeichen=""
+for iQ in "${arrQuellen[@]}"
+do
+    #echo -e "--- $iQ"
+    [[ -n "$eingabeQuelleAnfZeichen" ]] && eingabeQuelleAnfZeichen="$eingabeQuelleAnfZeichen "
+    [[ -n "$iQ" ]] && eingabeQuelleAnfZeichen="$eingabeQuelleAnfZeichen""$iQ"
+    [[ -n "$iQ" ]] && cp -arv "$iQ" "$eingabeZIEL" 2>"$dateiFEHLER" | tee -a "$dateiLOGS"
+done
+eingabeQUELLEkomplett="$eingabeQuelleAnfZeichen"
+
+
+
+
+#cp -rv $eingabeQUELLEkomplett $eingabeZIEL 2>$dateiFEHLER | tee -a $dateiLOGS
+#cp -rv "$eingabeQUELLEkomplett" "$eingabeZIEL" 2>"$dateiFEHLER" | tee -a "$dateiLOGS"
+#rsync -arv "$eingabeQUELLEkomplett" "$eingabeZIEL" 2>"$dateiFEHLER" | tee -a "$dateiLOGS"
+#cp -arv "$eingabeQUELLEkomplett" "$eingabeZIEL" 2>"$dateiFEHLER" | tee -a "$dateiLOGS"
+
+
+fncECHOlx "$txtHRFullScreen"
+fncECHOlx "|-"
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Fehlerkontrolle ---------------------------------------------------------------------
+txtStatusErfolgreich=""
+txtLogsFehlerAusgabe=""
+flagLogsFehler="false"
+
+if ( [[ -f "$dateiFEHLER" ]] )
+then
+    #nix=1
+    while read txtLogsFehler
+    do
+        #nix=1
+        if ( [[ "$txtLogsFehler" != "" ]] )
+        then
+            #nix=1
+            [[ "$flagLogsFehler" == "false" ]] && txtLogsFehlerAusgabe="|- WARNUNG: Beim Ausführen der Befehle sind folgende Fehler aufgetreten:"
+            flagLogsFehler="true"
+            txtStatusErfolgreich=" NICHT"
+            txtLogsFehlerAusgabe="$txtLogsFehlerAusgabe"\\n"$txtLogsFehler"
+        fi
+    done < "$dateiFEHLER"
+fi
+# ----- ENDE Fehlerkontrolle ----------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+[[ "$flagLogsFehler" == "true" ]] && fncECHOlx "$txtLogsFehlerAusgabe\\n|-"
+
+
+[[ -f "$dateiFEHLER" ]] && rm "$dateiFEHLER"
+
+
+fncECHOlx "|- Vorgang$txtStatusErfolgreich erfolgreich abgeschlossen!"
+fncECHOlx "|-"
+
+# -Statistik ermitteln und anzeigen:
+#du -hsc $eingabeQUELLEkomplett
+#fncECHOlx "`du -hsc $eingabeQUELLEkomplett`"
+arrGESAMTGROESSE=(`du -hsc $eingabeQUELLEkomplett | grep -i insgesamt`)
+strGESAMTGROESSE="${arrGESAMTGROESSE[0]}"
+intDateienGesamtAnzahl=`find $eingabeQUELLEkomplett -type f | wc -l`
+
+txtZEITSTEMPEL=`fncHHMMSS "norm.mS3"`
+zeitENDE="$txtZEITSTEMPEL"
+
+#fncECHOlx "|- Gesamtgröße der Daten: $strGESAMTGROESSE"
+#fncECHOlx "|- Menge der Daten:    $strGESAMTGROESSE"
+fncECHOlx "|- Anzahl Dateien: $intDateienGesamtAnzahl"
+fncECHOlx "|- Speicherplatz:  $strGESAMTGROESSE"
+fncECHOlx "|- Laufzeit:       $(fncZeitspanneStartEndeHHMMSS $zeitSTARTkopieren $zeitENDE)"
+fncECHOlxn "|-"
+
+# -um Benutzer über die Ausführung/das Beenden des Skripts zu informieren:
+#beep -l 200 -f 480 -D 40 --new -l 200 -f 520 -D 40 --new -l 350 -f 480 -D 100
+beep -l 200 -f 400 -D 60 --new -l 180 -f 420 -D 40 --new -l 160 -f 440 -D 20 -r 2
+
+
+
+fncECHOlx "$txtENDEzeit$zeitENDE"
+fncECHOlx "|-"
+fncECHOlx "|- $datei ($$) wurde beendet."
+
+[[ -f "$dateiLOGS" ]] && cp "$dateiLOGS" "$dateiLOGSsicherung" &
+
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+

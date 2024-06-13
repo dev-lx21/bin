@@ -1,0 +1,3462 @@
+#!/bin/bash
+# skript von -lx-
+
+
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+# -Medientyp Auswahl erweitern:
+#  Audio -> Audio
+#  Video -> Audio
+#  Video -> Video...
+#
+# ----- Bugs:
+# -Dateiname enthält Punkte!?!
+#
+# ----- DONE:
+# -Verarbeitungsgeschwindigkeit verbessern: siehe cpulimit, aber zu viele Forks!
+# -ffmpeg mit '-vcodec copy -acodec copy' starten, nur wenn der Befehl nicht funktioniert,
+#  wird konvertieren gestartet!
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+    
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+    
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+    
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+    
+    # -Nur den Infotext ausschneiden: 
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+    
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+    
+}
+[ -z $dateiVersionInfoNr ] && fncAUSLESENversion
+
+
+
+function fncANZAHLzeichen {
+    # -Die Anzahl der Zeichen in $1 ermitteln und mittels echo ausgeben!
+    [ ! "$1" ] && echo -e "0" && return
+    echo -e "${#1}"
+}
+
+
+txtPLATZHALTER=""
+function fncECHOplatzhalter {
+    # -Die Anzahl der Zeichen in $1 ermitteln und damit eine Linie als
+    #  PLATZHALTER erstellen! Maximale Gesamtzeichenanzahl:
+    #  intZZmax=..
+    # -Am Ende werden $1 und $txtPLATZHALTER gemeinsam ausgegeben.
+    #  --------------------------------------------------------------------------------
+    txtPLATZHALTER=""
+    txtLEERZEICHEN=""
+    typeset -i intZZmax=80
+    typeset -i intZZplatzhalter=0
+    [ ! "$1" ] && intZZplatzhalter=$intZZmax
+    #echo -e "${#1}"
+    # -Damit zwischen $1 und $txtPLATZHALTER genau 1 Leerzeichen ist,
+    #  wird das letzte Zeichen von $1 entsprechend ausgeschnitten und
+    #  überprüft:
+    [ "$1" ] && [ -n "${1: -1}" ] && txtLEERZEICHEN=" "
+    [ "$1" ] && intZZplatzhalter=intZZmax-${#1}-${#txtLEERZEICHEN}
+    # -Den Platzhalter mittels Schleife zusammenbauen:
+    while ( [[ $intZZplatzhalter -gt 0 ]] )
+    do
+        txtPLATZHALTER=$txtPLATZHALTER"-"
+        intZZplatzhalter=intZZplatzhalter-1
+    done
+    # -$1 und $PLATZHALTER direkt ausgeben:
+    echo -e "$1""$txtLEERZEICHEN""$txtPLATZHALTER"
+}
+
+
+function fncCheckZahlGerade {
+    # -ffmpeg kann nur mit geraden Werten arbeiten, deshalb werden hier
+    #  beliebige Integer Variablen kontrolliert und ggf korrigiert:
+    [ ! "$1" ] && echo -e "|- FEHLER: fncCheckZahlGerade: Es wurde kein Argument übergeben!" && return
+    
+    intCheckZahlGeradeOriginal="$1"
+    intCheckZahlGerade=`echo -e "scale=1 ; $intCheckZahlGeradeOriginal/2" | bc -l`
+    [[ "$intCheckZahlGerade" != *.0 ]] && intCheckZahlGeradeNeu=`echo -e "scale=0 ; $intCheckZahlGeradeOriginal+1" | bc -l` || intCheckZahlGeradeNeu="$intCheckZahlGeradeOriginal"
+    echo -e "$intCheckZahlGeradeNeu"
+}
+
+
+function fncTime2SekSek2Time {
+    # -Zeitangaben vereinfacht umrechnen: 
+    # --Erwartet wird $1 mit einer Zeitangabe im Format HH:MM:SS oder
+    #   mit einer Zeitangabe in Sekunden (als Ganzzahl)
+    # -HH:MM:SS wird zu Sekunden und Sekunden werden zu HH:MM:SS
+    #
+    # -$1 Check:
+    local txtFncFehlerStart="FEHLER: fncTime2SekSek2Time:"
+    [ ! "$1" ] && echo -e "|- $txtFncFehlerStart Es wurde kein Argument übergeben!" && return
+    
+    local flagT2SS2T=""
+    local intT2SS2TOriginal="$1"
+    local intS2Tfertig=""
+    local intT2Sfertig=""
+    
+    # ---------------------------------------------------------------------------------------------
+    # ---------- Eingabe kontrollieren und entsprechende Flags setzen: ----------------------------
+    #if ( [[ "$intT2SS2TOriginal" == *:*:* ]] )
+    if ( [[ "$intT2SS2TOriginal" =~ ^[0-5][0-9]:[0-5][0-9]$ ]] )
+    then
+        # -Flag setzen: MM:SS zu Sekunden
+        flagT2SS2T="MMSStime2sek"
+    elif ( [[ "$intT2SS2TOriginal" =~ ^[0-9][0-9]:[0-5][0-9]:[0-5][0-9]$ ]] )
+    then
+        # -Flag setzen: HH:MM:SS zu Sekunden
+        flagT2SS2T="HHMMSStime2sek"
+    elif ( [[ "$intT2SS2TOriginal" =~ ^[1-9][0-9]*$ ]] )
+    then
+        # -Flag setzen: Sekunden zu HH:MM:SS
+        flagT2SS2T="sek2time"
+    else
+        # -$1 entspricht nicht den Anforderungen!
+        echo -e "|- $txtFncFehlerStart Das übergebene Argument ($1) ist fehlerhaft!"
+        echo -e "|- Gültige Zeitangaben sind MM:SS oder HH:MM:SS. Mit führender Null!"
+        echo -e "|- Die reine Sekundenangabe erfordert eine positive ganze Zahl. Ohne führende Null!"
+        return
+    fi
+    # ---------------------------------------------------------------------------------------------
+    
+    # ---------------------------------------------------------------------------------------------
+    # ---------- Umrechnen: HH:MM:SS zu Sekunden --------------------------------------------------
+    if ( [[ "$flagT2SS2T" == "MMSStime2sek" ]] )
+    then
+        # -MM:SS zu Sekunden:
+        intT2Sfertig=`echo -e "scale=0 ; ${intT2SS2TOriginal:0:2}*60 + ${intT2SS2TOriginal:3:2}" | bc -l`
+        echo -e "$intT2Sfertig"
+        return
+    fi
+    if ( [[ "$flagT2SS2T" == "HHMMSStime2sek" ]] )
+    then
+        # -HH:MM:SS zu Sekunden:
+        intT2Sfertig=`echo -e "scale=0 ; ${intT2SS2TOriginal:0:2}*3600 + ${intT2SS2TOriginal:3:2}*60 + ${intT2SS2TOriginal:6:2}" | bc -l`
+        echo -e "$intT2Sfertig"
+        return
+    fi
+    # ---------------------------------------------------------------------------------------------
+    
+    # ---------------------------------------------------------------------------------------------
+    # ---------- Umrechnen: Sekunden zu HH:MM:SS --------------------------------------------------
+    function fncTime2SekSek2TimeInternS2Ttmp {
+        # -Ergebnis der letzten Berechnung prüfen und zuweisen:
+        # --Bei Bedarf ':' als Abstandhalter einbauen:
+        [ "$intS2Tfertig" ] && intS2Tfertig="$intS2Tfertig"":"
+        # --Berechnung $intS2Ttmp einbauen:
+        intS2Tfertig="$intS2Tfertig""$intS2Ttmp"
+    }
+    if ( [[ "$flagT2SS2T" == "sek2time" ]] )
+    then
+        intS2Ttmp=`echo -e "scale=0 ; $intT2SS2TOriginal/3600" | bc -l`
+        intS2Ttmp=`printf '%02d' $intS2Ttmp`
+        fncTime2SekSek2TimeInternS2Ttmp
+        # -Sonderfall: Wenn HH gleich 00 ist, werden diese gar nicht angezeigt:
+        [ "$intS2Ttmp" -lt 1 ] && intS2Tfertig=""
+        
+        intS2Ttmp=`echo -e "scale=0 ; $intT2SS2TOriginal%3600/60" | bc -l`
+        intS2Ttmp=`printf '%02d' $intS2Ttmp`
+        fncTime2SekSek2TimeInternS2Ttmp
+        
+        intS2Ttmp=`echo -e "scale=0 ; $intT2SS2TOriginal%60" | bc -l`
+        intS2Ttmp=`printf '%02d' $intS2Ttmp`
+        fncTime2SekSek2TimeInternS2Ttmp
+        echo -e "$intS2Tfertig"
+        return
+    fi
+    # ---------------------------------------------------------------------------------------------
+}
+
+
+
+
+
+
+
+
+
+
+
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++ START Argumente Kontrolle +++++++++++++++++++++++++++++++++++++++++++++
+#
+# -Alle Argumente kontrollieren und korrekt zuweisen:
+# --4 Argumente: Verzeichnis/se EXT-Quelle EXT-Ziel argFLAGintern
+# --3 Argumente: Verzeichnis/se EXT-Quelle EXT-Ziel
+# --2 Argumente: EXT-Quelle EXT-Ziel
+# --1 Argument : Verzeichnis/se
+#
+# -Wenn Anzahl und/oder Typ eines Arguments fehlerhaft sind, erscheint eine Fehlermeldung
+#  und ggf kann mittels kdialog die Angabe korrigiert werden!
+
+typeset -i zz=0
+typeset -i intANZAHLargumente=0
+typeset -i intARGUMENTvorletztes=0
+typeset -i intARGUMENTletztes=0
+intANZAHLargumente=$#
+intARGUMENTvorletztes=intANZAHLargumente-1
+intARGUMENTletztes=intANZAHLargumente
+
+checkBEFEHLpid=""
+checkPOPUPpid=""
+
+argVERZEICHNIS=""
+argEXTquelle=""
+argEXTziel=""
+argFLAGintern=""
+
+flagAUFRUFintern="false"
+flagMORE="false"
+flagBAKaction=""
+flagBAKactionAUSLESEN="false"
+BAKuvz="bak-lxFF"
+
+flagTESTDRIVE="false"
+flagTESTMODEliste="false"
+txtTESTMODEtitel=""
+txtTestmodeTitelZusatz=""
+txtTESTMODEtitelENDE=""
+
+flagLAYOUTtrennzeile="false"
+
+strg1="-"
+
+
+if ( [[ "$intANZAHLargumente" -gt 0 ]] )
+then
+    # -Argumente: Verzeichnis/se EXT-Quelle EXT-Ziel argFLAGintern
+    
+    # -argFLAGintern ist IMMER das 4. Argument
+    argFLAGintern="$4"
+    if ( [[ "$argFLAGintern" == ":flagAUFRUFintern:" ]] )
+    then
+        flagAUFRUFintern="true"
+        intARGUMENTvorletztes=intARGUMENTvorletztes-1
+        intARGUMENTletztes=intARGUMENTletztes-1
+        
+        argVERZEICHNIS="$1"
+        argEXTquelle="$2"
+        argEXTziel="$3"
+        dateiLOGSglobal="$5"
+        optionenZIELglobal="$6"
+        flagBAKaction="$7"
+        flagTESTDRIVEintern="$8"
+    fi
+    
+    #[[ "$argFLAGintern" != ":flagAUFRUFintern:" ]] && for i in "$@"
+    for i in "$@"
+    do
+        zz=zz+1
+        #echo -e "DEBUG Argumente - @ - $zz.: $i"
+        
+        # -Optionen auslesen und Flags setzen:
+        #[[ "$flagBAKactionAUSLESEN" == "true" ]] && flagBAKaction="$i" && shift && continue
+        [[ "$flagBAKactionAUSLESEN" == "true" ]] && [[ "$flagBAKaction" == "" ]] && flagBAKaction="$i" && continue
+        #[[ "$i" == "-bak" ]] && flagBAKactionAUSLESEN="true" && shift && continue
+        [[ "$i" == "-bak" ]] && flagBAKactionAUSLESEN="true" && continue
+
+        # -Verzeichnis/se
+        if ( [[ "$i" != -* ]] )
+        then
+            if ( [[ -d "$i" ]] )
+            then
+                if ( [[ "$i" != */ ]] )
+                then
+                    i=$i"/"
+                fi
+                if ( [[ "$argVERZEICHNIS" == "" ]] )
+                then
+                    argVERZEICHNIS=$i
+                else
+                    argVERZEICHNIS=$argVERZEICHNIS" "$i
+                fi
+            fi
+        fi
+        
+        # -EXT-Quelle
+        if ( [[ "$zz" -eq "$intARGUMENTvorletztes" ]] )
+        then
+            argEXTquelle=$i
+        fi
+        
+        # -EXT-Ziel
+        if ( [[ "$zz" -eq "$intARGUMENTletztes" ]] )
+        then
+            argEXTziel=$i
+        fi
+
+        if ( [[ "$i" == -*h* ]] )
+        then
+            strg1=$strg1"h"
+        fi
+        
+        if ( [[ "$i" == -*l* ]] && [[ "$i" != -*tls* ]] )
+        then
+            if ( [[ "$i" == -*l\?* ]] )
+            then
+                strg1=$strg1"l?"
+            elif ( [[ "$i" == -*scl* ]] )
+            then
+                strg1=$strg1"scl"
+            else
+                strg1=$strg1"l"
+            fi
+        fi
+        
+        if ( ( [[ "$i" == -*t* ]] && [[ "$i" != -*tls* ]] ) || ( [[ "$flagTESTDRIVEintern" == "true" ]] ) )
+        then
+            flagTESTDRIVE="true"
+            txtTESTMODEtitel="TESTMODE"
+            strg1=$strg1"t"
+        fi
+        if ( [[ "$i" == -*tls* ]] )
+        then
+            flagTESTDRIVE="true"
+            flagTESTMODEliste="true"
+            txtTESTMODEtitel="TESTMODE in Liste"
+            strg1=$strg1"tls"
+        fi
+    done
+fi
+
+# -Sicherheitskopie: Argumente verschieben
+[[ "$flagBAKactionAUSLESEN" == "true" ]] && shift && shift
+# -Sicherheitskopie: Standard festlegen
+flagBAKactionSTANDARD="uvz"
+[[ "$flagBAKaction" == "" ]] && flagBAKaction="$flagBAKactionSTANDARD"
+
+function fncAUSGABEstandard {
+    # -Gibt '(Standard)' aus, wenn $1 dem STANDARD $2 entspricht!
+    [[ "$1" == "" ]] && echo -e "(Argumente nicht angegeben: fncAUSGABEstandard)" && return
+    [[ "$2" == "" ]] && echo -e "(Argument nicht angegeben: fncAUSGABEstandard)" && return
+    [[ "$1" == "$2" ]] && echo -e " (Standard)"
+}
+
+function fncAUSGABEstandardONOFF {
+    # -Gibt 'on' aus, wenn $1 dem STANDARD $2 entspricht, ansonsten 'off'
+    [[ "$1" == "" ]] && echo -e "(Argumente nicht angegeben: fncAUSGABEstandard)" && return
+    [[ "$2" == "" ]] && echo -e "(Argument nicht angegeben: fncAUSGABEstandard)" && return
+    [[ "$1" == "$2" ]] && echo -e "on" && return
+    [[ "$1" != "$2" ]] && echo -e "off" && return
+}
+
+
+# if ( [[ "$intANZAHLargumente" -gt 2 ]] )
+# then
+#     argVERZEICHNIS=$1
+#     argEXTquelle=$2
+#     argEXTziel=$3
+#     argFLAGintern=$4
+# fi
+#
+# +++++ ENDE Argumente Kontrolle ++++++++++++++++++++++++++++++++++++++++++++++
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+
+
+
+
+
+
+zeitSTARTutc=`date '+%s'`
+zeitSTART=`date -d @$zeitSTARTutc`
+zeitSTARTdateiname=`date -d @$zeitSTARTutc '+%F_%T'`
+zeitSTARTdateiname=${zeitSTARTdateiname//\-/}
+zeitSTARTdateiname=${zeitSTARTdateiname//:/}
+zeitSTARTdateiname=${zeitSTARTdateiname//_/\-}
+
+
+zeitSTART=`date '+%F %T:%N'`
+flagACTION="false"
+
+
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+
+fmtCOLORfgBLAU=`tput setf 1`
+fmtCOLORfgGRUEN=`tput setf 2`
+fmtCOLORfgGELB=`tput setf 3`
+fmtCOLORfgROT=`tput setf 4`
+fmtCOLORbgBLAU=`tput setb 1`
+fmtCOLORbgGRUEN=`tput setb 2`
+fmtCOLORbgGELB=`tput setb 3`
+fmtCOLORbgROT=`tput setb 4`
+
+fmtRESET=`tput sgr0`
+
+
+zeileD=`tput dl1`
+zeileI=`tput il1`
+screenC=`tput clear`
+
+datei=${0//*\//}
+txtTITEL="Medientool für Audio, Video und Bilddateien!"
+nutzer=`ps --pid $$ -o user=`
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Prozess Option --------------------------------------------------------------------------
+arrPROZESSE=($datei ffmpeg)
+
+
+function fncKILLallePROZESSE {
+    # -Alle Instanzen der genutzten Programme auslesen und beenden!
+    # --WICHTIG: Nur im eigenen Terminal! Wenn $1==""
+    # --WICHTIG: Nur im eigenen Terminal! Wenn $1=="EIGENESTTY"
+    # --WICHTIG: Nur im eigenen Terminal! Wenn $1=="*"
+    # --WICHTIG: In allen Terminals! Wenn $1=="ALLETTY"
+    #
+    for i in "${arrPROZESSE[@]}"
+    do
+        if ( [[ "$1" == "" ]] || [[ "$1" == "EIGENESTTY" ]] )
+        then
+            arrTERMINALS=`tty`
+        elif ( [[ "$1" == "ALLETTY" ]] )
+        then
+            arrTERMINALS=(`ps -C $i -o tty=`)
+        else
+            arrTERMINALS=`tty`
+        fi
+        iTalle=""
+        for iT in "${arrTERMINALS[@]}"
+        do
+            if ( [[ "$iTalle" != *$iT* ]] )
+            then
+                echo -e "- Prozess: $i"
+                echo -e "- Terminal: "$iT
+
+                ausgabe=`ps -ll --tty $iT | grep $i`
+                if ( [[ "$ausgabe" != "" ]] )
+                then
+                    echo -e "$ausgabe"
+                    echo -e "-"
+                fi
+                
+
+                #strTERMINAL=`tty`
+                #strTERMINAL="pts/5"
+                strTERMINAL=$iT
+                strLISTEtoKILL=""
+                ausgabePIDs=""
+                ausgabeCHILDPIDs=""
+                #ausgabe=`lxPS -qs $i`
+                #ausgabe=`ps -All --tty "/dev/pts/5" | grep $1`
+                ausgabeLISTEdisplay=`ps --tty $strTERMINAL -o pid=`
+                ausgabeLISTEname=`ps -C $i -o pid=`
+                #ausgabeLISTEkombiniert=`ps --tty $strTERMINAL -l | grep $i`
+                #ausgabeLISTEkombiniert=`ps --tty "pts/5" -l | grep $i`
+                ausgabeLISTEkombiniert=`ps --tty $strTERMINAL -o pid= -o tty= -o comm= | grep $i`
+                arrLISTEpid=($ausgabeLISTEkombiniert)
+                #echo -e "- Kombiniert: "$ausgabeLISTEkombiniert
+                
+                typeset -i zL=0
+                echo -e "- PIDs:"
+                #while ( [[ "${arrLISTEpid[$zL]}" != "" ]] && [[ "${arrLISTEpid[$zL]}" != "$$" ]] )
+                while ( [[ "${arrLISTEpid[$zL]}" != "" ]] )
+                do
+                    ausgabePIDsTMP="${arrLISTEpid[$zL]}"
+                    echo -en "- PID: "$ausgabePIDsTMP
+                    if ( [[ "$ausgabePIDsTMP" == "$$" ]] )
+                    then
+                        #continue
+                        flagEIGENEpsid="true"
+                    fi
+                    if ( [[ "$ausgabePIDsTMP" != "" ]] && [[ "$ausgabePIDsTMP" != "$$" ]] )
+                    then
+                        if ( [[ "$strLISTEtoKILL" == "" ]] )
+                        then
+                            strLISTEtoKILL=$ausgabePIDsTMP
+                        else
+                            strLISTEtoKILL=$strLISTEtoKILL" "$ausgabePIDsTMP
+                        fi
+                    fi
+                    ausgabeCHILDPIDsTMP=`ps --ppid ${arrLISTEpid[$zL]} -o pid=`
+                    if ( [[ $ausgabeCHILDPIDsTMP != "" ]] )
+                    then
+                        echo -en " CPIDs: "$ausgabeCHILDPIDsTMP" --- "
+                        strLISTEtoKILL=$strLISTEtoKILL" "$ausgabeCHILDPIDsTMP
+                    fi
+                    zL=zL+3
+                done
+                echo -e "\\n---"
+
+                if ( [[ "$ausgabeLISTEkombiniert" != "" ]] )
+                then
+                    #echo -e "- PIDs: "$ausgabePIDs
+                    #echo -e "- CPIDs:"$ausgabeCHILDPIDs
+                    if ( [[ "$strLISTEtoKILL" != "" ]] )
+                    then
+                        #echo -e "kill -9 oder -14... "$strLISTEtoKILL
+                        #kill -9 $ausgabePIDs $ausgabeCHILDPIDs
+                        #echo -e "- Komplette Liste:"\\n$strLISTEtoKILL\\n"---"
+                        
+                        # -Doppelte PIDs in der Liste führen zu unnötigen Fehlermeldungen, daher
+                        #  werden diese erkannt und entfernt!
+                        echo -e "- Komplette Liste (bereinigt):"
+                        arrLISTEtoKILL=($strLISTEtoKILL)
+                        typeset -i zLK=0
+                        strLISTEpidBENUTZT=""
+                        flagLISTEtoKILLfertig="false"
+                        while ( [[ "${arrLISTEtoKILL[$zLK]}" != "" ]] )
+                        do
+                            if ( [[ "$strLISTEpidBENUTZT" != *${arrLISTEtoKILL[$zLK]}* ]] && [[ `ps -p ${arrLISTEtoKILL[$zLK]} | grep ${arrLISTEtoKILL[$zLK]}` != "" ]] )
+                            then
+                                strLISTEpidBENUTZT=$strLISTEpidBENUTZT" "${arrLISTEtoKILL[$zLK]}
+                                echo -en "${arrLISTEtoKILL[$zLK]} "
+                                flagLISTEtoKILLfertig="true"
+                            fi
+                            zLK=zLK+1
+                        done
+                        echo -e \\b
+                        if ( [[ "$flagLISTEtoKILLfertig" == "true" ]] )
+                        then
+                            echo -e "- Der Kill Befehl:"\\n"'kill -9 $strLISTEpidBENUTZT'"
+                            kill -9 $strLISTEpidBENUTZT 2>/dev/null
+                        else
+                            echo -e "- INFO: Die Prozesse wurden bereits beendet!"
+                        fi
+                    else
+                        echo -e "- INFO: Keine Prozesse zum Beenden gefunden!"
+                    fi
+                else
+                    echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+                fi
+                echo -e "-"
+
+            fi
+            iTalle=$iTalle" "$iT
+        done
+    done
+}
+
+#fncKILLallePROZESSE "EIGENESTTY"
+#fncKILLallePROZESSE "ALLETTY"
+
+
+
+if ( [[ "$1" == "-PS" ]] )
+then
+    echo -e "-"\\n"--- Alle Prozesse in allen Terminals anzeigen: ----------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        echo -e "- Prozess: $i"
+        ausgabe=`lxPS -qs $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            echo -e "$ausgabe"
+        else
+            echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        echo -e "-"
+    done
+    exit 0;
+fi
+
+if ( [[ "$1" == "-PSK" ]] )
+then
+    echo -e "-"\\n"--- Alle Prozesse im eigenen Terminal anzeigen und beenden (kill): --------------------------------"\\n"-"
+    fncKILLallePROZESSE "EIGENESTTY"
+    exit 0;
+fi
+
+if ( [[ "$1" == "-PSKA" ]] )
+then
+    echo -e "-"\\n"--- Alle Prozesse in allen Terminals anzeigen und beenden (kill): ---------------------------------"\\n"-"
+    fncKILLallePROZESSE "ALLETTY"
+    exit 0;
+fi
+# ----- ENDE Prozess Option ---------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+# -Anzahl der zu kopierenden Quellen auslesen/festlegen:
+typeset -i intMAXanzahlQUELLVERZEICHNISSE=5
+typeset -i intANZAHLquellen=1
+typeset -i intZ=1
+if ( [[ "$1" != "" ]] )
+then
+    intANZAHLquellen=1
+    #clear
+else
+    intANZAHLquellen=1
+fi
+
+
+
+# -die Namen der Dateien zum Zwischenspeichern und Loggen festlegen:
+#dateiURLS="00_$datei.URLS.txt"
+dateiLOGS="00_$datei.LOGS.txt"
+dateiLOGSohnePFAD="$dateiLOGS"
+dateiLOGStmp="00_$datei.LOGS.txt.tmp"
+dateiLOGStmpSTATUS="00_$datei.LOGS.STATUS.txt.tmp"
+dateiLOGStmpOHNEzeilennummern="00_$datei.LOGS.txt.OHNEzeilennummern.tmp"
+
+dateiLOGSsicherungOriginal="00_$datei.LOGS.$zeitSTARTdateiname.txt" && dateiLOGSsicherung="$dateiLOGSsicherungOriginal"
+
+dateiTESTMODElsOriginal="00_$datei.TESTMODE.$zeitSTARTdateiname.txt" && dateiTESTMODEls="$dateiTESTMODElsOriginal"
+dateiCACHEcheckFNCOriginal="00_$datei.$$.checkFNC.cache" && dateiCACHEcheckFNC="$dateiCACHEcheckFNCOriginal"
+dateiCACHEflagENDEOriginal="00_$datei.$$.flagENDE.cache" && dateiCACHEflagENDE="$dateiCACHEflagENDEOriginal"
+
+
+
+   
+
+
+
+txtHR="|--------------------------------------------------------------------------------"
+
+# txtKOPF=\
+# "|--------------------------------------------------------------------------------"\\n\
+# "|- $datei -| $txtTITEL"\\n\
+# "|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt)"
+# #"|- $datei $dateiVERSION -| "
+# txtKOPFlogs=$txtKOPF"Logdatei"\\n\
+# "|--------------------------------------------------------------------------------"\\n\
+# "|- $zeitSTART"\\n\
+# "|-"
+# txtKOPF=$txtKOPF$txtTITEL\\n\
+# "|--------------------------------------------------------------------------------"\\n\
+# "|- $zeitSTART"\\n\
+# "|-"
+
+
+txtKOPF=\
+"$txtHR"\\n\
+"|- $datei -| $txtTITEL"\\n\
+"|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt)"\\n\
+"$txtHR"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+txtKOPFlogs="$txtKOPF"
+
+
+
+txtBENUTZUNG=\
+"|- Benutzung:"\\n\
+"|- '$datei [OPTIONEN] [PFAD] [DATEIFORMAT-QUELLE] [[DATEIFORMAT-ZIEL]'"\\n\
+"|- '$datei [OPTIONEN] [PFAD]'"\\n\
+"|- '$datei [OPTIONEN]'"\\n\
+"|- Um einfach Video-, Bild- oder Audiodateien umzuwandeln! Falls keine Argumente angegeben"\\n\
+"|- werden, wird automatisch eine Abfrage mittels Kdialog gestartet."\\n\
+"|-"
+
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Hinweise zur Benutzung:"\\n\
+"|- -Wenn Sie das aktuelle Arbeitsverzeichnis zum Umwandeln auswählen möchten, können Sie einfach '.'"\\n\
+"|-  als Pfad angeben."\\n\
+"|- -Wird das Verzeichnis mittels Kdialog ausgewählt, also $datei wurde ohne eine Pfadangabe gestartet,"\\n\
+"|-  können Sie mehrere Verzeichnisse (max: $intMAXanzahlQUELLVERZEICHNISSE) zum Bearbeiten auswählen."\\n\
+"|- -Bei der Auswahl des Formats der Quelldateien können Sie auch einfach 'alle' auswählen. Dann werden"\\n\
+"|-  alle Dateien, die dem zuvor gewählten Dateityp (Mime-Type) entsprechen, bearbeitet."\\n\
+"|-"\\n\
+"|- Optionen:"\\n\
+"|- -h\\tDiesen Hilfetext anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- -l\\tDie Logdatei ($dateiLOGS) anzeigen. Falls das nächste Argument ein Pfad ist,"\\n\
+"|-   \\twird in diesem Verzeichnis nach der Datei gesucht. Falls kein Pfad übergeben wurde,"\\n\
+"|-   \\twird im aktuellen Verzeichnis gesucht. Falls keine Logdatei gefunden wird, öffnet"\\n\
+"|-   \\tsich automatisch ein Fenster zur Dateiauswahl. Andere Optionen werden ignoriert."\\n\
+"|- -l?\\tDas Fenster zur Dateiauswahl öffnen und eine beliebige Logdatei zum Anzeigen auswählen."\\n\
+"|- -t\\tDen Testmodus starten. D.h. das Skript sucht nach passenden Dateien, startet aber nicht\\n"\
+"|-   \\tdie Umwandlung mittels ffmpeg und zeigt einen entsprechenden Hinweis an.\\n"\
+"|- -tls\\tWie der normale Testmodus, aber es wird eine Auflistung der umzuwandelnden Dateien\\n"\
+"|-   \\tunter '$dateiTESTMODEls' gespeichert.\\n"\
+"|-"\\n\
+"|- Erweiterte Optionen und Möglichkeiten:"\\n\
+"|- -bak '...'\\tDie Einstellung für die Sicherheitskopie festlegen. Mögliche Werte:"\\n\
+"|-   \\tcp:\\tSicherheitskopie behalten"`fncAUSGABEstandard "cp" "$flagBAKactionSTANDARD"`\\n\
+"|-   \\tuvz:\\tSicherheitskopie behalten, aber die Datei in das Unterverzeichnis"\\n\
+"|-   \\t\\t$BAKuvz (wird automatisch erstellt) verschieben"`fncAUSGABEstandard "uvz" "$flagBAKactionSTANDARD"`\\n\
+"|-   \\trm:\\tSicherheitskopie wird nach erfolgreicher Bearbeitung gelöscht"`fncAUSGABEstandard "rm" "$flagBAKactionSTANDARD"`\\n\
+"|-"\\n\
+"|-"\\n\
+"|- WICHTIG:"\\n\
+"|- -Dieses Tool benötigt folgende Pakete um zu funktionieren:"\\n\
+"|-  ffmpeg und die bevorzugten Codecs (zum Beispiel: h264, libmp3lame,...)"\\n\
+"|- -Das Skript arbeitet rekursiv, d.h. es werden auch alle Dateien in Unterverzeichnissen"\\n\
+"|-  umgewandelt!"\\n\
+"|-"\\n\
+"|-"\\n\
+"|- Beispiel:"\\n\
+"|- $datei /home/foo/video/ avi mp4"\\n\
+"|- -Im Verzeichnis /home/foo/video/ werden die Dateien von avi zu mp4 umgewandelt."\\n\
+"|- $datei /home/foo/musik/ /home/foo/noch-mehr-musik/ .wav .mp3"\\n\
+"|- -In den Verzeichnissen /home/foo/musik/ /home/foo/noch-mehr-musik/ werden die Dateien"\\n\
+"|-  von wav zu mp3 umgewandelt."\\n\
+"|-"
+
+#"|-"\\n\
+#"|- Die Quiet Optionen zum Beschleunigen des Programmstarts:"\\n\
+#"|- -q\\tDie Sicherheitsfrage überspringen und direkt das Skript starten."\\n\
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tZuwenige oder unzulässige Argumente übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+txtENDEzeit=\\n\
+"|-"\\n\
+"|- Start:\t$zeitSTART"\\n\
+"|- Ende:\t"
+
+
+txtbox_pfad="\n\n------------------------------\nVerzeichnis:\n$pfad\n------------------------------"
+
+
+# -Die Hilfetexte für die Befehle während ffmpeg ausgeführt wird:
+txtHILFEoptionenFFMPEGstart="Während ffmpeg ausgeführt wird, sind folgende Befehle verfügbar:<br>"
+txtHILFEoptionenFFMPEGliste1="<b>i</b> - Status Informationen anzeigen.<br>"
+txtHILFEoptionenFFMPEGliste2="<b>h</b> - Diese Hilfe anzeigen.<br>"
+#txtHILFEoptionenFFMPEGliste3="<b>f</b> - Aktuelle Datei fertig stellen, dann Skript beenden.<br>"
+txtHILFEoptionenFFMPEGliste3="<b>f</b> - Datei fertig stellen, nächstes Verzeichnis bearbeiten bzw Skript beenden.<br>"
+txtHILFEoptionenFFMPEGliste4="<b>w</b> - Aktuelle Datei abbrechen (mit Sicherung), dann Skript fortsetzen.<br>"
+txtHILFEoptionenFFMPEGliste5="<b>q</b> - Aktuelle Datei abbrechen (mit Sicherung), dann Skript beenden.<br>"
+txtHILFEoptionenFFMPEGliste6="<b>e</b> - Skript sofort beenden. Wichtig: Ohne Sicherung"
+
+txtNOtagsHILFEoptionenFFMPEGstart="Während ffmpeg ausgeführt wird, sind folgende Befehle verfügbar:"
+txtNOtagsHILFEoptionenFFMPEGliste1="i - Status Informationen anzeigen."
+txtNOtagsHILFEoptionenFFMPEGliste2="h - Diese Hilfe anzeigen."
+#txtNOtagsHILFEoptionenFFMPEGliste3="f - Aktuelle Datei fertig stellen, dann Skript beenden."
+txtNOtagsHILFEoptionenFFMPEGliste3="f - Datei fertig stellen, nächstes Verzeichnis bearbeiten bzw Skript beenden."
+txtNOtagsHILFEoptionenFFMPEGliste4="w - Aktuelle Datei abbrechen (mit Sicherung), dann Skript fortsetzen."
+txtNOtagsHILFEoptionenFFMPEGliste5="q - Aktuelle Datei abbrechen (mit Sicherung), dann Skript beenden."
+txtNOtagsHILFEoptionenFFMPEGliste6="e - Skript sofort beenden. Wichtig: Ohne Sicherung"
+
+
+
+
+
+
+
+
+
+function fncCHECKzugriffeLOGS {
+    # -Um laufende Schreibzugriffe auf die Logdatei nicht zu stören, wird
+    #  bei Bedarf eine kurze Pause eingebaut:
+    while ( [[ `lsof $dateiLOGS | grep ffmpeg` != "" ]] )
+    do
+        beep -l 100 -f 200 -r 3 -D 100
+        sleep 0.1
+    done
+}
+
+
+
+function fncECHOlx {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    strSONDERZEICHENuvz=""
+    if ( [[ "$1" != "" ]] )
+    then
+        #[[ "$flagAUFRUFintern" == "true" ]] && strSONDERZEICHENuvz=" -!!!-"
+        echo -e "$1$strSONDERZEICHENuvz"
+        echo -e "$1$strSONDERZEICHENuvz" >> $dateiLOGS
+    fi
+    strSONDERZEICHENuvz=""
+}
+function fncECHOlxL {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        #echo -e "$1"
+        echo -e "$1" >> $dateiLOGS
+    fi
+}
+function fncECHOlxD {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        #echo -e "$1" >> $dateiLOGS
+    fi
+}
+
+
+
+
+
+
+
+
+if ( [[ "$1" == -*M* ]] )
+then
+    flagMORE="true"
+    #befehlAUSGABEmore="| more"
+    #befehlAUSGABEmore="echo -e $befehlAUSGABEmore"
+    #befehlAUSGABEmore="echo -e more"
+    #befehlAUSGABEmore="| $befehlAUSGABEmore"
+fi
+
+# -Die Hilfe anzeigen:
+#echo -e "|- strg1:'$strg1'"
+if ( [[ "$strg1" == -*h* ]] )
+then
+    echo -e $txtKOPF
+    echo -e $txtHILFE
+    exit 0;
+fi
+
+# -Die Logdatei anzeigen:
+# --verschiedene Optionen: l? oder nur l
+# --l? startet Auswahlfenster für Logdatei im aktuellen Verzeichnis
+# --l Falls vorhanden wird Logdatei im aktuellen Verzeichnis angezeigt, ansonsten startet Auswahlfenster
+
+function fncEINGABElogdatei {
+    eingabeDATEI=$(kdialog --title="Logdatei wählen:" --getopenfilename "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+    checkDIALOG=$(echo -e "$?")
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+            checkDIALOGfehler="" ;;
+        (1)
+            # -abbruchBENUTZER
+            checkDIALOGfehler="|- Sie haben die Auswahl der Logdatei abgebrochen. Das Skript wird daher beendet." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER:"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+    "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+    "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+    "|- und die Ausgabe in der Konsole beachten." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    if ( [[ "$checkDIALOGfehler" != "" ]] )
+    then
+        # -Fehlermeldung ausgeben und Skript beenden:
+        echo -e $checkDIALOGfehler
+        echo -e "|-"
+        exit $checkDIALOG;
+    fi
+}
+
+function fncAUSGABElogdatei {
+    txtfncAUSGABE=$1
+    echo -e $txtHR\\n"|- Ausgabe $txtfncAUSGABE"\\t"-START-"\\n$txtHR
+    # -Bei einem internen Aufruf (z.Bsp. strBEFEHLnachQUIT) darf more nicht
+    #  verwendet werden, denn more erwartet eine Eingabe des Benutzers. More wurde allerdings
+    #  in einer Subshell gestartet, deshalb ist keine Interaktion vom Benutzer möglich!
+    # -???Terminaltest mittels tty: mit *dev* = Ausgabe über Display! = mit Benutzer!???
+    # -Bei einem internen Aufruf wird ein entsprechendes Flag übertragen, damit more möglichst verhindert wird...
+    #if ( [[ `tty` == *dev* ]] )
+    if ( [[ "$flagMORE" == "false" ]] )
+    then
+        # -Interner Aufruf
+        # --oder
+        # -Normaler Aufruf ohne More-Option
+        cat $txtfncAUSGABE
+    else
+        #echo -e "DEBUG: txtfncAUSGABE:\\t\\t$txtfncAUSGABE"
+        #echo -e "DEBUG: befehlAUSGABEmore:\\t"`$befehlAUSGABEmore`
+        #cat $txtfncAUSGABE `$befehlAUSGABEmore`
+        #(cat $txtfncAUSGABE) `$befehlAUSGABEmore`
+        #--- cat $txtfncAUSGABE | `$befehlAUSGABEmore` ---
+        more $txtfncAUSGABE
+    fi
+    echo -e $txtHR\\n"|- Ausgabe $txtfncAUSGABE"\\t"-ENDE-"\\n$txtHR
+    exit 0;
+}
+
+#echo -e "DEBUG - vorgabePFAD: $vorgabePFAD"
+vorgabePFAD=${2:-`pwd`}
+#echo -e "DEBUG - vorgabePFAD: $vorgabePFAD"
+[[ "$vorgabePFAD" != */ ]] && vorgabePFAD=$vorgabePFAD"/"
+vorgabeFILTER="Textdatei (*.txt)"
+
+if ( [[ "$1" == -*l\?* ]] )
+then
+    fncEINGABElogdatei
+    # -Pfad zur Logdatei übergeben, Daten ausgeben und Skript beenden:
+    fncAUSGABElogdatei "$eingabeDATEI"
+fi
+
+# if ( [[ "$1" == -*l* ]] )
+# then
+#     echo -e $txtHR\\b
+#     cat $dateiLOGS
+#     echo -e \\b$txtHR
+#     exit 0;
+# fi
+if ( [[ "$1" == "-l" ]] )
+then    
+    if ( [[ -f "$vorgabePFAD$dateiLOGS" ]] )
+    then
+        # -Pfad zur Logdatei übergeben, Daten ausgeben und Skript beenden:
+        fncAUSGABElogdatei "$vorgabePFAD$dateiLOGS"
+    else
+        # -Keine Logdatei gefunden, deshalb Auswahlfenster aufrufen:
+        #vorgabePFAD=`pwd`
+        vorgabeFILTER="Textdatei (*.txt)"
+        fncEINGABElogdatei
+        # -Pfad zur Logdatei übergeben, Daten ausgeben und Skript beenden:
+        fncAUSGABElogdatei "$eingabeDATEI"
+    fi
+fi
+
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Media-Array Funktionen --------------------------------------------------------------
+
+function fncLISTmedia {
+    # -Auslesen aus dem System...
+    typeset -i z=0
+    arrMEDIAauswahl01[$z]="audio"
+    arrMEDIAauswahl02[$z]="Dateityp:Audio"
+    z=z+1
+    arrMEDIAauswahl01[$z]="video"
+    arrMEDIAauswahl02[$z]="Dateityp:Video"
+    z=z+1
+    arrMEDIAauswahl01[$z]="bild"
+    arrMEDIAauswahl02[$z]="Dateityp:Bild"
+    z=z+1
+    typeset -i z=0
+    arrMEDIAaudio[$z]="aac Audio:AAC"
+    z=z+1
+    arrMEDIAaudio[$z]="flac Audio:FLAC"
+    z=z+1
+    arrMEDIAaudio[$z]="mp3 Audio:MP3"
+    z=z+1
+    arrMEDIAaudio[$z]="m4a Audio:M4A"
+    z=z+1
+    arrMEDIAaudio[$z]="ogg Audio:OGG"
+    z=z+1
+    arrMEDIAaudio[$z]="wav Audio:WAV"
+    z=z+1
+    #arrMEDIAaudio[$z]="audio Audio:alle"
+    #z=z+1
+    typeset -i z=0
+    arrMEDIAvideo[$z]="avi Video:AVI"
+    z=z+1
+    arrMEDIAvideo[$z]="flv Video:FLV"
+    z=z+1
+    arrMEDIAvideo[$z]="mpg Video:MPEG1-2-3"
+    z=z+1
+    arrMEDIAvideo[$z]="mp4 Video:MPEG4"
+    z=z+1
+    arrMEDIAvideo[$z]="mov Video:QuickTime"
+    z=z+1
+    arrMEDIAvideo[$z]="mkv Video:Matroska"
+    z=z+1
+    arrMEDIAvideo[$z]="vob Video:VOB-DVD"
+    z=z+1
+    arrMEDIAvideo[$z]="webm Video:Matroska-WEBM"
+    z=z+1
+    arrMEDIAvideo[$z]="wmv Video:Windows-Media"
+    z=z+1
+    arrMEDIAvideo[$z]="alle Video:alle"
+    z=z+1
+    typeset -i z=0
+    #arrMEDIAvideoMP4[$z]="mp4 MPEG4 off"
+    arrMEDIAvideoMP4[$z]="mp4 MPEG4"
+    z=z+1
+    #arrMEDIAvideoMP4[$z]="mp4.HD MPEG4:HD-Format on"
+    arrMEDIAvideoMP4[$z]="mp4.HD MPEG4:HD-Format"
+    z=z+1
+    #arrMEDIAvideoMP4[$z]="mp4.HDtxtNAME MPEG4:HD-Format,Textbox(Dateiname) off"
+    arrMEDIAvideoMP4[$z]="mp4.HDtxtNAME MPEG4:HD-Format,Textbox(Dateiname)"
+    z=z+1
+    #arrMEDIAvideoMP4[$z]="mp4.HDtxtDAUER MPEG4:HD-Format,Textbox(Dauer) off"
+    arrMEDIAvideoMP4[$z]="mp4.HDtxtDAUER MPEG4:HD-Format,Textbox(Dauer)"
+    z=z+1
+    #arrMEDIAvideoMP4[$z]="mp4.HDtxtNAMEtxtDAUER MPEG4:HD-Format,Textbox(Dateiname,Dauer) off"
+    arrMEDIAvideoMP4[$z]="mp4.HDtxtNAMEtxtDAUER MPEG4:HD-Format,Textbox(Dateiname,Dauer)"
+    z=z+1
+    arrMEDIAvideoMP4[$z]="mp4.codecsCOPY MPEG4:Codecs-Copy"
+    z=z+1
+    arrMEDIAvideoMP4[$z]="mp4.codecsCOPYCutEnde4s MPEG4:Codecs-Copy,CutEnde4s"
+    z=z+1
+    arrMEDIAvideoMP4[$z]="mp4.HDCutEnde4s MPEG4:HD-Format,CutEnde4s"
+    z=z+1
+    #arrMEDIAvideoMP4[$z]="videoAUSWAHL Video Format auswählen..."
+    #z=z+1
+    typeset -i z=0
+    arrMEDIAbild[$z]="bmp Bild:BMP"
+    z=z+1
+    arrMEDIAbild[$z]="gif Bild:GIF"
+    z=z+1
+    arrMEDIAbild[$z]="jp* Bild:JPEG"
+    z=z+1
+    arrMEDIAbild[$z]="png Bild:PNG"
+    z=z+1
+    arrMEDIAbild[$z]="svg Bild:SVG"
+    z=z+1
+    arrMEDIAbild[$z]="tif Bild:TIFF"
+    z=z+1
+    #arrMEDIAbild[$z]="bild Bild:alle"
+    #z=z+1
+}
+
+
+function fncRADIOLISTanzeigen {
+    typeset -i z=0
+    while [[ ${strARRAY[$z]} != "" ]]
+    do
+        echo -e "${strARRAY[$z]}"
+        z=z+1
+    done
+    echo -e "-+---+-"
+}
+
+function fncRADIOLISTarray {
+    txtLISTEarray=""
+    txtLISTEchecked=" off"
+    typeset -i z=0
+    while [[ ${strARRAY[$z]} != "" ]]
+    do
+        #txtLISTEarray=$txtLISTEarray"${strARRAY[$z]}"$txtLISTEchecked
+        txtLISTEarray="$txtLISTEarray${strARRAY[$z]}$txtLISTEchecked"
+        #txtLISTEarray=$txtLISTEarray" "
+        txtLISTEarray="$txtLISTEarray "
+        z=z+1
+    done
+}
+
+function fncRADIOLISTfromARRAY {
+    txtLISTEchecked="off"
+    if ( [[ "$2" == "" ]] || [[ "$2" == "alle" ]] )
+    then
+        typeset -n strARRAY01="arrMEDIA$1"
+        typeset -i z=0
+        while ( [[ ${strARRAY01[$z]} != "" ]] )
+        do
+            [[ ${strARRAY01[$z]} == alle* ]] && [[ "$2" != "alle" ]] && z=z+1 && continue
+            [[ ${strARRAY01[$z]} == *on ]] && txtLISTEchecked="on" && optionenZIELstandard=${strARRAY01[$z]//*./} && optionenZIELstandard=${optionenZIELstandard//\ */}
+            echo -e ${strARRAY01[$z]} $txtLISTEchecked
+            txtLISTEchecked="off"
+            z=z+1
+        done
+        return
+    fi
+    typeset -n strARRAY01="$1"
+    typeset -n strARRAY02="$2"
+    typeset -i z=0
+    while [[ ${strARRAY01[$z]} != "" ]]
+    do
+        #echo -e ${strARRAY01[$z]}";"${strARRAY02[$z]}";"$txtLISTEchecked | xargs -d ";" echo
+        echo -e ${strARRAY01[$z]} ${strARRAY02[$z]} $txtLISTEchecked
+        z=z+1
+        #echo -e "-+-"
+    done
+}
+
+function fncEXTENSIONfromARRAY {
+    # -Alle entsprechenden Extensions in einem Array zusammenfassen:
+    arrEXTENSIONSalle=""
+    typeset -n strARRAY01="arrMEDIA$1"
+    typeset -i z=0
+    while [[ ${strARRAY01[$z]} != "" ]]
+    do
+        strARRAYmediaKOMPLETT=${strARRAY01[$z]}
+        strARRAYmediaEXTENSION=${strARRAYmediaKOMPLETT// */}
+        arrEXTENSIONSalle[$z]=$strARRAYmediaEXTENSION
+        z=z+1
+    done
+}
+
+# -Die fast komplette Formatliste für Mediendateien:
+fncLISTmedia
+
+# ----- ENDE Media-Array Funktionen ---------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+typeset -i zz=0
+for i in "$@"
+do
+    [[ "$i" == -* ]] && continue
+    zz=zz+1
+    #echo -e "|- DEBUG Argumente -\"@\"- $zz.: $i"
+    [ $zz -eq 1 ] && argVERZEICHNIS="$i"
+    [ $zz -eq 2 ] && argEXTquelle="$i"
+    [ $zz -eq 3 ] && argEXTziel="$i"
+done
+
+
+# -Pfad Shortcut für aktuelles Verzeichnis:
+[[ "$argVERZEICHNIS" == "." ]] && argVERZEICHNIS=`pwd` && argVERZEICHNIS=$argVERZEICHNIS"/"
+
+# -Verzeichnis mit relativem Pfad wird in absoluten Pfad umgewandelt:
+[[ "$argVERZEICHNIS" != "" ]] && [[ "$argVERZEICHNIS" != */ ]] && argVERZEICHNIS=$argVERZEICHNIS"/"
+[[ "$argVERZEICHNIS" != "" ]] && [[ "$argVERZEICHNIS" != /* ]] && argVERZEICHNISabsolut=`pwd` && [[ "$argVERZEICHNISabsolut" != */ ]] && argVERZEICHNIS=$argVERZEICHNISabsolut"/"$argVERZEICHNIS
+
+
+
+
+MimeTypeAuswahl=""
+optionenZIEL=""
+# -----------------------------------------------------------------------------
+# ----- START if Argumente aus Kommandozeile ----------------------------------
+#if ( [[ "$intANZAHLargumente" -gt 2 ]] )
+if ( [[ $# -gt 2 ]] )
+then
+#     if ( [[ "$flagAUFRUFintern" != "true" ]] )
+#     then
+#         dateiLOGS=$argVERZEICHNIS$dateiLOGSohnePFAD
+#         echo -en "" > $dateiLOGS
+#         fncECHOlx "$txtKOPF"
+#         fncECHOlx "|- Die Argumente aus der Kommandozeile werden übernommen und $datei"
+#         fncECHOlx "|- wird mit folgenden Optionen gestartet:"
+#         fncECHOlx "|- -Arbeitsverzeichnis:\\t$argVERZEICHNIS"
+#         fncECHOlx "|- -Dateiformat Quelle:\\t$argEXTquelle"
+#         fncECHOlx "|- -Dateiformat Ziel:\\t$argEXTziel"
+#         #fncECHOlx "|-"
+#     fi
+    eingabeQUELLEkomplett=$argVERZEICHNIS
+    extension=$argEXTquelle
+    extensionZIEL=$argEXTziel
+    
+    extensionCASEUP=${extension^^}
+    extensionZIELCASEUP=${extensionZIEL^^}
+
+
+else
+
+
+    eingabeQUELLEkomplett=""
+    eingabeQUELLEbak=`pwd`
+
+
+
+    function fncEINGABEverzeichnisse {
+        # *****************************************************************************
+        # ***** START Eingabe Quellen Verzeichnis *************************************
+        checkDIALOGhinweis=""
+        while ( [[ "$intANZAHLquellen" -gt 0 ]] && [[ "$intZ" -le "$intMAXanzahlQUELLVERZEICHNISSE" ]] )
+        do
+            intANZAHLquellen=intANZAHLquellen-1
+
+            # -Quelle auswählen:
+            if ( [[ "$eingabeQUELLE" == "" ]] )
+            then
+                eingabeQUELLE=$(kdialog --title="Bitte Verzeichnis ($intZ/$intMAXanzahlQUELLVERZEICHNISSE) wählen:" --getexistingdirectory $eingabeQUELLEbak 2>/dev/null)
+                #eingabeQUELLE=$(kdialog --title="Quelle wählen:" --getopenfilename "/" --multiple)
+                checkDIALOG=$(echo -e "$?")
+            fi
+            if ( [[ "$eingabeQUELLE" != "" ]] && [[ "$eingabeQUELLE" != */ ]] )
+            then
+                eingabeQUELLE=$eingabeQUELLE"/"
+            fi
+            checkDIALOGfehler=""
+            # -Case für Fensterüberwachung:
+            case "$checkDIALOG" in
+                (0)
+                    intANZAHLquellen=1
+                    checkDIALOGfehler="" ;;
+                (1)
+                    # -abbruchBENUTZER
+                    if ( [[ "$intZ" -lt 2 ]] )
+                    then
+                        checkDIALOGfehler="|- Auswahl Quellverzeichnis: FEHLER!"\\n"|- Sie haben die Auswahl des Quellverzeichnis abgebrochen. Das Skript wird daher beendet."
+                    else
+                        checkDIALOGfehler=""
+                        checkDIALOGhinweis="|- Die Auswahl zusätzlicher Quellverzeichnisse wurde abgebrochen. Die bereits gewählten Quellen werden übernommen."
+                    fi ;;
+                (*)
+                    # -abbruchFEHLER
+                    checkDIALOGfehler="|- Auswahl Quellverzeichnis: FEHLER!"\\n\
+        "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+        "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+        "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+        "|-"\\n\
+        "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+        "|- und die Ausgabe in der Konsole beachten." ;;
+            esac
+            # -Fehlerausgabe und Skript beenden:
+            if ( [[ "$checkDIALOGfehler" != "" ]] )
+            then
+                # -Fehlermeldung ausgeben und Skript beenden:
+                #dateiLOGS=$eingabeQUELLE$dateiLOGSohnePFAD
+                #echo -en "" > $dateiLOGS
+                fncECHOlxD "$txtKOPF"
+                fncECHOlxD "$checkDIALOGfehler"
+                fncECHOlxD "|-"
+                # -Abbrechen:
+                exit 1;
+            else
+                txtINFOeingabeQUELLE="|- -$intZ. Quelle:\\t$eingabeQUELLE"
+                #fncECHOlx $txtINFOeingabeQUELLE
+                intZ=intZ+1
+            fi
+
+            # -Quellen zusammenbauen:
+            if ( [[ "$eingabeQUELLEkomplett" == "" ]] )
+            then
+                eingabeQUELLEkomplett=$eingabeQUELLE
+            else
+                eingabeQUELLEkomplett=$eingabeQUELLEkomplett" "$eingabeQUELLE
+            fi
+            eingabeQUELLEbak="$eingabeQUELLE"
+            eingabeQUELLE=""
+
+        done
+        # ***** ENDE Eingabe Quellen Verzeichnis **************************************
+        # *****************************************************************************
+    }
+    
+    #fncECHOlx $checkDIALOGhinweis
+    
+    [ "$argVERZEICHNIS" == "" ] && fncEINGABEverzeichnisse
+    [ "$argVERZEICHNIS" == "" ] || eingabeQUELLEkomplett="$argVERZEICHNIS"
+    # -Für die Ausgabe in den Dialog Fenstern:
+    txtInfoQuelleKomplett=${eingabeQUELLEkomplett// /<br>}
+
+
+
+    # txtQUELLEN=$eingabeQUELLEkomplett
+    # fncECHOlx "|-"
+    # du -hsc "$eingabeQUELLEkomplett"
+    #fncECHOlx "|-"
+    #fncRADIOLISTanzeigenARR "arrMEDIAauswahl01" "arrMEDIAauswahl02"
+    #exit 0;
+
+    # -Die Formatliste anzeigen:
+    # typeset -n strARRAY=arrMEDIAaudio
+    # fncRADIOLISTanzeigen
+    # typeset -n strARRAY=arrMEDIAvideo
+    # fncRADIOLISTanzeigen
+    # typeset -n strARRAY=arrMEDIAbild
+    # fncRADIOLISTanzeigen
+
+
+    typeset -n strARRAY=arrMEDIAaudio
+    fncRADIOLISTarray
+    txtLISTEaudio=$txtLISTEarray
+
+    typeset -n strARRAY=arrMEDIAvideoMP4
+    fncRADIOLISTarray
+    txtLISTEvideoMP4=$txtLISTEarray
+    
+    typeset -n strARRAY=arrMEDIAvideo
+    fncRADIOLISTarray
+    txtLISTEvideo=$txtLISTEarray
+
+    typeset -n strARRAY=arrMEDIAbild
+    fncRADIOLISTarray
+    txtLISTEbild=$txtLISTEarray
+
+
+    txtLISTEkomplett=$txtLISTEaudio$txtLISTEvideo$txtLISTEbild
+    #echo $txtLISTEkomplett
+
+    txtLISTEkomplettOHNEalle=${txtLISTEaudio//audio*/}${txtLISTEvideo//video*/}${txtLISTEbild//bild*/}
+    #echo $txtLISTEkomplettOHNEalle
+
+    
+    function fncMimeTypeAuswahl {
+        #typeset -n strARRAY=arrMEDIAauswahl
+        #fncRADIOLISTarray
+        #txtLISTEauswahl=$txtLISTEarray
+        txtDIALOGtitle="Auswahl Dateityp Quelle:"
+        MimeTypeAuswahl=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
+        <h4>Welcher Dateityp (Mime-Type) soll umgewandelt werden?</h4><br>\
+        Das genaue Dateiformat der Quelldaten kann im nächsten Schritt gewählt werden.<br><br>\
+        Quelle: $txtInfoQuelleKomplett<br>" \
+        $(fncRADIOLISTfromARRAY "arrMEDIAauswahl01" "arrMEDIAauswahl02"))
+        checkDIALOG=$(echo -e "$?")
+        debugWERT=$MimeTypeAuswahl
+        fncFEHLERdialog "$txtDIALOGtitle"
+    }
+
+
+    function fncEXTENSIONquelle {        
+        txtDIALOGtitle="Dateiformat Quelle:"
+        extension=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
+        <h4>Welche Dateien sollen umgewandelt werden?</h4><br>\
+        Alle Dateien mit diesem Format innerhalb der gewählten Quellverzeichnisse werden<br>\
+        umgewandelt. Unterverzeichnisse werden dabei automatisch mitbearbeitet.<br><br>\
+        Quelle: $txtInfoQuelleKomplett<br>" \
+        $(fncRADIOLISTfromARRAY "$MimeTypeAuswahl" "alle"))
+        checkDIALOG=$(echo -e "$?")
+        debugWERT=$extension
+        extensionCASEUP=${extension^^}
+        fncEXTENSIONfromARRAY "$MimeTypeAuswahl"
+        #echo -e "--- ${arrEXTENSIONSalle[@]}"
+        fncFEHLERdialog "$txtDIALOGtitle"
+    }
+
+
+    function fncEXTENSIONziel {
+        txtDIALOGtitle="Neues Dateiformat:"
+        extensionZIEL=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
+        <h4>In welches Format sollen die Dateien umgewandelt werden?</h4><br>\
+        Alle Dateien im $extensionCASEUP Format innerhalb der gewählten Quellen werden<br>\
+        in das neue Format umgewandelt. Bei einigen Formaten ist es möglich<br>\
+        noch zusätzliche Optionen (Auflösung, Qualität,...) auszuwählen.<br><br>\
+        Quelle: $txtInfoQuelleKomplett<br>" \
+        $(fncRADIOLISTfromARRAY "$MimeTypeAuswahl"))
+        checkDIALOG=$(echo -e "$?")
+        debugWERT=$extensionZIEL
+        optionenZIEL=""
+        [[ "$extensionZIEL" == *.* ]] && optionenZIEL=${extensionZIEL//*./} && extensionZIEL=${extensionZIEL//.*/}
+        extensionZIELCASEUP=${extensionZIEL^^}
+        optionenZIEL=${optionenZIEL^^}
+        fncFEHLERdialog "$txtDIALOGtitle"
+    }
+    
+    
+    function fncOPTIONENziel {
+        txtDIALOGtitle="$extensionZIELCASEUP Optionen:"
+        optionenZIEL=$(kdialog --title="$txtDIALOGtitle" --radiolist="<h3><center>$datei</center></h3><hr>\
+        <h4>Zusätzliche Optionen für das Zielformat ($extensionZIELCASEUP) festlegen:</h4><br>\
+        Automatisch werden beim Umwandeln die auf dem System vorhandenen<br>\
+        Standard Codecs für das gewählte Format benutzt. Bei Codecs-Copy<br>\
+        werden die Original Codecs einfach nur kopiert.<br><br>\
+        Quelle: $txtInfoQuelleKomplett<br>" \
+        $(fncRADIOLISTfromARRAY "$MimeTypeAuswahl$extensionZIELCASEUP"))
+        checkDIALOG=$(echo -e "$?")
+        debugWERT=$optionenZIEL
+        fncFEHLERdialog "$txtDIALOGtitle"
+    }
+    
+
+
+
+    function fncFEHLERdialog {
+        txtFEHLERdialogINSIDE=""
+        [ "$1" ] && txtFEHLERdialogINSIDE="$1 "
+        # -Case für Fensterüberwachung:
+        case "$checkDIALOG" in
+            (0)
+                # -kein Fehler!
+                checkDIALOGfehler="" ;;
+            (1)
+                # -Abbruch durch Benutzer!
+                checkDIALOGfehler="|- $txtFEHLERdialogINSIDE""FEHLER!"\\n"|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+            (*)
+                # -Abbruch durch Fehler!
+                checkDIALOGfehler="|- $txtFEHLERdialogINSIDE""FEHLER!"\\n\
+                "|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+                "|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+                "|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+                "|-"\\n\
+                "|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+                "|- und die Ausgabe in der Konsole beachten." ;;
+        esac
+        # -Fehlerausgabe und Skript beenden:
+        if ( [[ "$checkDIALOGfehler" != "" ]] )
+        then
+            # -Fehlermeldung ausgeben und Skript beenden:
+            fncECHOlxD "$txtKOPF"
+            fncECHOlxD "$checkDIALOGfehler"
+            fncECHOlxD "|-"
+            #kdialog --title="FEHLER" --error="$checkDIALOGfehler"
+            exit 0;
+        fi
+        # -DEBUG:
+        #fncECHOlx "|--- $debugWERT"
+    }
+
+
+    fncMimeTypeAuswahl
+    
+    fncEXTENSIONquelle
+    
+    fncEXTENSIONziel
+    
+    if ( [[ "$extensionZIELCASEUP" == "MP4" ]] )
+    then
+        # -Ausgabe Optionen für MP4 abfragen:
+        fncOPTIONENziel
+        optionenZIELaktuell="$optionenZIEL"
+    else
+        optionenZIELaktuell="$optionenZIELstandard"
+    fi
+    
+#     fncECHOlx "|- Quellverzeichnis:\\t$eingabeQUELLEkomplett"
+#     fncECHOlx "|- Dateityp Auswahl:\\t$MimeTypeAuswahl"
+#     fncECHOlx "|- Dateiformat Quelle:\\t$extension"
+#     fncECHOlx "|- Dateiformat Ziel:\\t$extensionZIEL"
+#     fncECHOlx "|- Optionen Ziel:\\t$optionenZIEL"
+#     fncECHOlx "|- Sicherheitskopie:\\t$flagBAKaction"
+    #exit 0;
+    
+
+
+fi
+# ----- ENDE if Argumente aus Kommandozeile -----------------------------------
+# -----------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+# -Fehlende Werte bei komplettem Aufruf über die Kommandozeile festlegen:
+# --$MimeTypeAuswahl
+# --$optionenZIEL
+
+if ( [[ "$MimeTypeAuswahl" == "" ]] )
+then
+    [[ "$MimeTypeAuswahl" == "" ]] && for iEXT in "${arrMEDIAvideo[@]}"
+    do
+        #echo -e "--- $iEXT"
+        [[ "$iEXT" == $extension* ]] && MimeTypeAuswahl="video" && break
+    done
+    [[ "$MimeTypeAuswahl" == "" ]] && for iEXT in "${arrMEDIAaudio[@]}"
+    do
+        #echo -e "--- $iEXT"
+        [[ "$iEXT" == $extension* ]] && MimeTypeAuswahl="audio" && break
+    done
+    [[ "$MimeTypeAuswahl" == "" ]] && for iEXT in "${arrMEDIAbild[@]}"
+    do
+        #echo -e "--- $iEXT"
+        [[ "$iEXT" == $extension* ]] && MimeTypeAuswahl="bild" && break
+    done
+fi
+
+
+
+
+
+#[[ "$optionenZIEL" == "" ]] && extensionCASEUP=${extension^^} && `fncRADIOLISTfromARRAY "$MimeTypeAuswahl" >/dev/null 2>&1` && optionenZIEL=$optionenZIELstandard
+
+# optionenZIEL="$optionenZIELglobal"
+# [[ "$optionenZIEL" == "" ]] && extensionCASEUP=${extension^^} && fncRADIOLISTfromARRAY "$MimeTypeAuswahl" >/dev/null 2>&1 && optionenZIEL=$optionenZIELstandard
+
+
+
+
+
+
+
+
+# fncECHOlxD "|- Quellverzeichnis:\\t$eingabeQUELLEkomplett"
+# fncECHOlxD "|- Dateityp Auswahl:\\t$MimeTypeAuswahl"
+# fncECHOlxD "|- Dateiformat Quelle:\\t$extension"
+# fncECHOlxD "|- Dateiformat Ziel:\\t$extensionZIEL"
+# fncECHOlxD "|- Optionen Ziel:\\t$optionenZIEL"
+# fncECHOlxD "|- Sicherheitskopie:\\t$flagBAKaction"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -Einzelne Argumente kontrollieren und korrigieren:
+if ( [[ "$extension" != .* ]] )
+then
+    extension=".$extension"
+fi
+
+if ( [[ "$extensionZIEL" != .* ]] )
+then
+    extensionZIEL=".$extensionZIEL"
+fi
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+function fncYEAR1231 {
+    case "$1" in
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y%m%d'`
+            ;;
+    esac
+}
+
+function fncKILLpid {
+#     if ( [[ "$1" == "" ]] )
+#     then
+#         return 10
+#     fi
+
+    # -EINSCHALTEN: Tastatureingaben ausgeben/darstellen:
+    stty echo
+    
+    strKILLsignal=""
+    if ( [[ "$2" != "" ]] )
+    then
+        strKILLsignal="$2 "
+    fi
+    
+    if ( [[ "$1" != "" ]] )
+    then
+        [[ "`ps -p $1 -o pid=`" != "" ]] && strKillPID="$1"
+        [[ "`ps -C $1 -o pid=`" != "" ]] && strKillPID="`ps -C $1 -o pid=`"
+#         if ( [[ `ps -p $strKillPID | grep $strKillPID` == $strKillPID* ]] )
+#         then
+#             #kill $strKillPID >/dev/null 2>&1
+#             # -Die Ausgabe wegen Fehlermeldungen nach Kill abschalten:
+#             #exec >/dev/null 2>&1
+#             # -Der Kill Befehl:
+#             #kill $strKillPID >/dev/null 2>&1
+#             kill $strKillPID >/dev/null 2>&1
+#             # -Die Ausgabe wieder auf den Bildschirm legen:
+#             #exec >`tty` 2>&1
+#         fi
+        typeset -i zKILL=0
+        flagDONEkill="false"
+        #while ( [[ `ps -p $strKillPID | grep $strKillPID` == $strKillPID* ]] )
+        #while ( [[ `ps -p $strKillPID -o pid=` == "$strKillPID" ]] )
+        while ( [[ `ps -p $strKillPID -o pid=` != "" ]] )
+        do
+            txtPROZESSname="`ps -p $strKillPID -o comm=`"
+            if ( [[ "$flagDONEkill" != "true" ]] )
+            then
+                fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Befehl: Kill SIGTERM $strKillPID Prozess $txtPROZESSname"
+                exec >/dev/null 2>&1
+                # -Die Ausgabe in /dev/null umleiten wegen Fehlermeldungen nach Kill Befehl:
+                kill $strKILLsignal$strKillPID >/dev/null 2>&1 &
+                exec >`tty` 2>&1
+            fi
+            #kdialog --title "Status.KILL.`fncHHMMSS 'norm.mS2'`" --passivepopup "--- KILL PID: $strKillPID<br><br>--- Taste: $eingabeTASTE" 10 --geometry=260x100 &
+            zKILL=zKILL+1
+            sleep 0.5
+            # -Maximale Wartezeit: 20 Sekunden
+            #  20 Sekunden / sleep 0.5 = 40 Durchläufe der while Schleife
+            [ $zKILL -ge 39 ] && flagDONEkill="true"
+            [ $zKILL -ge 40 ] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Befehl: Kill SIGKILL Prozess $txtPROZESSname"
+            [ $zKILL -ge 40 ] && kill -9 $strKillPID >/dev/null 2>&1 &
+            [ $zKILL -ge 40 ] && break
+            
+        done
+    fi
+    xset +dpms >/dev/null 2>&1
+}
+
+
+function getCPos { 
+    local v=() t=$(stty -g)
+    stty -echo
+    printf "\033[6n"
+    IFS='[;' read -ra v -d R
+    stty $t
+    CPos=(${v[@]:1})
+}
+
+
+
+
+
+
+
+
+
+
+
+
+#fncDEBUGstart
+#fncDEBUGstop
+
+
+
+
+
+function fncCHECKpsKILLps {
+    # -Wake-Up: Check und Kill Funktion falls das Skript hängt!
+    # --Wenn also die normale Ausführung und Kontrolle innerhalb einer Funktion oder eines Befehls
+    #   gestört ist, wird der Prozess gekillt und das Skript kann weiter laufen!
+    # $1: PID zum Checken
+    # $2: PID zum Killen, wenn kein Integer, wird Befehl ausgeführt
+    # $3: Zeitintervall für Check, wenn leer, wird 60 Sekunden als Standard gesetzt
+    WAKEUPcheckPID=$1
+    WAKEUPkillPID=$2
+    #WAKEUPcheckINTERVALL=$3
+    WAKEUPcheckINTERVALL=60
+    
+    while [ `ps -p $WAKEUPcheckPID -o pid=` ]
+    do
+        # -Zeitintervall beachten:
+        sleep $WAKEUPcheckINTERVALL
+    done
+    
+    # -Um Überschneidungen zu vermeiden:
+    sleep 2
+    echo -e "i"
+
+}
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START fncCHECKtaste -----------------------------------------------------------------------
+function fncCHECKtaste {
+    pidCHECKtaste="$BASHPID"
+    
+    # -Die Aktualisierung in die $dateiCACHEcheckFNC schreiben! Wird mit 10 Sekunden Intervall
+    #  ausgeführt.
+    fncSTARTpsCHECKMODE "inside" "$pidCHECKtaste"
+#     exec >`tty` 2>&1
+#     fncECHOlx "|- "`fncHHMMSS`" --- inside --- \$\$ PID: $$ - BASHPID: $BASHPID $pidCHECKtaste"
+#     exec >/dev/null 2>&1
+
+    eingabeTASTE=""
+    # -Statuspopup anzeigen: alle 2, 5, 10 oder 20 Min
+    # -intUTCreloadSTATUS am Anfang nur um 50 Sek erhöhen und erst wenn der Wert überschritten
+    #  wurde, prüft das Skript wieder die genauen Sek und Min
+    # -später um 550 Sek (mindestens 9 Min) erhöhen, erst dann wieder genau Sek und Min prüfen
+    #kdialog --title "Start.FUNCTION" --passivepopup "--- PID: $checkBEFEHLpid - Taste: $eingabeTASTE" 10 --geometry=260x100 &
+    intMM=`date '+%M'`
+    intSS=`date '+%S'`
+    typeset -i intUTCsekunden=0
+    typeset -i intUTCreloadSTATUS=0
+    typeset -i intUTCsekundenREWRITE=0
+    typeset -i intUTCBefehlStart=0
+    typeset -i intUTCBefehlAktuell=0
+    typeset -i intUTCBefehlLaufzeit=0
+    
+    intUTCsekunden=`date '+%s'`
+    # -Für den Reload des Infopopup:
+    intUTCreloadSTATUS=intUTCsekunden+50
+    intUTCsekundenREWRITE=intUTCsekunden+10
+    
+    # -Für die Anzeige der laufenden Zeit bei der aktuellen Umwandlung:
+    intUTCBefehlStart="$intUTCsekunden"
+    
+    #fncDEBUGstart "WHILE-eingabeTASTE-nicht-q"
+    
+    # -AUSSCHALTEN: Tastatureingaben ausgeben/darstellen:
+    stty -echo
+    
+    while ( [[ "$eingabeTASTE" != q* ]] && [[ "$eingabeTASTE" != w* ]] )
+    do
+        
+        #fncDEBUGstart
+        #tput cup $cursorZEILE 0
+        #eingabeTASTE=`dd bs=1 count=1 2>/dev/null`
+        
+        #read -n 1 -t 0.1 -s eingabeTASTE
+        
+        #exec 0</dev/tty
+        #fncDEBUGstart "READ-eingabeTASTE"
+        sleep 0.01
+        read -N 1 -t 0.1 -s eingabeTASTE
+        #exec 0</dev/null
+        
+#         if ( [[ "$eingabeTASTE" != "" ]] )
+#         then
+#             # -Die eingegebenen Zeichen entfernen, sonst gibt es bei der nächsten Ausgabe Verschiebungen.
+#             # --Zeile löschen und neu einfügen:
+#             exec >`tty` 2>&1
+#             echo $zeileD
+#             echo $zeileI
+#             exec >/dev/null 2>&1
+#         fi
+        #echo -e $eingabeTASTE >/dev/null 2>&1 &
+        
+        #echo -e ""
+        #kdialog --title "Start.WHILE" --passivepopup "--- PID: $checkBEFEHLpid - Taste: $eingabeTASTE" 10 --geometry=260x100 &
+        #fncDEBUGstop
+        
+        intMM=`date '+%M'`
+        intSS=`date '+%S'`
+        intUTCsekunden=`date '+%s'`
+        
+        # -Die Aktualisierung in die $dateiCACHEcheckFNC schreiben! Wird mit 10 Sekunden Intervall
+        #  ausgeführt.
+        [ $intUTCsekunden -ge $intUTCsekundenREWRITE ] && intUTCsekundenREWRITE=intUTCsekunden+10 && fncSTARTpsCHECKMODE "inside" "$pidCHECKtaste"
+        #fncDEBUGstop "READ-eingabeTASTE"
+        
+        
+        #if ( [[ "$intUTCsekunden" -ge "$intUTCreloadSTATUS" ]] && [[ "$intUTCsekunden" == *0 ]] && [[ "$eingabeTASTE" != "q" ]] )
+        if ( [[ "$intUTCsekunden" -ge "$intUTCreloadSTATUS" ]] && [[ "$intMM" == *0 ]] && [[ "$eingabeTASTE" != "q" ]] )
+        then
+            if ( [[ "$intSS" == "00" ]] || [[ "$intSS" == *0 ]] )
+            then
+                intMM=`date '+%M'`
+                intSS=`date '+%S'`
+                intUTCsekunden=`date '+%s'`
+                intUTCreloadSTATUS=`echo -e "$intUTCsekunden + 550" | bc`
+                eingabeTASTE="i"
+            fi
+        fi
+        
+        #if ( [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` == "" ]] )
+        #if ( [[ "$checkBEFEHLpid" != "" ]] && [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` != $checkBEFEHLpid* ]] )
+        #if ( [[ "$checkBEFEHLpid" != "" ]] && [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` == "" ]] )
+        
+        #fncDEBUGstart "IF-checkBEFEHLpid"
+        if ( [[ "$checkBEFEHLpid" != "" ]] && [[ `ps -p $checkBEFEHLpid | grep $checkBEFEHLpid` != *$checkBEFEHLpid* ]] )
+        then
+            #kdialog --title "befehlPID" --passivepopup "--- Befehl PID: $checkBEFEHLpid - Taste: $eingabeTASTE" 10 --geometry=260x100 &
+            #kdialog --title "befehlPID" --msgbox "--- Befehl PID: $checkBEFEHLpid - Taste: $eingabeTASTE" --geometry=260x100 &
+            # -Den checkBEFEHLreturn Status kontrollieren und ggf korrigieren!
+            # --Prozess wurde normal beendet: 0
+            eingabeTASTE="q-PIDcheck"
+            fncKILLpid $checkBEFEHLpid
+            flagENDE="$flagENDE:SCRIPT.CHECK-PID.datei-fertig"
+            #fncDEBUGstop "IF-checkBEFEHLpid"
+            #break
+            continue
+        fi
+        #fncDEBUGstop "IF-checkBEFEHLpid"
+        
+        #tput cub 1
+        #echo -n " "
+        #tput cub 1
+        #beep -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100
+        if ( [[ "$eingabeTASTE" == "i" ]] )
+        then
+            #fncCURSORzeileAKTUELLspalteNULL
+            #if ( [[ `ps -p $checkPOPUPpid | grep $checkPOPUPpid` != "" ]] )
+            if ( [[ "$checkPOPUPpid" != "" ]] && [[ `ps -p $checkPOPUPpid | grep $checkPOPUPpid` == $checkPOPUPpid* ]] )
+            then
+                fncKILLpid $checkPOPUPpid
+                checkPOPUPpid=""
+            else
+                # "frame= 95 fps= 22 q=29.0 size= 0kB time=00:00:03.18 bitrate= 0.1kbits/s speed=0.732x "
+                #dateiLOGStmpBAK=$dateiLOGStmp".bak"
+                #cp $dateiLOGStmp $dateiLOGStmpBAK
+                #txtSTATUS=`tail -n 1 $dateiLOGStmpBAK`
+                [ -f "$dateiLOGS" ] && txtSTATUS=`tail -n 1 $dateiLOGS`
+                [ -f "$dateiLOGStmp" ] && txtSTATUS=`tail -n 1 $dateiLOGStmp`
+                txtSTATUS=${txtSTATUS//*frame/frame}
+                txtSTATUSdauer=${txtSTATUS//*time=/}
+                txtSTATUSdauer=${txtSTATUSdauer//.*/}
+                intDauerDateiAktuell="$txtSTATUSdauer"
+                [[ "${intDauerDateiAktuell:0:3}" == "00:" ]] && intDauerDateiAktuell=${intDauerDateiAktuell:3}
+                
+                # -$intDauerDateiKomplett wird in der fncFFMPEG ermittelt und gibt die
+                #  Gesamtdauer der Datei immer im Format MM:SS oder HH:MM:SS an.
+                # -$intDauerDateiAktuell wird mittels $txtSTATUSdauer aus den beiden Logs
+                #  ($dateiLOGS und $dateiLOGStmp) ausgelesen. Format: HH:MM:SS
+                #
+                # -Zeitangaben sichern:
+                BAKintDauerDateiKomplett="$intDauerDateiKomplett"
+                BAKintDauerDateiAktuell="$intDauerDateiAktuell"
+                
+                intBefehlSekKomplett=`fncTime2SekSek2Time "$intDauerDateiKomplett"`
+                intBefehlSekAktuell=`fncTime2SekSek2Time "$intDauerDateiAktuell"`
+                
+                intBefehlSekProzent100="$intBefehlSekKomplett"
+                intBefehlSekProzent1=`echo -e "scale=3 ; $intBefehlSekProzent100/100" | bc -l`
+                intBefehlSekProzentAktuell=`echo -e "scale=3 ; $intBefehlSekAktuell/$intBefehlSekProzent1" | bc -l`
+                
+                # -DEBUG Infos anzeigen:
+#                 kdialog --msgbox "DEBUG $datei<hr><br>\
+#                 Zeitangaben: $intDauerDateiAktuell von $intDauerDateiKomplett<br>\
+#                 Zeitangaben BAK: $BAKintDauerDateiAktuell von $BAKintDauerDateiKomplett<br><br>\
+#                 Sekunden: $intBefehlSekAktuell von $intBefehlSekKomplett<br>\
+#                 SekunFNC: `fncTime2SekSek2Time "$intDauerDateiAktuell"` von `fncTime2SekSek2Time "$intDauerDateiKomplett"`<br><br>\
+#                 Prozente: 1: $intBefehlSekProzent1 - 100: $intBefehlSekProzent100 - Aktuell: $intBefehlSekProzentAktuell" &
+                
+                intBefehlSekProzentAktuellVorKomma=${intBefehlSekProzentAktuell//.*/}
+                intBefehlSekProzentAktuellNachKomma=${intBefehlSekProzentAktuell//*./}
+                # -Falls der Prozent Wert noch unter 1 ist, ist VorKomma leer und wird daher auf
+                #  0 gesetzt:
+                [[ ! "$intBefehlSekProzentAktuellVorKomma" ]] && intBefehlSekProzentAktuellVorKomma="0"
+                # -Falls der Prozent Wert noch unter 10 ist, wird als erste Stelle eine
+                #  führende Null eingefügt:
+                [[ "$intBefehlSekProzentAktuellVorKomma" -lt 10 ]] && intBefehlSekProzentAktuellVorKomma="0""$intBefehlSekProzentAktuellVorKomma"
+                # -Falls zufällig bei $intBefehlSekProzentAktuell ein glattes Ergebnis rauskommt
+                #  und somit NachKomma leer ist, wird NachKomma mit Nullen gefüllt:
+                [[ ! "$intBefehlSekProzentAktuellNachKomma" ]] && intBefehlSekProzentAktuellNachKomma="000"
+                intBefehlSekProzentAktuellNachKomma=${intBefehlSekProzentAktuellNachKomma:0:2}
+                intBefehlSekProzentAktuell="$intBefehlSekProzentAktuellVorKomma,$intBefehlSekProzentAktuellNachKomma"
+                
+                intUTCBefehlAktuell=`date '+%s'`
+                intUTCBefehlLaufzeit=$(( $intUTCBefehlAktuell-$intUTCBefehlStart ))
+                intBefehlSekLaufzeit=`fncTime2SekSek2Time "$intUTCBefehlLaufzeit"`
+                
+                # -Um bei den Zeitangaben die leere Stundenangabe nicht auszugeben, wird
+                #  die fncTime2SekSek2Time zweimal aufgerufen. Beim Umrechnen von Sekunden
+                #  in Zeitangabe werden automatisch die leeren Stunden weggelassen.
+                #
+                # -1. Zeitangabe in Sekunden umrechnen:
+                #intDauerDateiKomplett=`fncTime2SekSek2Time "$intDauerDateiKomplett"`
+                intDauerDateiAktuell=`fncTime2SekSek2Time "$intDauerDateiAktuell"`
+                # -2. Sekunden in Zeitangabe umrechnen:
+                #intDauerDateiKomplett=`fncTime2SekSek2Time "$intDauerDateiKomplett"`
+                intDauerDateiAktuell=`fncTime2SekSek2Time "$intDauerDateiAktuell"`
+                
+                #fncDEBUGstart "IF-eingabeTASTE==i"
+                # -Das Display Management System wird abgeschaltet, wegen Problemen mit dem Passivepopup.
+                xset -dpms >/dev/null 2>&1
+                intSSpopup="15"
+                #popupSTATS=$(kdialog --title "$datei.Status `fncHHMMSS 'norm.mS2'`" --passivepopup " --- <b>$datei: Status</b> --- <br><br>-$strFERTIGdateiNAME<br>-Status: $intDauerDateiAktuell von $intDauerDateiKomplett<br><br>Das Fenster wird nach $intSSpopup Sek. automatisch ausgeblendet. $cursorZEILE:$checkBEFEHLpid" $intSSpopup --geometry=400x160 &)
+                
+                #kdialog --title "$datei.Info `fncHHMMSS 'norm.mS2'`" --passivepopup "<b>$datei: $strFERTIGdateiNAME</b><br>Fertig: $intBefehlSekProzentAktuell% ($intDauerDateiAktuell von $intDauerDateiKomplett)<br>Läuft seit: $intBefehlSekLaufzeit<br><br>Info ausblenden nach $intSSpopup Sekunden.<br>$checkBEFEHLpid $flagENDE" $intSSpopup --geometry=400x160 &
+                
+#                 kdialog --title "$datei.Info `fncHHMMSS 'norm.mS2'`" --passivepopup "<b>$datei: $strFERTIGdateiNAME</b><br>Fertig: $intBefehlSekProzentAktuell% ($intDauerDateiAktuell von $intDauerDateiKomplett)<br>DEBUG $intBefehlSekAktuell von $intBefehlSekKomplett<br>Läuft seit: $intBefehlSekLaufzeit<br><br>Info ausblenden nach $intSSpopup Sekunden.<br>$checkBEFEHLpid $flagENDE" $intSSpopup --geometry=400x160 &
+                
+                
+#                 kdialog --title "$datei.Info `fncHHMMSS 'nurSS.mS3'`" --passivepopup "Datei: $strFERTIGdateiNAME<br><br>Fertig: $intBefehlSekProzentAktuell% ($intDauerDateiAktuell von $intDauerDateiKomplett)<br>Läuft seit: $intBefehlSekLaufzeit<br><br>Info ausblenden nach $intSSpopup Sekunden.<br>$checkBEFEHLpid $flagENDE" $intSSpopup --geometry=400x160 &
+                
+#                 kdialog --title "$datei.Info `fncHHMMSS 'nurSS.mS3'`" --passivepopup "Datei: $strFERTIGdateiNAME<br><br>Fertig: $intBefehlSekProzentAktuell% ($intDauerDateiAktuell von $intDauerDateiKomplett)<br>Läuft seit: $intBefehlSekLaufzeit<br><br>Anzeigedauer Info: $intSSpopup - PID: $checkBEFEHLpid - Status: $flagENDE" $intSSpopup --geometry=400x160 &
+                
+#                 kdialog --title "$datei.Info `fncHHMMSS 'nurSS.mS3'`:" --passivepopup "Datei: $strFERTIGdateiNAME<br><br>Fertig: <b>$intBefehlSekProzentAktuell%</b> ($intDauerDateiAktuell von $intDauerDateiKomplett)<br>Läuft seit: $intBefehlSekLaufzeit<br><br>Anzeigedauer Info: $intSSpopup Sek - PID: $checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+                
+#                 kdialog --title "`fncHHMMSS 'nurSS.mS3'`: $datei.Info" --passivepopup "Datei: $strFERTIGdateiNAME<br><br>Fertig: <b>$intBefehlSekProzentAktuell%</b> ($intDauerDateiAktuell von $intDauerDateiKomplett)<br>Läuft seit: $intBefehlSekLaufzeit<br><br>Anzeigedauer Info: $intSSpopup Sek - PID: $checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+                
+#                 kdialog --title "`fncHHMMSS 'nurSS.mS3'`: $datei.Status:" --passivepopup "$strFERTIGdateiNAME<br><br>Fertig: \\t<b>$intBefehlSekProzentAktuell%</b> ($intDauerDateiAktuell von $intDauerDateiKomplett)<br>Läuft seit: \\t$intBefehlSekLaufzeit<br><br>Anzeigedauer Info: $intSSpopup Sek - PID: $checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+                
+#                 kdialog --title "`fncHHMMSS 'nurSS.mS3'`: $datei.Status:" --passivepopup "$strFERTIGdateiNAME<br><br>Fertig: \\t<b>$intBefehlSekProzentAktuell%</b> in $intBefehlSekLaufzeit<br>\\t\\t\\t$intDauerDateiAktuell von $intDauerDateiKomplett<br><br>Anzeigedauer Info: $intSSpopup Sek - PID: $checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+                
+#                 kdialog --title "`fncHHMMSS 'nurSS.mS3'`: $datei.Status:" --passivepopup "$strFERTIGdateiNAME<br><br>Fertig: \\t<b>$intBefehlSekProzentAktuell%</b> ($intDauerDateiAktuell)<br>Gesamt: \\t$intDauerDateiKomplett<br>Läuft seit: \t$intBefehlSekLaufzeit<br><br>Anzeigedauer Info: $intSSpopup Sek - PID: $checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+#                 sleep 0.5
+                
+#                 kdialog --title "`fncHHMMSS 'nurSS.mS3'`: $datei.Status:" --passivepopup "$strFERTIGdateiNAME<br><br>Gesamt: \\t$intDauerDateiKomplett<br>Fertig: \\t$intDauerDateiAktuell - <b>$intBefehlSekProzentAktuell%</b><br>Läuft seit: \\t$intBefehlSekLaufzeit<br><br>Anzeigedauer Info: $intSSpopup Sek - PID: $checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+#                 sleep 0.5
+                
+#                 kdialog --title "`fncHHMMSS 'nurSS.mS3'`: $datei.Status:" --passivepopup "$strFERTIGdateiNAME<br><br>Gesamt: $intDauerDateiKomplett<br><b>Fertig: $intDauerDateiAktuell - $intBefehlSekProzentAktuell%</b><br>Laufzeit: $intBefehlSekLaufzeit<br><br>Anzeigedauer Info: $intSSpopup Sek - PID: $checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+#                 sleep 0.5
+                
+#                 kdialog --title "`fncHHMMSS 'nurSS.mS3'`: $datei.Status:" --passivepopup "$strFERTIGdateiNAME<br><br><b>Fertig: $intDauerDateiAktuell - $intBefehlSekProzentAktuell%</b><br>Gesamt: $intDauerDateiKomplett<br>Laufzeit: $intBefehlSekLaufzeit<br><br>Anzeigedauer Info: $intSSpopup Sek - PID: $checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+                
+                kdialog --title "$datei.Status `fncHHMMSS 'norm.mS2'`:" --passivepopup "$strFERTIGdateiNAME<br><br><b>Fertig: $intDauerDateiAktuell - $intBefehlSekProzentAktuell%</b><br>Gesamt: $intDauerDateiKomplett<br>Laufzeit: $intBefehlSekLaufzeit<br><br>Anzeigedauer Info: $intSSpopup Sek - PID: $checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+                
+                checkPOPUPreturn=$?
+                checkPOPUPpid=$!
+                #fncDEBUGstop "IF-eingabeTASTE==i"
+                #popupPID=$(kdialog --title "Popup PID" --passivepopup "--- `fncHHMMSS` - $checkPOPUPpid" $intSSpopup --geometry=400x160 &)
+                #rm $dateiLOGStmpBAK
+            fi
+            #eingabeTASTE=""
+        fi
+        if ( [[ "$eingabeTASTE" == "e" ]] )
+        then
+            # -Sofortiges Beenden ohne Sicherung
+            exec >`tty` 2>&1
+            #fncKILLpid $checkBEFEHLpid "-9"
+            fncKILLpid $checkBEFEHLpid
+            
+            # -Die große Keule:
+            #fncKILLallePROZESSE "EIGENESTTY"
+            $0 "-PSK" "EIGENESTTY" >/dev/null 2>&1
+            
+            exit 20;
+        fi
+        if ( [[ "$eingabeTASTE" == "f" ]] )
+        then
+            # -Aktuelle Datei fertig stellen, zum nächsten Verzeichnis wechseln bzw das Skript beenden.
+            #
+            # -Das Display Management System wird abgeschaltet, wegen Problemen mit dem Passivepopup.
+            xset -dpms >/dev/null 2>&1
+            # -Rückmeldung für den Benutzer, dass die Eingabe vom Skript erkannt wurde:
+            intSSpopup="15"
+            #kdialog --title "$datei.Info `fncHHMMSS 'norm.mS2'`" --passivepopup " --- <b>$datei: Info</b> --- <br><br>Benutzer.Befehl.f:<br>Der Benutzer hat das Beenden eingeleitet: Die aktuelle Datei wird fertig gestellt und danach $datei beendet.<br><br>Das Fenster wird nach $intSSpopup Sek. automatisch ausgeblendet. $cursorZEILE:$checkBEFEHLpid" $intSSpopup --geometry=400x160 &
+            kdialog --title "$datei.Info `fncHHMMSS 'norm.mS2'`:" --passivepopup "<b>$datei: Benutzer.Befehl.f</b><br><br>Aktuelle Datei fertig bearbeiten, danach zum nächsten Verzeichnis wechseln bzw $datei beenden.<br><br>Info ausblenden nach $intSSpopup Sekunden.<br>$checkBEFEHLpid $flagENDE" $intSSpopup --geometry=400x160 &
+            
+            # -Nur beim ersten Aufruf wird Statuszeile angezeigt!
+            if ( [[ "$flagENDE" != *:BENUTZER.BEFEHL.f* ]] )
+            then
+                # -Ausgabe einschalten, Status flagENDE anzeigen, Ausgabe abschalten
+                exec >`tty` 2>&1
+                cursorZEILE=cursorZEILE-1
+                tput cup $cursorZEILE 0
+                cursorZEILE=cursorZEILE+1
+                fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Benutzer.Befehl.f: Datei fertig stellen, nächstes Verzeichnis bearbeiten bzw $datei beenden."
+                exec >/dev/null 2>&1
+                flagENDE="$flagENDE:BENUTZER.BEFEHL.f"
+            fi
+        fi
+        if ( [[ "$eingabeTASTE" == "h" ]] )
+        then
+            # -Hilfe Popup anzeigen:
+            txtHILFEoptionenFFMPEGliste="$txtHILFEoptionenFFMPEGliste1$txtHILFEoptionenFFMPEGliste2$txtHILFEoptionenFFMPEGliste3$txtHILFEoptionenFFMPEGliste4$txtHILFEoptionenFFMPEGliste5$txtHILFEoptionenFFMPEGliste6"
+            txtHILFEoptionenFFMPEG="$txtHILFEoptionenFFMPEGstart$txtHILFEoptionenFFMPEGliste"
+            intSSpopup="30"
+            #kdialog --title "$datei.Hilfe.`fncHHMMSS`" --passivepopup "--- `fncHHMMSS` - <b>$datei: Hilfe</b><br>Das Fenster wird nach $intSSpopup Sek. automatisch ausgeblendet.<br><br>$txtHILFEoptionenFFMPEG" $intSSpopup --geometry=600x400 &
+            
+            kdialog --title "$datei.Hilfe `fncHHMMSS 'norm.mS2'`:" --msgbox "<b>$datei: Hilfe</b><br><br>$txtHILFEoptionenFFMPEG" --geometry=600x400 &
+        fi
+        
+        #fncDEBUGstart
+        #fncCURSORzeileAKTUELLspalteNULL &
+        #fncDEBUGstop
+        
+    done
+    #fncDEBUGstop "WHILE-eingabeTASTE-nicht-q"
+    
+    #kdialog --title "PopupENDE" --passivepopup "--- Befehl PID: $checkBEFEHLpid - Taste: $eingabeTASTE" 10 --geometry=260x100 &
+#     if ( [[ "$eingabeTASTE" == "q" ]] )
+#     then
+#         #fncKILLpid $checkBEFEHLpid
+#         strKillPID=$checkBEFEHLpid
+#         #exec >/dev/null 2>&1
+#         if ( [[ `ps -p $strKillPID | grep $strKillPID` != "" ]] )
+#         then
+#             #kill $strKillPID >/dev/null 2>&1
+#             # -Die Ausgabe wegen Fehlermeldungen nach Kill abschalten:
+#             #exec >/dev/null 2>&1
+#             # -Der Kill Befehl:
+#             kill $strKillPID >/dev/null 2>&1
+#             # -Die Ausgabe wieder auf den Bildschirm legen:
+#             #exec >`tty` 2>&1
+#         fi
+#         #break
+#     fi
+    
+    # -Datei abbrechen, Skript fortsetzen:
+    if ( [[ "$eingabeTASTE" == "w" ]] )
+    then
+        exec >`tty` 2>&1
+        #fncCURSORzeileAKTUELLspalteNULL
+        tput cup $cursorZEILE 0
+        fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Benutzer.Befehl.w: Datei abbrechen und sichern, dann Skript fortsetzen."
+        #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Benutzer.Befehl.w -> Datei abbrechen, dann sichern, dann Skript fortsetzen."
+        sleep 0.5
+        intSSpopup="15"
+        #kdialog --title "$datei.Info `fncHHMMSS 'norm.mS2'`" --passivepopup " --- <b>$datei: Info</b> --- <br><br>Benutzer.Befehl.w:<br>Prüfe Datei $strFERTIGdateiNAME, sichere Daten, beende Prozesse...<br>Das fehlerfreie Beenden kann etwas dauern! Bitte haben Sie ein wenig Geduld! (10-20 Sek.)<br><br>Das Fenster wird nach $intSSpopup Sek. automatisch ausgeblendet. $cursorZEILE:$checkBEFEHLpid" $intSSpopup --geometry=600x160 &
+        kdialog --title "$datei.Info `fncHHMMSS 'norm.mS2'`:" --passivepopup "<b>$datei: Benutzer.Befehl.w</b><br><br>Aktuelle Datei prüfen, sichern und danach $datei fortsetzen. Bitte haben Sie einen Moment (10-20 Sek) Geduld!<br><br>Info ausblenden nach $intSSpopup Sekunden.<br>$checkBEFEHLpid $flagENDE" $intSSpopup --geometry=400x160 &
+        
+        fncKILLpid $checkBEFEHLpid
+        #sleep 4
+        #fncKILLpid $checkBEFEHLpid "-9"
+        flagENDE="$flagENDE:BENUTZER.BEFEHL.w"
+    elif ( [[ "$eingabeTASTE" == "q-PIDcheck" ]] )
+    then
+        fncKILLpid $checkBEFEHLpid
+        flagENDE="$flagENDE:ENDE.normal"
+    else
+        fncKILLpid $checkBEFEHLpid
+        flagENDE="$flagENDE:ENDE.CHECK-PID.else"
+    fi
+    
+    
+    # -Datei abbrechen, Skript beenden:
+    if ( [[ "$eingabeTASTE" == "q" ]] )
+    then
+        exec >`tty` 2>&1
+        #fncCURSORzeileAKTUELLspalteNULL
+        tput cup $cursorZEILE 0
+        fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Benutzer.Befehl.q: Datei abbrechen und sichern, dann Skript beenden."
+        #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Benutzer.Befehl.w -> Datei abbrechen, dann sichern, dann Skript fortsetzen."
+        sleep 0.5
+        intSSpopup="15"
+        #kdialog --title "$datei.Info `fncHHMMSS 'norm.mS2'`" --passivepopup " --- <b>$datei: Info</b> --- <br><br>Benutzer.Befehl.w:<br>Prüfe Datei $strFERTIGdateiNAME, sichere Daten, beende Prozesse...<br>Das fehlerfreie Beenden kann etwas dauern! Bitte haben Sie ein wenig Geduld! (10-20 Sek.)<br><br>Das Fenster wird nach $intSSpopup Sek. automatisch ausgeblendet. $cursorZEILE:$checkBEFEHLpid" $intSSpopup --geometry=600x160 &
+        kdialog --title "$datei.Info `fncHHMMSS 'norm.mS2'`:" --passivepopup "<b>$datei: Benutzer.Befehl.q</b><br><br>Aktuelle Datei prüfen, sichern und danach $datei beenden. Bitte haben Sie einen Moment (10-20 Sek) Geduld!<br><br>Info ausblenden nach $intSSpopup Sekunden.<br>$checkBEFEHLpid $flagENDE" $intSSpopup --geometry=400x160 &
+        
+        fncKILLpid $checkBEFEHLpid
+        #sleep 4
+        #fncKILLpid $checkBEFEHLpid "-9"
+        flagENDE="$flagENDE:BENUTZER.BEFEHL.q"
+    elif ( [[ "$eingabeTASTE" == "q-PIDcheck" ]] )
+    then
+        fncKILLpid $checkBEFEHLpid
+        flagENDE="$flagENDE:ENDE.normal"
+    else
+        fncKILLpid $checkBEFEHLpid
+        flagENDE="$flagENDE:ENDE.CHECK-PID.else"
+    fi
+    
+    #fncKILLpid $checkPOPUPpid
+    #checkPOPUPpid=""
+    
+    # -Da fncCHECKtaste in einer Subshell läuft, wird eine Cachedatei zum Übertragen von
+    #  Werten benötigt: $dateiCACHEflagENDE
+    echo -e "$flagENDE" > $dateiCACHEflagENDE
+    
+}
+# ----- ENDE fncCHECKtaste ------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function fncFFMPEGbefehlAUFLOESUNGFRAMERATE {
+    i=$1
+    # -HD Standard Werte:
+    intHDresolutionWIDTH=1280
+    intHDresolutionHEIGHT=720
+    intMAXframerate=30
+    intMAXbitrate=1500000
+    
+    #fncDEBUGstart
+    
+    # -Dateiname ohne Pfad:
+    i_Dateiname=${i//*\//}
+    # -aufloesung usw. auslesen:
+    #  mediainfo --Inform='Video;%Width%' video.mp* 
+    i_width=`mediainfo --Inform='Video;%Width%' $i`
+    i_height=`mediainfo --Inform='Video;%Height%' $i`
+    i_BitRate=`mediainfo --Inform='Video;%BitRate%' $i`
+    i_FrameRate=`mediainfo --Inform='Video;%FrameRate%' $i`
+    i_FrameRate=${i_FrameRate//\.*/}
+    #echo -e "--- aufloesung: $i_width x $i_height"
+    #echo -e "--- Bitrate: $i_BitRate - Framerate: $i_FrameRate"
+    txtBEFEHLaufloesung=""
+    txtBEFEHLframerate=""
+    txtBEFEHLbitrate=" -c:v libx264 -crf 20"
+    txtBEFEHLbitrate=" -maxrate $intMAXbitrate"
+    txtBEFEHLbitrate=""
+    
+    intSOLLzuISTwidth1000=`echo -e "scale=3 ; ($intHDresolutionWIDTH/$i_width)*1000" | bc -l`
+    intSOLLzuISTwidth1000=${intSOLLzuISTwidth1000//.*/}
+    intSOLLzuISTheight1000=`echo -e "scale=3 ; ($intHDresolutionHEIGHT/$i_height)*1000" | bc -l`
+    intSOLLzuISTheight1000=${intSOLLzuISTheight1000//.*/}
+    
+    # -Der kleinere der beiden SOLLzuIST Werte wird als Faktor zur weiteren
+    #  Umrechnung verwendet:
+    [ "$intSOLLzuISTwidth1000" -lt "$intSOLLzuISTheight1000" ] && intSOLLzuISTfaktor=`echo -e "scale=3 ; $intSOLLzuISTwidth1000/1000" | bc -l` || intSOLLzuISTfaktor=`echo -e "scale=3 ; $intSOLLzuISTheight1000/1000" | bc -l`
+    
+    # -Neue Auflösung berechnen und einbinden:
+    # --Falls IST-Wert größer als SOLL-Wert: "$i_width" -gt "$intHDresolutionWIDTH" oder...
+    # --Falls einer der SOLLzuIST Werte kleiner als 1000 ist: "$intSOLLzuISTwidth1000" -lt 1000 oder...
+    #if ( [[ "$i_width" -gt "$intHDresolutionWIDTH" ]] || [[ "$i_height" -gt "$intHDresolutionHEIGHT" ]] )
+    if ( [[ "$intSOLLzuISTwidth1000" -lt 1000 ]] || [[ "$intSOLLzuISTheight1000" -lt 1000 ]] )
+    then
+#         # seitenverhaeltnis ermitteln und beibehalten
+#         # varINT=`echo -e "(8+5)*2" | bc`
+#         verhaeltnis=`echo -e "$i_width/$i_height" | bc -l`
+#         max_width=$intHDresolutionWIDTH
+#         max_height=`echo -e "scale=0 ; $intHDresolutionWIDTH/$verhaeltnis" | bc -l`
+#         max_height_check=`echo -e "scale=1 ; $max_height/2" | bc -l`
+#         #echo -e "--- max_height: $max_height --- max_height_check: $max_height_check"
+#         if ( [[ "$max_height_check" != *.0 ]] )
+#         then
+#             max_height=`echo -e "scale=0 ; $max_height+1" | bc -l`
+#         fi
+#         #echo -e "--- NEUE aufloesung: $max_width x $max_height"
+#         aufloesung=$max_width"x"$max_height
+#         txtBEFEHLaufloesung=" -s $aufloesung"
+        
+        intMaxWidth=`echo -e "scale=3 ; $i_width*$intSOLLzuISTfaktor" | bc -l`
+        intMaxWidth=${intMaxWidth//.*/}
+        intMaxWidth="`fncCheckZahlGerade $intMaxWidth`"
+        
+        intMaxHeight=`echo -e "scale=3 ; $i_height*$intSOLLzuISTfaktor" | bc -l`
+        intMaxHeight=${intMaxHeight//.*/}
+        intMaxHeight="`fncCheckZahlGerade $intMaxHeight`"
+        
+        aufloesung="$intMaxWidth""x""$intMaxHeight"
+        txtBEFEHLaufloesung=" -s $aufloesung"
+    fi
+    if ( [[ "$i_FrameRate" -gt "$intMAXframerate" ]] )
+    then
+        txtBEFEHLframerate=" -r $intMAXframerate"
+    fi
+    if ( [[ "$i_BitRate" -gt "$intMAXbitrate" ]] )
+    then
+        txtBEFEHLframerate="$txtBEFEHLframerate""$txtBEFEHLbitrate"
+    fi
+    
+    #fncDEBUGstop
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START fncFFMPEG ---------------------------------------------------------------------------
+intDauerDateiKomplett=""
+intDauerDateiAktuell=""
+function fncFFMPEG {
+    # -Daten übernehmen und FFMPG Befehl zusammenbauen!
+    # -Ggf prüfen ob Extension Quelle nicht Extension Ziel ist!
+    checkBEFEHLpid=""
+    checkPOPUPpid=""
+    #fncECHOlx "|- DEBUG-FFMPEG: Datei:\\t$1"
+    #fncECHOlx "|- DEBUG-FFMPEG: Quelle:\\t$2\\t\\tZiel:\\t$3"
+    #fncECHOlx "|-"
+    
+    #fncECHOlx "|-"
+    #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "+- ffmpeg: Quelle: $2 - Ziel: $3 mit TXTBOX.Name.Dauer - $strFERTIGdateiNAME"
+    #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "+- $intID: Quelle: $2 - Ziel: $3 mit TXTBOX.Name.Dauer - $strFERTIGdateiNAME"
+    
+    fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+- Datei: $strFERTIGdateiNAME"
+    #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Quelle: $2 - Ziel: $3 mit TXTBOX.Name.Dauer - $strFERTIGdateiNAME"
+    
+    # -Das Display Management System wird abgeschaltet, wegen Problemen mit dem Passivepopup.
+    xset -dpms >/dev/null 2>&1
+    
+    # -Videogesamtdauer auslesen und anzeigen:
+    #i_Dauer=`ffprobe -v error -show_entries format=duration -sexagesimal -of default=noprint_wrappers=1:nokey=1 $1`
+    #i_Dauer=`ffprobe $1 -show_format -v quiet -sexagesimal | sed -n 's/duration=//p'`
+    #i_DauerMI=`mediainfo --Inform='Video;%Duration%' $1`
+    # -Performance testen:
+    # --format-duration-sed: 7s - entries-duration-wrap: 1s - mediainfo: 1s (aber Ausgabe millisek)
+    #fncECHOlx "|- mediainfo: "`mediainfo --Inform='Video;%Duration%' $1`
+    #fncECHOlx "|- format-duration-sed:"\\n"--- ffprobe: "`ffprobe $1 -show_format -v quiet -sexagesimal | sed -n 's/duration=//p'`
+    #fncECHOlx "|- entries-duration-wrap:"\\n"--- ffprobe: "`ffprobe -v error -show_entries format=duration -sexagesimal -of default=noprint_wrappers=1:nokey=1 $1`
+    
+    i_Dauer=`ffprobe -v error -show_entries format=duration -sexagesimal -of default=noprint_wrappers=1:nokey=1 $1`
+    
+    # -i_DauerHMS kann nicht an fncTime2SekSek2Time übergeben werden! Fehler unklar, vielleicht enthält
+    #  die Variable ein unsauberes, verstecktes Steuerzeichen.
+    i_DauerHMS=${i_Dauer//.*/}
+    i_DauerHMS=${i_DauerHMS//\:/\\\:}
+    i_DauerHMS="0"$i_DauerHMS
+    
+    # -intDauerDateiKomplett wird deshalb ganz neu aus der Anzahl der Gesamtsekunden berechnet:
+    intDauer=`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 $1`
+    intDauerDateiKomplett=${intDauer//.*/}
+    intDauerDateiKomplett=`fncTime2SekSek2Time "$intDauerDateiKomplett"`
+    
+    strQuelleDateiExtension=${1//*./}
+    
+    #strFERTIGdateiPFAD=${1%$2}"_$datei"$3
+    #strFERTIGdateiPFAD=${1//.*/}"_$datei"$3
+    strFERTIGdateiPFAD=${1//.$strQuelleDateiExtension/}"_$datei"$3
+    
+    boxCOLORtxt="white"
+    #boxCOLORbackground="0xcccccc"
+    #boxCOLORbackground="black@0.8"
+    boxCOLORbackground="0xcccccc"
+    boxCOLORborderTXT="0x000000"
+    boxWborder="4"
+    boxWborderTXT="2"
+    boxSIZEfont="18"
+    boxXY="10"
+    
+    # -Datei sichern:
+    quelleBAK=$1".$datei.bak"
+    mv $1 $quelleBAK
+    
+    # -Wegen ffmpeg MoovAtomInputfile Fehler wird der Outputfile Dateiname erweitert:
+    strOUTPUTatom=".NEU$3"
+
+    # -'-v': Den Ausgabelevel von ffmpeg einstellen. Mögliche Werte:
+    #  quiet panic fatal error warning info (Standard) verbose debug trace
+    strFFMPEGverbose="info"
+    strFFMPEGcodecCOPY="-c:v copy -c:a copy"
+    strFFMPEGcodecCOPY="-vcodec copy -acodec copy"
+    dateiLOGStmp=$dateiLOGS".tmp"
+    
+    #fncECHOlx "|- INFO --- ffmpeg wird ausgeführt..."
+    
+    
+    # -Optionen beim Umwandeln:
+    # --50% Wiedergabegeschwindigkeit:
+    #   -filter_complex "[0:v]setpts=2*PTS[v];[0:a]atempo=0.5[a]" -map "[v]" -map "[a]"
+    # --25% Wiedergabegeschwindigkeit:
+    #   -filter_complex "[0:v]setpts=4*PTS[v];[0:a]atempo=0.5,atempo=0.5[a]" -map "[v]" -map "[a]"
+    
+    #kdialog --title "DEBUG.$datei.vorFFMPEG" --passivepopup "--- ffmpeg PID: $checkBEFEHLpid<br><br>--- Taste: $eingabeTASTE" 10 --geometry=260x100 &
+    
+    
+#     if ( [[ "$optionenZIEL" == *codecsCOPYCutEnde4s ]] && [[ ${intDauer%.*} -le 4 ]] )
+#     then
+#         optionenZIEL=${optionenZIEL//codecsCOPYCutEnde4s/codecsCOPY}
+#     fi
+    
+    infoFFMPEGzusatzFEATURES=""
+    if ( [[ "$flagFFMPEGcheckTXTBOX" == "true" ]] )
+    then
+        [[ "$optionenZIEL" == *txtNAME ]] && infoFFMPEGzusatzFEATURES="'TXTBOX:Name anzeigen'"
+        [[ "$optionenZIEL" == *txtDAUER ]] && infoFFMPEGzusatzFEATURES="'TXTBOX:Dauer anzeigen'"
+        [[ "$optionenZIEL" == *txtNAMEtxtDAUER ]] && infoFFMPEGzusatzFEATURES="'TXTBOX:Name.Dauer anzeigen'"
+    fi
+    [[ "$optionenZIEL" == *codecsCOPY ]] && infoFFMPEGzusatzFEATURES="'Codecs-Copy'"
+    [[ "$optionenZIEL" == *codecsCOPYCutEnde4s ]] && infoFFMPEGzusatzFEATURES="'Codecs-Copy, Ende 4s entfernen'"
+    [[ "$optionenZIEL" == *HDCutEnde4s ]] && infoFFMPEGzusatzFEATURES="'Ende 4s entfernen'"
+
+    txtBEFEHLaufloesung=""
+    txtBEFEHLframerate=""
+    if ( [[ "$flagFFMPEGcheckHDVIDEO" == "true" ]] )
+    then
+        fncFFMPEGbefehlAUFLOESUNGFRAMERATE "$quelleBAK"
+        [ ! -z "$infoFFMPEGzusatzFEATURES" ] && infoFFMPEGzusatzFEATURES=$infoFFMPEGzusatzFEATURES" + "
+        infoFFMPEGzusatzFEATURES=$infoFFMPEGzusatzFEATURES"'HD Format erstellen'"
+    fi
+    infoFFMPEGzusatzFEATURESoriginal="$infoFFMPEGzusatzFEATURES"
+    
+    #[ ! -z "$infoFFMPEGzusatzFEATURES" ] && infoFFMPEGzusatzFEATURES="|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Optionen: "$infoFFMPEGzusatzFEATURES" - "$txtBEFEHLaufloesung$txtBEFEHLframerate
+    [ ! -z "$infoFFMPEGzusatzFEATURES" ] && infoFFMPEGzusatzFEATURES="|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Optionen: "$infoFFMPEGzusatzFEATURES
+    
+    
+    # DEBUG-Info:
+    intSSpopup="15"
+    #kdialog --title "$datei.Info `fncHHMMSS 'norm.mS2'`" --passivepopup "<b>Optionen:</b><br>Auflösung: $txtBEFEHLaufloesung<br>Framerate: $txtBEFEHLframerate<br><br>$intSSpopup sek - PID: $checkBEFEHLpid - $flagENDE" $intSSpopup --geometry=400x160 &
+    
+    case "$optionenZIEL" in
+        ( *txtNAME )
+            # Den entsprechenden FFMPEG Befehl ausführen: umwandeln, TXTBOX Name, ggf HD
+            ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -vf "drawtext=fontfile=DejaVuSansMono.ttf: text='\\$strFERTIGdateiNAME': x=$boxXY: y=$boxXY: fontcolor=$boxCOLORtxt: fontsize=$boxSIZEfont: box=0: boxcolor=$boxCOLORbackground: boxborderw=$boxWborder: bordercolor=$boxCOLORborderTXT: borderw=$boxWborderTXT" -metadata comment="$strFERTIGcomment" $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            ;;
+        ( *txtDAUER )
+            # Den entsprechenden FFMPEG Befehl ausführen: umwandeln, TXTBOX Dauer, ggf HD
+            ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -vf "drawtext=fontfile=DejaVuSansMono.ttf: text='%{pts\:gmtime\:0\:%H\\\\\\:%M\\\\\\:%S}/\\$i_DauerHMS': x=(w-tw-$boxXY): y=$boxXY: fontcolor=$boxCOLORtxt: fontsize=$boxSIZEfont: box=0: boxcolor=$boxCOLORbackground: boxborderw=$boxWborder: bordercolor=$boxCOLORborderTXT: borderw=$boxWborderTXT" -metadata comment="$strFERTIGcomment" $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            ;;
+        ( *txtNAMEtxtDAUER )
+            # Den entsprechenden FFMPEG Befehl ausführen: umwandeln, TXTBOX Name, TXTBOX Dauer, ggf HD
+            ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -vf "drawtext=fontfile=DejaVuSansMono.ttf: text='\\$strFERTIGdateiNAME': x=$boxXY: y=$boxXY: fontcolor=$boxCOLORtxt: fontsize=$boxSIZEfont: box=0: boxcolor=$boxCOLORbackground: boxborderw=$boxWborder: bordercolor=$boxCOLORborderTXT: borderw=$boxWborderTXT, drawtext=fontfile=DejaVuSansMono.ttf: text='%{pts\:gmtime\:0\:%H\\\\\\:%M\\\\\\:%S}/\\$i_DauerHMS': x=(w-tw-$boxXY): y=$boxXY: fontcolor=$boxCOLORtxt: fontsize=$boxSIZEfont: box=0: boxcolor=$boxCOLORbackground: boxborderw=$boxWborder: bordercolor=$boxCOLORborderTXT: borderw=$boxWborderTXT" -metadata comment="$strFERTIGcomment" $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            ;;
+        ( *codecsCOPY )
+            # Den entsprechenden FFMPEG Befehl ausführen: Codecs werden nur kopiert!
+            ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -metadata comment="$strFERTIGcomment" $strFFMPEGcodecCOPY $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            ;;
+        ( *codecsCOPYCutEnde4s )
+            # Den entsprechenden FFMPEG Befehl ausführen: Codecs werden nur kopiert und am Ende 4 Sekunden entfernt!
+            #ffmpeg -t `echo -e "$(ffprobe -v quiet ende-cut_01.mp4 -show_format 2>&1 | sed -n 's/duration=//p') - 4" | bc` -i ende-cut_01.mp4 -c copy ende-cut_01.ffprobe-4.mp4
+            # intDauer (123.45678) kann direkt verwendet werden.
+            if ( [[ ${intDauer%.*} -le 4 ]] )
+            then
+                ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -metadata comment="$strFERTIGcomment" $strFFMPEGcodecCOPY $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            else
+                intDauerCutEnde4s=`echo -e "$intDauer - 4" | bc`
+                ffmpeg -t $intDauerCutEnde4s -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -metadata comment="$strFERTIGcomment" $strFFMPEGcodecCOPY $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            fi
+            ;;
+        ( *HDCutEnde4s )
+            # Den entsprechenden FFMPEG Befehl ausführen: ggf HD und am Ende 4 Sekunden entfernt!
+            #ffmpeg -t `echo -e "$(ffprobe -v quiet ende-cut_01.mp4 -show_format 2>&1 | sed -n 's/duration=//p') - 4" | bc` -i ende-cut_01.mp4 -c copy ende-cut_01.ffprobe-4.mp4
+            # intDauer (123.45678) kann direkt verwendet werden.
+            if ( [[ ${intDauer%.*} -le 4 ]] )
+            then
+                ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -metadata comment="$strFERTIGcomment" $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            else
+                intDauerCutEnde4s=`echo -e "$intDauer - 4" | bc`
+                ffmpeg -t $intDauerCutEnde4s -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -metadata comment="$strFERTIGcomment" $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            fi
+            ;;
+        ( * )
+            # Den entsprechenden FFMPEG Befehl ausführen: umwandeln, mit Standard System Codecs
+            #ffmpeg -v $strFFMPEGverbose -i $quelleBAK -metadata comment="$strFERTIGcomment" $strFFMPEGcodecCOPY $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            #ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -metadata comment="$strFERTIGcomment" $strFERTIGdateiPFAD$strOUTPUTatom > $dateiLOGStmp 2>&1 &
+            #ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -metadata comment="$strFERTIGcomment" $strFFMPEGcodecCOPY $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -metadata comment="$strFERTIGcomment" $strFERTIGdateiPFAD$strOUTPUTatom >> $dateiLOGS 2>&1 &
+            ;;
+    
+    esac
+    
+    #ffmpeg -v $strFFMPEGverbose -i $quelleBAK$txtBEFEHLaufloesung$txtBEFEHLframerate -vf "drawtext=fontfile=DejaVuSansMono.ttf: text='\\$strFERTIGdateiNAME': x=$boxXY: y=$boxXY: fontcolor=$boxCOLORtxt: fontsize=$boxSIZEfont: box=0: boxcolor=$boxCOLORbackground: boxborderw=$boxWborder: bordercolor=$boxCOLORborderTXT: borderw=$boxWborderTXT, drawtext=fontfile=DejaVuSansMono.ttf: text='%{pts\:gmtime\:0\:%H\\\\\\:%M\\\\\\:%S}/\\$i_DauerHMS': x=(w-tw-$boxXY): y=$boxXY: fontcolor=$boxCOLORtxt: fontsize=$boxSIZEfont: box=0: boxcolor=$boxCOLORbackground: boxborderw=$boxWborder: bordercolor=$boxCOLORborderTXT: borderw=$boxWborderTXT" -metadata comment="$strFERTIGcomment" $strFERTIGdateiPFAD$strOUTPUTatom > $dateiLOGStmp 2>&1 &
+    checkBEFEHLreturn=$?
+    checkBEFEHLpid=$!
+    
+    # function fncCHECKpaket {
+    # if `apt list cpulimit --installed | grep cpulimit` == *cpulimit*
+    # ... return true
+    # }
+    #cpulimit -q -z -c 2 -l 80 -p $checkBEFEHLpid &
+    cpulimit -p $checkBEFEHLpid -q -z -c 2 -l 60 &
+    fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Quelle: $2 - Ziel: $3 - PID: $checkBEFEHLpid"
+    
+    
+    stsFFMPEGbefehlAUFRUF="ffmpeg -i $quelleBAK [Optionen] $strFERTIGdateiPFAD"
+    arrPIDSbefehlFFMPEG=(`ps -C ffmpeg -o pid=`)
+    for iPIDS in "${arrPIDSbefehlFFMPEG[@]}"
+    do
+        iPIDSbefehlAUFRUF="`ps -p $iPIDS -o args=`"
+        [[ "$iPIDSbefehlAUFRUF" == *$quelleBAK* ]] && stsFFMPEGbefehlAUFRUF="$iPIDSbefehlAUFRUF" && break
+    done
+    
+    
+    #stsFFMPEGbefehlAUFRUF2="`ps -C ffmpeg -o args=`"
+#     fncECHOlxL "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- $stsFFMPEGbefehlAUFRUF"
+#     stsFFMPEGbefehlAUFRUF=${stsFFMPEGbefehlAUFRUF//\-vf*/\-vf...}
+#     fncECHOlxD "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- $stsFFMPEGbefehlAUFRUF"
+    fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- $stsFFMPEGbefehlAUFRUF"
+    #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- $stsFFMPEGbefehlAUFRUF2"
+    
+    fncECHOlx "$infoFFMPEGzusatzFEATURES"
+    
+    #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "+- ffmpeg: Befehl wird ausgeführt... - Abbrechen: 'q' - Statusinfo: 'i'"
+    #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "+- $intID: Befehl wird ausgeführt... - Abbrechen: 'q' - Statusinfo: 'i'"
+    #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Befehl wird ausgeführt... - Optionen: i, h (Hilfe), f, w, q, e"
+    fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+- Befehl wird ausgeführt... - Optionen: i, h (Hilfe), f, w, q, e"
+    
+    #kdialog --title "DEBUG.$datei.nachFFMPEG" --passivepopup "--- ffmpeg PID: $checkBEFEHLpid<br><br>--- Taste: $eingabeTASTE" 10 --geometry=260x100 &
+    
+    function getCPos { 
+        local v=() t=$(stty -g)
+        stty -echo
+        printf "\033[6n"
+        IFS='[;' read -ra v -d R
+        stty $t
+        CPos=(${v[@]:1})
+    }
+    typeset -i cursorZEILE=0
+    getCPos
+    cursorZEILE=$CPos
+    
+    function fncCURSORzeileAKTUELLspalteNULL {
+        typeset -i cursorZEILE=0
+        getCPos
+        cursorZEILE=$CPos
+        #tput cup $cursorZEILE 0
+    }
+    
+    exec >/dev/null 2>&1
+    
+    
+    
+    
+    function fncSTARTpsCHECKMODE {
+        # -Überwacht Hauptprozess wegen BUGReadTimeout!
+        
+        #checkmodePIDHAUPT=$1
+        #WAKEUPcheckINTERVALL=$2
+        typeset -i checkmodeSEKreloadMAX=60
+        typeset -i checkmodeSEKintervall=10
+        
+        # -Aufruf innerhalb des Hauptprozess: $dateiCACHEcheckFNC wird neu gesetzt!
+        # --$1 muss "inside" sein
+        # --$2 muss die BASHPID des Hauptprozess sein
+        if ( [[ "$1" == "inside" ]] && [[ "$2" ]] )
+        then
+            typeset -i intUTCsekunden=0
+            typeset -i intUTCsekundenRELOAD=0
+            intUTCsekunden=`date '+%s'`
+            intUTCsekundenRELOAD=intUTCsekunden+checkmodeSEKreloadMAX
+            #fncDEBUGstart "fncSTARTpsCHECKMODE"
+            echo -e "$intUTCsekundenRELOAD\\n$2" > $dateiCACHEcheckFNC
+            #fncDEBUGstop "fncSTARTpsCHECKMODE"
+            return 0;
+        fi
+        
+        
+        flagCHECKTASTEgestartet="true"
+        # -Cache Datei anlegen und erstmals füllen:
+        typeset -i intUTCsekunden=0
+        typeset -i intUTCsekundenRELOAD=0
+        intUTCsekunden=`date '+%s'`
+        intUTCsekundenRELOAD=intUTCsekunden+checkmodeSEKreloadMAX
+        echo -e "$intUTCsekunden\\n...START..." > $dateiCACHEcheckFNC
+#         exec >`tty` 2>&1
+#         [[ -f "$dateiCACHEcheckFNC" ]] && fncECHOlx "|- "`fncHHMMSS`" --- Cache angelegt: $dateiCACHEcheckFNC - $intUTCsekunden"
+#         exec >/dev/null 2>&1
+        
+        
+        # -WHILE läuft während Hauptprozess läuft! D.h. Hauptprozess schreibt alle 10 Sekunden
+        #  die $dateiCACHEcheckFNC neu, passiert das länger als $checkmodeSEKreloadMAX nicht mehr,
+        #  wird der Hauptprozess gekillt!
+        while [[ "$flagCHECKTASTEgestartet" == "true" ]]
+        do
+            # -Zeitintervall beachten:
+            sleep $checkmodeSEKintervall
+            typeset -i i=0
+            while read arrEINLESEN[$i]
+            do
+                i=i+1
+            done < $dateiCACHEcheckFNC
+            checkmodeSEKreloadDATEI=${arrEINLESEN[0]}
+            checkmodePIDHAUPT=${arrEINLESEN[1]}
+            #fncDEBUGstart "INTERVALL-checkmode"
+            #[ $checkmodeSEKreloadDATEI -lt $intUTCsekundenRELOAD ] && flagCHECKTASTEgestartet="false" && fncECHOlx "|- "`fncHHMMSS`" --- checkmode Sekunden: $checkmodeSEKreloadDATEI - $intUTCsekundenRELOAD"
+            [ $checkmodeSEKreloadDATEI -lt $intUTCsekundenRELOAD ] && flagCHECKTASTEgestartet="false"
+            
+            intUTCsekunden=`date '+%s'`
+            intUTCsekundenRELOAD=intUTCsekunden+checkmodeSEKreloadMAX
+            # -Hauptprozess prüfen: $checkmodePIDHAUPT
+            #[ `ps -p $checkmodePIDHAUPT -o pid=` ] || fncECHOlx "|- "`fncHHMMSS`" --- checkmode Prozess: $checkmodePIDHAUPT nicht gefunden"
+            [ `ps -p $checkmodePIDHAUPT -o pid=` ] || flagCHECKTASTEgestartet="false"
+            #fncDEBUGstop "INTERVALL-checkmode"
+            
+            # -Einmalig CheckTasteFunktion aufrufen:
+            #[[ "$flagCHECKTASTEgestartet" == "false" ]] && fncCHECKtaste & && checkmodePIDtaste=$! && flagCHECKTASTEgestartet="true"
+        done
+        fncKILLpid $checkmodePIDHAUPT
+        
+        # -Um Überschneidungen zu vermeiden:
+        #sleep $checkmodeSEKreloadMAX
+        [ -f $strFERTIGdateiPFAD$strOUTPUTatom ] && exec >`tty` 2>&1 && fncECHOlx "|- "`fncHHMMSS`" --- checkmodePIDHAUPT: BUGReadTimeout - PID: $BASHPID" && echo -e "BUGReadTimeout" > $dateiCACHEflagENDE
+        #[ -f $strFERTIGdateiPFAD$strOUTPUTatom ] && fncCHECKtaste && fncECHOlx "|- "`fncHHMMSS`" --- checkmodePIDHAUPT: BUGReadTimeout ---"
+        
+        #fncDEBUGstop "fncSTARTpsCHECKMODE"
+    }
+    
+    #exec >`tty` 2>&1
+    #fncECHOlx "|- "`fncHHMMSS`" --- vor FNC --- \$\$ PID: $$ - BASHPID: $BASHPID"
+    #exec >/dev/null 2>&1
+    #fncSTARTpsCHECKMODE $checkBEFEHLpid &
+    fncSTARTpsCHECKMODE &
+    pidFNCcheckmode=$!
+    
+    
+#     exec >`tty` 2>&1
+#     fncECHOlx "|- "`fncHHMMSS`" --- vor Subshell --- \$\$ PID: $$ - BASHPID: $BASHPID"
+#     exec >/dev/null 2>&1
+    ( fncCHECKtaste )
+    
+    # -$flagENDE aus Cachedatei auslesen:
+    while ( [[ ! -f "$dateiCACHEflagENDE" ]] )
+    do
+        sleep 0.1
+    done
+    flagENDE="`cat $dateiCACHEflagENDE`"
+    
+#     exec >`tty` 2>&1
+#     fncECHOlx "|- "`fncHHMMSS`" --- nach Subshell --- \$\$ PID: $$ - BASHPID: $BASHPID"
+#     exec >/dev/null 2>&1
+    
+    #wait $pidFNCcheckmode
+    
+    #pidCHECKtaste=$!
+    #wait
+    #fncKILLpid $pidCHECKtaste
+    
+    
+    function fncDATEIohnePFAD {
+        [ -z $1 ] && echo -e "Keine Datei übergeben!" && return
+        echo -e "${1//*\//}"
+    }
+    
+    stty echo
+    exec >`tty` 2>&1
+    
+    
+    
+    # -cpulimit mit --monitor-forks erzeugt dutzende weitere Aufrufe, daher:
+    #kill -9 `ps -C cpulimit -o pid=` >/dev/null 2>&1
+    
+    
+    
+    # -Den, wegen des MoovAtomInputfile Fehlers, neuen Outputfile Dateinamen nochmal zum
+    #  eigentlichen Namen zurück ändern:
+    fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Umbenennen: "`fncDATEIohnePFAD $strFERTIGdateiPFAD$strOUTPUTatom`" zu "`fncDATEIohnePFAD $strFERTIGdateiPFAD`
+    mv $strFERTIGdateiPFAD$strOUTPUTatom $strFERTIGdateiPFAD
+    while ( [[ ! -f "$strFERTIGdateiPFAD" ]] )
+    do
+        sleep 0.1
+    done
+    
+    # -Zieldatei prüfen und Sicherung löschen:
+    if ( [[ -f "$strFERTIGdateiPFAD" ]] )
+    then
+        nix=1
+        intDauer=${intDauer//.*/}
+        
+        #exec >`tty` 2>&1
+        getCPos
+        cursorZEILE=$CPos
+        cursorZEILE=cursorZEILE-1
+        tput cup $cursorZEILE 0
+        cursorZEILE=cursorZEILE+1
+        #intDauerZIEL=`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 $strFERTIGdateiPFAD`
+        intDauerZIEL=`ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 $strFERTIGdateiPFAD`
+        #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- START while-ffprobe-Dauer"
+        typeset -i intWHILEzz=0
+        while ( [[ "$intDauerZIEL" == "" ]] && [[ "$intWHILEzz" -lt 10 ]] )
+        do
+            intWHILEzz=intWHILEzz+1
+            sleep 0.2
+            #intDauerZIEL=`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 $strFERTIGdateiPFAD`
+            intDauerZIEL=`ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 $strFERTIGdateiPFAD`
+        done
+        [[ "$intDauerZIEL" == "" ]] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- FEHLER: Länge der Zieldatei kann nicht ermittelt werden!"
+        [[ "$intDauerZIEL" == "" ]] && intDauerZIEL="0"
+        #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- ENDE while-ffprobe-Dauer"
+        intDauerZIEL=${intDauerZIEL//.*/}
+        #exec >`tty` 2>&1
+        #fncECHOlx "|- DEBUG --- intDauer: $intDauer - intDauerZIEL: $intDauerZIEL"
+        if ( [[ "$intDauer" -gt "$intDauerZIEL" ]] && [[ "$optionenZIEL" != *CutEnde4s* ]] )
+        then
+            # -Umwandlung war NICHT erfolgreich:
+            #
+            fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- FEHLER: Zieldatei beschädigt oder unvollständig! Soll: $intDauer Ist: $intDauerZIEL"
+            strFERTIGdateiPFADsicherung=${strFERTIGdateiPFAD//$3/.bak.$intDauerZIEL$3}
+            [ -f "$strFERTIGdateiPFADsicherung" ] && strFERTIGdateiPFADsicherung=${strFERTIGdateiPFAD//$3/.bak."$$"$3}
+            mv $strFERTIGdateiPFAD $strFERTIGdateiPFADsicherung && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "-> Fehlerhafte Zieldatei gesichert: `fncDATEIohnePFAD $strFERTIGdateiPFADsicherung`"
+            mv $quelleBAK $1 && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "-> Quelldatei wiederhergestellt: `fncDATEIohnePFAD $1`"
+#             flagFEHLERffmpegDAUER="true"
+#             txtFEHLERtmp="|- "`fncHHMMSS`" FEHLER: Folgende Datei wurde nicht erfolgreich abgeschlossen: $strFERTIGdateiNAME"
+#             if ( [[ "$txtFEHLERffmpeg" == "" ]] )
+#             then
+#                 txtFEHLERffmpeg=$txtFEHLERtmp
+#             else
+#                 txtFEHLERffmpeg=$txtFEHLERffmpeg"\\n"$txtFEHLERtmp
+#             fi
+#             txtFEHLERtmp=""
+        else
+            # -Umwandlung war erfolgreich:
+            #
+            # -TODO: Dateigröße vorher/nachher erfassen!
+            [[ "$flagBAKaction" == "rm" ]] && rm $quelleBAK && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Quelldatei wurde erfolgreich gelöscht! - `fncDATEIohnePFAD $quelleBAK`"
+            [[ "$flagBAKaction" == "cp" ]] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Quelldatei wurde erfolgreich gesichert! - `fncDATEIohnePFAD $quelleBAK`"
+            [[ "$flagBAKaction" == "uvz" ]] && [[ ! -d "$iQUELLE$BAKuvz" ]] && mkdir $iQUELLE$BAKuvz
+            [[ "$flagBAKaction" == "uvz" ]] && mv $quelleBAK $iQUELLE$BAKuvz"/"`fncDATEIohnePFAD $quelleBAK` && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- Quelldatei wurde erfolgreich im Unterverzeichnis ($BAKuvz) gesichert! - `fncDATEIohnePFAD $quelleBAK`"
+            #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ ">> Befehl wurde erfolgreich beendet! - `fncDATEIohnePFAD $strFERTIGdateiPFAD`"
+            fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+> Befehl wurde erfolgreich beendet! - `fncDATEIohnePFAD $strFERTIGdateiPFAD`"
+        fi
+        #[ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "--"
+        [ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`
+        fncECHOlx "|- "`fncHHMMSS`
+    else
+        exec >`tty` 2>&1
+    fi
+    
+    # -TMP Logdatei löschen:
+    [ -f "$dateiLOGStmp" ] && rm $dateiLOGStmp
+    # -Cachedatei löschen:
+    [ -f "$dateiCACHEcheckFNC" ] && rm $dateiCACHEcheckFNC
+    [ -f "$dateiCACHEflagENDE" ] && rm $dateiCACHEflagENDE
+    
+
+    # -Zur einfacheren Kontrolle wird Bild aus Video generiert:
+    #ffmpeg -r 25 -i $strFERTIGdateiPFAD -an -ss 0:0:1 -t 0:0:1 -vf fps=1/1 -s 1280x720 ${1%$2}_%03d.jpg
+    
+    #fncECHOlx "|-"
+
+}
+# ----- ENDE fncFFMPEG ----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+#fncECHOlx "|- INFO --- Zeit: "`date`
+
+
+# -----------------------------------------------------------------------------
+# ----- START der Quellen Schleife --------------------------------------------
+#echo -e "--- DEBUG: eingabeQUELLEkomplett: $eingabeQUELLEkomplett"
+eingabeQUELLEarray=($eingabeQUELLEkomplett)
+flagAUSGABEkopf="true"
+flagFEHLERffmpegDAUER="false"
+flagENDE=""
+txtFEHLERffmpeg=""
+
+for iQUELLE in "${eingabeQUELLEarray[@]}"
+do
+    [[ "$iQUELLE" != */ ]] && iQUELLE=$iQUELLE"/"
+    [[ "$flagAUFRUFintern" != "true" ]] && dateiLOGS="$iQUELLE""$dateiLOGSohnePFAD" && dateiLOGSsicherung="$iQUELLE""$dateiLOGSsicherungOriginal"
+    [[ "$flagAUFRUFintern" == "true" ]] && dateiLOGS="$dateiLOGSglobal"
+    dateiTESTMODEls="$iQUELLE$dateiTESTMODElsOriginal"
+    dateiCACHEcheckFNC="$iQUELLE""$dateiCACHEcheckFNCOriginal"
+    dateiCACHEflagENDE="$iQUELLE""$dateiCACHEflagENDEOriginal"
+    
+    optionenZIELinfoTXT="$optionenZIEL"
+    [[ "$optionenZIEL" == "" ]] && optionenZIELinfoTXT="keine"
+    
+    if ( [[ "$flagAUFRUFintern" != "true" ]] )
+    then
+        if ( [[ "$flagAUSGABEkopf" == "true" ]] )
+        then
+            fncClearX
+            echo -en "" > $dateiLOGS
+            fncECHOlx "$txtKOPF"
+            fncECHOlx "|- Quellverzeichnis:\\t$eingabeQUELLEkomplett"
+            fncECHOlx "|- Dateityp Auswahl:\\t$MimeTypeAuswahl"
+            fncECHOlx "|- Dateiformat Quelle:\\t$extension \\tDateiformat Ziel:\\t$extensionZIEL"
+            fncECHOlx "|- Sicherheitskopie:\\t$flagBAKaction \\tOptionen Ziel:"\ \ \ "\\t$optionenZIELinfoTXT"
+            
+            [[ "$flagTESTMODEliste" == "true" ]] && txtTestmodeTitelZusatz=" (mit Speichern)"
+            [[ "$flagTESTDRIVE" == "true" ]] && fncECHOlx "|- Info: Der $txtTESTMODEtitel""$txtTestmodeTitelZusatz ist eingeschaltet!"
+            fncECHOlx "|-"
+            
+            #[[ "$flagTESTMODEliste" == "true" ]] && [ ! -f $dateiTESTMODEls ] && cp "$dateiLOGS" "$dateiTESTMODEls" && echo -e "|- $txtTESTMODEtitel:" >> $dateiTESTMODEls
+            [[ "$flagTESTMODEliste" == "true" ]] && [ ! -f $dateiTESTMODEls ] && cp "$dateiLOGS" "$dateiTESTMODEls"
+            
+            fncECHOlx "|- Wichtige Befehle während $datei ausgeführt wird:"
+            fncECHOlx "|- $txtNOtagsHILFEoptionenFFMPEGliste3"
+            fncECHOlx "|- $txtNOtagsHILFEoptionenFFMPEGliste4"
+            fncECHOlx "|- $txtNOtagsHILFEoptionenFFMPEGliste5"
+            
+            #fncECHOlx "|- $datei wird mit folgenden Optionen gestartet:"
+            #fncECHOlx "|- -Dateiformat Quelle:\\t$extension"
+            #fncECHOlx "|- -Dateiformat Ziel:\\t$extensionZIEL"
+        else
+            echo -en "" > $dateiLOGS
+            fncECHOlxL "$txtKOPF"
+            fncECHOlxL "|- Quellverzeichnis:\\t$eingabeQUELLEkomplett"
+            fncECHOlxL "|- Dateityp Auswahl:\\t$MimeTypeAuswahl"
+            fncECHOlxL "|- Dateiformat Quelle:\\t$extension \\tDateiformat Ziel:\\t$extensionZIEL"
+            fncECHOlxL "|- Sicherheitskopie:\\t$flagBAKaction \\tOptionen Ziel:"\ \ \ "\\t$optionenZIELinfoTXT"
+            
+            [[ "$flagTESTMODEliste" == "true" ]] && txtTestmodeTitelZusatz=" (mit Speichern)"
+            [[ "$flagTESTDRIVE" == "true" ]] && fncECHOlxL "|- Info: Der $txtTESTMODEtitel""$txtTestmodeTitelZusatz ist eingeschaltet!"
+            fncECHOlx "|-"
+            
+            #fncECHOlxL "|- $datei wird mit folgenden Optionen gestartet:"
+            #fncECHOlxL "|- -Dateiformat Quelle:\\t$extension"
+            #fncECHOlxL "|- -Dateiformat Ziel:\\t$extensionZIEL"
+        fi
+        flagAUSGABEkopf="false"
+    fncECHOlx "|-"
+    fi
+    
+    
+    #fncDEBUGstart
+    
+    
+    typeset -i intIDfortlaufend=0
+    intID=`printf %03d $intIDfortlaufend`
+    
+    
+#     fncECHOlx "|-"
+#     fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+- Verzeichnis: $iQUELLE"
+    
+    
+    #for ia in $(ls --group-directories-first $iQUELLE)
+    typeset -i iaLSarrayZZ=0
+    #iaLSarray=(`ls --group-directories-first $iQUELLE`)
+    iaLSarray=(`ls $iQUELLE*$extension 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    iaLSarray=(`ls --group-directories-first $iQUELLE 2>/dev/null`)
+    
+    
+    intAnzahlID=`printf %03d $iaLSarrayANZAHL`
+    txtAnzahlID="/$intAnzahlID"
+    
+    
+    suchpfadVERZEICHNIS="$iQUELLE"*
+    suchpfadDATEIEN="$iQUELLE"*"$extension"
+    [[ "$extension" == ".alle" ]] && suchpfadDATEIEN="$iQUELLE"*".*"
+    
+    
+    # -Leerzeichen Kontrolle:
+    flagLEERZEICHEN="false"
+    for ia in $suchpfadDATEIEN
+    do
+        flagLEERZEICHEN=${ia// /true}
+        [[ "$flagLEERZEICHEN" == *true* ]] && /home/lx21/bin/lxRENAME "$suchpfadVERZEICHNIS" "false" "true" >> $dateiLOGS 2>&1 && break
+    done
+    
+    
+    # -Alte FOR Variante: als Array
+    #for ia in "${iaLSarray[@]}"
+    
+    
+    
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # -Neue FOR Variante: suchpfadDATEIEN
+    for ia in $suchpfadDATEIEN
+    do
+        #echo -e "DEBUG DATEIEN ia: $ia"
+        
+        #iaLSarrayZZ=iaLSarrayZZ+1
+        flagENDE=""
+        nix=0
+        i_Dateiname="$ia"
+        i_Dateiname=${ia//*\//}
+        i_DateinameOHNEext=${i_Dateiname//.*/}
+        extensionQuelleAktuell=${i_Dateiname//*./}
+        extensionCASEUP=${extensionQuelleAktuell^^}
+        strFERTIGdateiNAME=${i_Dateiname//.$extensionQuelleAktuell/$extensionZIEL}
+        strFERTIGcommentEXT=${extensionQuelleAktuell//./}"->"${extensionZIEL//./}
+        strFERTIGcommentHD=""
+        [[ "$optionenZIEL" == *HD* ]] && strFERTIGcommentHD="HD-Optimierung"
+        [[ "$strFERTIGcommentHD" != "" ]] && strFERTIGcommentHD="$strFERTIGcommentHD""_"
+        strFERTIGcommentTXTBOX=""
+        [[ "$optionenZIEL" == *txtNAME ]] && strFERTIGcommentTXTBOX="TXTBOX.Name"
+        [[ "$optionenZIEL" == *txtDAUER ]] && strFERTIGcommentTXTBOX="TXTBOX.Dauer"
+        [[ "$optionenZIEL" == *txtNAMEtxtDAUER ]] && strFERTIGcommentTXTBOX="TXTBOX.Name.Dauer"
+        [[ "$strFERTIGcommentTXTBOX" != "" ]] && strFERTIGcommentTXTBOX="_""$strFERTIGcommentTXTBOX"
+        strFERTIGcomment="[`fncYEAR1231 nurZAHLEN`-`fncHHMMSS nurZAHLEN`_$datei:$strFERTIGcommentHD""$strFERTIGcommentEXT""$strFERTIGcommentTXTBOX]"
+        
+        # DEBUG infos:
+        #echo -e "---"
+        #echo -e "DEBUG DATEIEN flagAUFRUFintern: $flagAUFRUFintern"
+        #echo -e "DEBUG DATEIEN ia: $ia\\tDateiname: $i_Dateiname\\tDateiname ZIEL: $strFERTIGdateiNAME"
+        #echo -e "DEBUG DATEIEN pfadQUELLE: $iQUELLE"
+        #echo -e "DEBUG DATEIEN pfadUVZ: $pfadUVZ"
+        #echo -e "DEBUG DATEIEN pfadDATEI: $pfadDATEI"
+        
+        if ( ( [[ -f  "$ia" ]] && [[ "$ia" == *$extension ]] ) || ( [[ -f  "$ia" ]] && [[ "$extension" == ".alle" ]] ) )
+        then
+            # -Sonderfall: Extension Quelle .alle
+            [[ "$extension" == ".alle" ]] && checkMEDIAINFO=`mediainfo --Inform='General;%InternetMediaType%' "$ia"` && [[ "$checkMEDIAINFO" != *$MimeTypeAuswahl* ]] && continue
+            
+            #[[ "$iQUELLE$ia" == *$extensionZIEL ]] && continue
+            
+            #[ $intIDfortlaufend -eq 0 ] && [[ "$flagAUFRUFintern" != "true" ]] && fncECHOlx "|-"
+            [ $intIDfortlaufend -eq 0 ] && [[ "$flagAUFRUFintern" != "true" ]] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+- Verzeichnis: $iQUELLE"
+            [ $intIDfortlaufend -eq 0 ] && [[ "$flagTESTMODEliste" == "true" ]] && echo -e "$iQUELLE" >> $dateiTESTMODEls
+            flagLAYOUTtrennzeile="true"
+            
+#             fncECHOlx "|- DEBUG --- UVZ: $pfadUVZ - EXT Quelle: $extension - EXT Ziel: $extensionZIEL"
+#             fncECHOlx "|- DEBUG --- Logdatei: $dateiLOGS - Optionen: $optionenZIEL - Sicherheitskopie: $flagBAKaction"
+#             fncECHOlx "|-"\\n"|- DEBUG --- $*"\\n"|-"
+            
+            iaLSarrayZZ=iaLSarrayZZ+1
+            intIDfortlaufend=intIDfortlaufend+1
+            intID=`printf %03d $intIDfortlaufend`
+            # --- $ia ist Datei in $iQUELLE Verzeichnis!!!
+            pfadDATEI="$ia"
+            #suchpfad=$ia/*$extension
+            
+            # -Wenn checkTXTBOX true ist, muss makeTXTBOX auch true sein!
+            # -Umgekehrt ist es möglich, dass nicht nach TXTBOX Dateien (also in denen die TXTBOX noch fehlt)
+            #  gesucht wird, aber dann makeTXTBOX gemacht werden kann
+            # -Wenn checkHDVIDEO true ist, muss makeHDVIDEO auch true sein!
+            
+            flagFFMPEGcheckTXTBOX="false"
+            # -Check Benutzereinstellung $flagFFMPEGcheckTXTBOX
+            [[ "$optionenZIEL" == *txt* ]] && flagFFMPEGcheckTXTBOX="true"
+            # -Zum Check ob TXTBOX Umwandlung nötig wäre, wird das Kommentar ausgelesen:
+            #[[ "$flagFFMPEGcheckTXTBOX" == "true" ]] && quelleCOMMENT=$(ffprobe -v quiet "$pfadDATEI" -show_format 2>&1 | sed -n 's/comment=//p') && quelleCOMMENT=${quelleCOMMENT//TAG:/}
+            quelleCOMMENT=$(ffprobe -v quiet "$pfadDATEI" -show_format 2>&1 | sed -n 's/comment=//p') && quelleCOMMENT=${quelleCOMMENT//TAG:/}
+            #fncECHOlx "|- DEBUG --- Quelle Kommentar: $quelleCOMMENT"
+            #fncECHOlx "|- DEBUG --- Ziel Kommentar: $strFERTIGcomment"
+            [[ -n "$quelleCOMMENT" ]] && strFERTIGcomment="$strFERTIGcomment --- $quelleCOMMENT"
+            
+            flagFFMPEGcheckHDVIDEO="false"
+            # -Check Benutzereinstellung $flagFFMPEGcheckHDVIDEO
+            [[ "$optionenZIEL" == *HD* ]] && flagFFMPEGcheckHDVIDEO="true"
+            # -Zum Check ob HD Umwandlung nötig wäre, wird fncFFMPEGbefehlAUFLOESUNGFRAMERATE benutzt:
+            txtBEFEHLaufloesung=""
+            txtBEFEHLframerate=""
+            checkBefehlAufloesungFramerate=""
+            [[ "$flagFFMPEGcheckHDVIDEO" == "true" ]] && fncFFMPEGbefehlAUFLOESUNGFRAMERATE "$pfadDATEI"
+            
+            [[ "$txtBEFEHLaufloesung" == "" ]] && [[ "$txtBEFEHLframerate" == "" ]] && checkBefehlAufloesungFramerate="WxH-0.Fps-0"
+            [[ "$txtBEFEHLaufloesung" != "" ]] && [[ "$txtBEFEHLframerate" == "" ]] && checkBefehlAufloesungFramerate="WxH-1.Fps-0"
+            [[ "$txtBEFEHLaufloesung" == "" ]] && [[ "$txtBEFEHLframerate" != "" ]] && checkBefehlAufloesungFramerate="WxH-0.Fps-1"
+            [[ "$txtBEFEHLaufloesung" != "" ]] && [[ "$txtBEFEHLframerate" != "" ]] && checkBefehlAufloesungFramerate="WxH-1.Fps-1"
+            
+#             fncECHOlx "|- DEBUG --- Quelle Kommentar: $quelleCOMMENT \\tOptionen Ziel: $optionenZIEL"
+#             fncECHOlx "|- DEBUG --- BEFEHL Auflösung - Framerate: $txtBEFEHLaufloesung - $txtBEFEHLframerate"
+            if ( ( [[ "$quelleCOMMENT" == *txtbox.name.dauer* ]] || [[ "$optionenZIEL" != *txt* ]] ) && [[ "$txtBEFEHLaufloesung" == "" ]] && [[ "$txtBEFEHLframerate" == "" ]] && [[ "$extensionCASEUP" == "$extensionZIELCASEUP" ]] && [[ "$optionenZIEL" != *codecsCOPY* ]] )
+            then
+                #txtINFOkeineUMWANDLUNG="Umwandlung nicht erforderlich!"
+                [[ "$optionenZIEL" != *txt* ]] && txtINFOkeineUMWANDLUNG="Umwandlung nicht erforderlich!"
+                [[ "$quelleCOMMENT" == *txtbox.name.dauer* ]] && txtINFOkeineUMWANDLUNG="Datei wurde bereits umgewandelt!"
+                [[ "$txtBEFEHLaufloesung" == "" ]] || [[ "$txtBEFEHLframerate" == "" ]] || [[ "$extensionCASEUP" == "$extensionZIELCASEUP" ]] && txtINFOkeineUMWANDLUNG="Umwandlung nicht erforderlich!"
+                
+                #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "-> $datei: Datei wurde bereits umgewandelt! - $strFERTIGdateiNAME"
+                #fncECHOlx "|- "`fncHHMMSS`" INFO "\ "-> $intID: Datei wurde bereits umgewandelt! - $strFERTIGdateiNAME"
+                fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "-> $txtINFOkeineUMWANDLUNG - $strFERTIGdateiNAME"
+                # -Abstandhalter Zeile:
+                #[ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "--"
+                #[ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`" INFO "\ \ \ ": "\ "--"
+                [ $iaLSarrayZZ -lt $iaLSarrayANZAHL ] && fncECHOlx "|- "`fncHHMMSS`
+                
+            else
+                nix=1
+                #[[ "$flagTESTDRIVE" != "true" ]] && fncECHOlx "--- DEBUG - $checkBefehlAufloesungFramerate - umwandeln - kein TESTMODE - $pfadDATEI"
+                #[[ "$flagTESTDRIVE" == "true" ]] && fncECHOlx "--- DEBUG - $checkBefehlAufloesungFramerate - umwandeln - TESTMODE - $pfadDATEI"
+                
+                [[ "$flagTESTDRIVE" != "true" ]] && fncFFMPEG "$pfadDATEI" "$extension" "$extensionZIEL"
+                [[ "$flagTESTDRIVE" == "true" ]] && fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "+- $txtTESTMODEtitel - $checkBefehlAufloesungFramerate - $pfadDATEI"
+                
+                [[ "$flagTESTMODEliste" == "true" ]] && echo -e "$pfadDATEI" >> $dateiTESTMODEls
+                
+#                 if ( [[ "$txtFEHLERffmpeg" == "" ]] )
+#                 then
+#                     # -Normaler Aufruf, erfolgreich, also keine Fehler!
+#                     #fncECHOlxL "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "-> UVZ wurde erfolgreich bearbeitet!"
+#                     fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "-> Datei ERFOLGREICH: $iQUELLE"
+#                 else
+#                     # -Normaler Aufruf, nicht erfolgreich, also mit Fehler!
+#                     #fncECHOlxL "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "-> Fehler! UVZ wurde nicht erfolgreich bearbeitet!"
+#                     fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "-> Datei FEHLER: $iQUELLE"
+#                 fi
+                #fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: "\ "-> nach fncFFMPEG: flagENDE: $flagENDE"
+        
+                #continue
+            fi
+        fi
+        
+        txtENDEeingabe=""
+        if ( [[ "$flagENDE" == *:BENUTZER.BEFEHL.f* ]] )
+        then
+            txtENDEeingabe="|- --Ihre Eingabe: \"f\" - Datei fertig bearbeiten: $strFERTIGdateiNAME\\n"
+        fi
+        if ( [[ "$flagENDE" == *:BENUTZER.BEFEHL.w* ]] )
+        then
+            txtENDEeingabe="$txtENDEeingabe|- --Ihre Eingabe: \"w\" - Aktuelle Bearbeitung abbrechen, dann Skript weiter ausführen.\\n"
+        fi
+        if ( [[ "$flagENDE" == *:BENUTZER.BEFEHL.q* ]] )
+        then
+            txtENDEeingabe="$txtENDEeingabe|- --Ihre Eingabe: \"q\" - Aktuelle Bearbeitung abbrechen, dann Skript beenden.\\n"
+            break
+        fi
+        if ( [[ "$flagENDE" == *:BENUTZER.BEFEHL.f* ]] )
+        then
+            txtENDEeingabe="$txtENDEeingabe|- --Ihre Eingabe: \"f\" - $datei wird beendet.\\n"
+            break
+        fi
+    done
+#     intIDfortlaufend=intIDfortlaufend+1
+#     intID=`printf %03d $intIDfortlaufend`
+    if ( [[ "$iaLSarrayANZAHL" -gt 0 ]] )
+    then
+        if ( [[ "$txtFEHLERffmpeg" == "" ]] )
+        then
+            # -Normaler Aufruf, erfolgreich, also keine Fehler!
+            #fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "+> ERFOLGREICH: $iQUELLE"
+            #fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ \ \ \ "+> ERFOLGREICH: $iQUELLE"
+            fncECHOlx "|- `fncHHMMSS` INFO $intID$txtAnzahlID: -+> ERFOLGREICH: $iQUELLE"
+        else
+            # -Normaler Aufruf, nicht erfolgreich, also mit Fehler!
+            #fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "+> FEHLER: $iQUELLE"
+            #fncECHOlx "|- `fncHHMMSS` INFO"\ \ \ \ \ \ \ "+> FEHLER: $iQUELLE"
+            fncECHOlx "|- `fncHHMMSS` INFO $intID$txtAnzahlID:"\ \ "+> FEHLER: $iQUELLE"
+        fi
+    fi
+    intIDfortlaufend=intIDfortlaufend+1
+    intID=`printf %03d $intIDfortlaufend`
+    
+    
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # -Neue FOR Variante: suchpfadVERZEICHNIS
+    for ia in $suchpfadVERZEICHNIS
+    do
+        [[ ! -d "$ia" ]] && continue
+        [[ "$ia" != */ ]] && ia=$ia"/"
+        intIDfortlaufend=0
+        intID=`printf %03d $intIDfortlaufend`
+        #echo -e "DEBUG VERZEICHNISSE ia: $ia"
+        #iaLSarrayZZ=iaLSarrayZZ+1
+        flagENDE=""
+        nix=0
+        i_Dateiname="$ia"
+        i_Dateiname=${ia//*\//}
+        i_DateinameOHNEext=${i_Dateiname//.*/}
+        strFERTIGdateiNAME=${i_Dateiname//$extension/$extensionZIEL}
+        
+#         strFERTIGcommentEXT=${extension//./}"->"${extensionZIEL//./}
+#         strFERTIGcommentHD=""
+#         [[ "$optionenZIEL" == *HD* ]] && strFERTIGcommentHD="HD-Optimierung"
+#         [[ "$strFERTIGcommentHD" != "" ]] && strFERTIGcommentHD="$strFERTIGcommentHD""_"
+#         strFERTIGcommentTXTBOX=""
+#         [[ "$optionenZIEL" == *txtNAME ]] && strFERTIGcommentTXTBOX="TXTBOX.Name"
+#         [[ "$optionenZIEL" == *txtDAUER ]] && strFERTIGcommentTXTBOX="TXTBOX.Dauer"
+#         [[ "$optionenZIEL" == *txtNAMEtxtDAUER ]] && strFERTIGcommentTXTBOX="TXTBOX.Name.Dauer"
+#         [[ "$strFERTIGcommentTXTBOX" != "" ]] && strFERTIGcommentTXTBOX="_""$strFERTIGcommentTXTBOX"
+#         strFERTIGcomment="[$datei:$strFERTIGcommentHD""$strFERTIGcommentEXT""$strFERTIGcommentTXTBOX]"
+        
+        # -Pfad zum UVZ zusammenbauen:
+        pfadUVZ=$ia
+        # DEBUG infos:
+        #echo -e "---"
+        #echo -e "DEBUG VERZEICHNISSE flagAUFRUFintern: $flagAUFRUFintern"
+        #echo -e "DEBUG VERZEICHNISSE ia: $ia\\tDateiname: $i_Dateiname\\tDateiname ZIEL: $strFERTIGdateiNAME"
+        #echo -e "DEBUG VERZEICHNISSE pfadQUELLE: $iQUELLE"
+        #echo -e "DEBUG VERZEICHNISSE pfadUVZ: $pfadUVZ"
+        #echo -e "DEBUG VERZEICHNISSE pfadDATEI: $pfadDATEI"
+
+        if ( [[ -d "$ia" ]] )
+        then
+            # --- $ia ohne Pfad ist Unterverzeichnis!!!
+            # -Pfad zum UVZ zusammenbauen:
+            #pfadUVZ=$iQUELLE$ia"/"
+            # -Prüfen ob im UVZ Dateien mit der richtigen Extension drin sind:
+            iaLSarrayUVZ=(`ls $pfadUVZ*$extension 2>/dev/null`)
+            iaLSarrayUVZANZAHL=${#iaLSarrayUVZ[@]}
+            [ $iaLSarrayUVZANZAHL -lt 1 ] && continue
+            #suchpfad=$ia/*$extension
+            #echo -e "-- DEBUG-ia: Unterverzeichnis: $pfadUVZ"
+#             if ( [[ "$iaLSarrayANZAHL" -gt 0 ]] || [[ "$flagAUFRUFintern" == "true" ]] )
+#             then
+#                 fncECHOlx "|- "`fncHHMMSS`
+#             fi
+            if ( [[ "$flagLAYOUTtrennzeile" == "true" ]] )
+            then
+                fncECHOlx "|- "`fncHHMMSS`
+            fi
+            flagLAYOUTtrennzeile="true"
+            fncECHOlx "|- "`fncHHMMSS`" INFO $intID$txtAnzahlID: -+- Verzeichnis: $pfadUVZ"
+            [[ "$flagTESTMODEliste" == "true" ]] && echo -e "$pfadUVZ" >> $dateiTESTMODEls
+            
+#             fncECHOlx "|- DEBUG --- UVZ: $pfadUVZ - EXT Quelle: $extension - EXT Ziel: $extensionZIEL"
+#             fncECHOlx "|- DEBUG --- Logdatei: $dateiLOGS - Optionen: $optionenZIEL - Sicherheitskopie: $flagBAKaction"
+#             fncECHOlx "|-"\\n"|- DEBUG --- $*"\\n"|-"
+            #fncECHOlx "|- DEBUG --- BEFEHL Auflösung - Framerate: $txtBEFEHLaufloesung - $txtBEFEHLframerate"
+            $0 "$pfadUVZ" "$extension" "$extensionZIEL" ":flagAUFRUFintern:" "$dateiLOGS" "$optionenZIEL" "$flagBAKaction" "$flagTESTDRIVE"
+            # -fncCHECKstatusDOaction:
+            [ $? -eq 20 ] && exit 20;
+            continue
+        fi
+        
+        txtENDEeingabe=""
+        if ( [[ "$flagENDE" == *:BENUTZER.BEFEHL.f* ]] )
+        then
+            txtENDEeingabe="|- --Ihre Eingabe: \"f\" - Datei fertig bearbeiten: $strFERTIGdateiNAME\\n"
+        fi
+        if ( [[ "$flagENDE" == *:BENUTZER.BEFEHL.w* ]] )
+        then
+            txtENDEeingabe="$txtENDEeingabe|- --Ihre Eingabe: \"w\" - Aktuelle Bearbeitung abbrechen, dann Skript weiter ausführen.\\n"
+        fi
+        if ( [[ "$flagENDE" == *:BENUTZER.BEFEHL.q* ]] )
+        then
+            txtENDEeingabe="$txtENDEeingabe|- --Ihre Eingabe: \"q\" - Aktuelle Bearbeitung abbrechen, dann Skript beenden.\\n"
+            break
+        fi
+        if ( [[ "$flagENDE" == *:BENUTZER.BEFEHL.f* ]] )
+        then
+            txtENDEeingabe="$txtENDEeingabe|- --Ihre Eingabe: \"f\" - $datei wird beendet.\\n"
+            break
+        fi
+    done
+    
+    
+    
+    
+    #fncDEBUGstop
+    
+    
+    if ( [[ "$flagENDE" == "" ]] )
+    then
+        flagENDE=":norm.ENDE:"
+    fi
+    
+    [ -n "$txtTESTMODEtitel" ] && txtTESTMODEtitelENDE="$txtTESTMODEtitel "
+    txtENDEwarumKOPF="|-\\n|- -Beenden Status: $txtTESTMODEtitelENDE\"$flagENDE\"\\n"
+    if ( [[ "$txtENDEeingabe" == "" ]] && [[ "$txtFEHLERffmpeg" == "" ]] )
+    then
+        txtENDEwarum="|- --ffmpeg.INFO: Keine Fehler.\\n|- --$datei.INFO: Wurde normal beendet.\\n"
+        txtSTRGerfolgreich=" erfolgreich"
+        #txtFEHLERnorm="|-"
+    else
+        if ( [[ "$txtFEHLERffmpeg" == "" ]] )
+        then
+            txtENDEwarum="|- --ffmpeg.INFO: Keine Fehler.\\n|- --$datei.INFO: Ende durch Benutzer!\\n"
+            txtSTRGerfolgreich=" durch den Benutzer"
+            #txtFEHLERnorm="|-"
+        else
+            # -Ende Meldung anhand des flagENDE ausgeben!!!
+            txtENDEwarum="|- --ffmpeg.WARNUNG: Fehler.\\n|- --$datei.INFO: Ende durch Skript/Benutzer!\\n"
+            txtSTRGerfolgreich=""
+            txtFEHLERffmpeg="$txtFEHLERffmpeg\\n"
+            #txtFEHLERnorm="|-\\n|- Bei der Ausführung des Skripts sind Fehler aufgetreten!\\n|- -Nähere Infos finden Sie in der Logdatei: '$datei -l'\\n|- -Beachten Sie auch die Ausgabe in der Konsole und prüfen Sie die Rechtevergabe\\n|- "\ "in den entsprechenden Verzeichnissen.\\n|- Fehlermeldungen:\\n"
+            txtFEHLERnorm="|-\\n|- -Bei der Ausführung des Skripts sind Fehler aufgetreten!\\n|- --Nähere Infos finden Sie in der Logdatei: '$datei -l'\\n|- --Beachten Sie auch die Ausgabe in der Konsole und prüfen Sie die Rechtevergabe\\n|- "\ \ "in den entsprechenden Verzeichnissen.\\n|-\\n|- -Fehlermeldungen:\\n"
+        fi
+    fi
+    txtENDEwarum="$txtENDEwarumKOPF$txtENDEwarum"
+    if ( [[ "$flagAUFRUFintern" == "true" ]] )
+    then
+        nix=0
+#         if ( [[ "$txtSTRGerfolgreich" != "" ]] )
+#         then
+#             # -Interner Aufruf, erfolgreich, also keine Fehler!
+#             #fncECHOlxL "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "-> UVZ wurde erfolgreich bearbeitet!"
+#             fncECHOlxL "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "-> ERFOLGREICH: $iQUELLE"
+#         else
+#             # -Interner Aufruf, nicht erfolgreich, also mit Fehler!
+#             #fncECHOlxL "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "-> Fehler! UVZ wurde nicht erfolgreich bearbeitet!"
+#             fncECHOlxL "|- `fncHHMMSS` INFO"\ \ \ \ ":"\ \ "-> FEHLER: $iQUELLE"
+#         fi
+    else
+        fncECHOlxL "|-"
+        fncECHOlxL "|- `fncHHMMSS` $datei wurde$txtSTRGerfolgreich beendet!"
+        fncECHOlxL "$txtFEHLERnorm$txtFEHLERffmpeg$txtENDEwarum|-"
+    fi
+    
+    if ( [[ "$flagAUFRUFintern" == "true" ]] && [[ "$txtFEHLERffmpeg" != "" ]] )
+    then
+        nix=1
+    fi
+    
+    
+    # -Bei internem Aufruf müssen die Fehlermeldungen an die obere Logdatei übergeben werden:
+    # --Zuerst in temporärer Logdatei speichern.
+    # --Wenn das Root-Skript fertig ist, werden die temporären Daten angehangen.
+    if ( [[ "$flagAUFRUFintern" == "true" ]] && [[ "$txtFEHLERffmpeg" != "" ]] )
+    then
+        nix=1
+    fi
+    if ( [[ "$flagENDE" == *:BENUTZER.BEFEHL.f* ]] )
+    then
+        break
+    fi
+
+
+
+
+
+
+
+
+
+# ----- START der Logs-Funktionen ---------------------------------------------
+# -Logdatei mit Zeilennummern versehen, damit Fehlermeldungen besser
+#  zugeordnet werden können!
+# --Zuerst alle Zeilennummern einfügen und dann den Fehlercheck starten.
+#
+function fncLOGSzeilennummern {
+    #fncDEBUGstart "Zeilennummern"
+    # -Maximale Anzahl an Zeilen ermitteln, damit klar ist wieviele Stellen für die
+    #  Zeilennummern gebraucht werden.
+    typeset -i intANZAHLzeichenZEILEN=0
+    typeset -i intZEILENNUMMER=0
+    intANZAHLzeilenLOGS=`wc -l $dateiLOGS`
+    #echo -e "--- DEBUG-INFO: Anzahl Zeilen: $intANZAHLzeilenLOGS"
+    intANZAHLzeilenLOGS=${intANZAHLzeilenLOGS// */}
+    #echo -e "--- DEBUG-INFO: Anzahl Zeilen: $intANZAHLzeilenLOGS"
+    intANZAHLzeichenZEILEN=`echo $intANZAHLzeilenLOGS | wc -m`
+    intANZAHLzeichenZEILEN=intANZAHLzeichenZEILEN-1
+    #echo -e "--- DEBUG-INFO: Anzahl Zeichen: $intANZAHLzeichenZEILEN"
+    
+    while read txtLOGS
+    do
+        #txtLOGStrESCAPE=`echo -e "$txtLOGS" | tr -d '\r\n'`
+        #txtLOGS="$txtLOGStrESCAPE"
+        echo -e "$txtLOGS" >> $dateiLOGStmp
+    done < $dateiLOGS
+    
+    while [ ! -f $dateiLOGStmp ]
+    do
+        sleep 0.1
+    done
+    mv $dateiLOGStmp $dateiLOGS
+    while [ ! -f $dateiLOGS ]
+    do
+        sleep 0.1
+    done
+    
+    while read txtLOGS
+    do
+        [[ "$txtLOGS" == "" ]] && continue
+        intZEILENNUMMER=intZEILENNUMMER+1
+        #echo -e "--- DEBUG ---"
+        #echo -e "--- DEBUG --- txtLOGS original: $txtLOGS"
+        #txtLOGStrZIFFERN=`echo -e "$txtLOGS" | tr -d '\000-\011\013\014\016-\037'`
+        #echo -e "--- DEBUG --- txtLOGS Ziffern: $txtLOGStrZIFFERN"
+        #txtLOGStrR=`echo -e "$txtLOGS" | tr -d '\r'`
+        #echo -e "--- DEBUG --- txtLOGS nur r: $txtLOGStrR"
+        #txtLOGStrN=`echo -e "$txtLOGS" | tr -d '\n'`
+        #echo -e "--- DEBUG --- txtLOGS nur n: $txtLOGStrN"
+        
+        # -Download Prozentangabe wird mit $txtLOGStrESCAPE komplett ausgelesen und
+        #  gleichzeitig bleiben Leerzeichen und Tabs erhalten!
+        txtLOGStrESCAPE=`echo -e "$txtLOGS" | tr -d '\r'`
+        txtLOGS="$txtLOGStrESCAPE"
+        #echo -e "--- DEBUG --- txtLOGS r und n: $txtLOGStrESCAPE"
+        
+        #txtLOGS=${txtLOGS//\\r/}
+        #echo -e "--- DEBUG --- intZEILENNUMMER: $intZEILENNUMMER"
+        
+        # -Fehlende Zeilennummer: Download Prozentangabe
+        if [[ "$txtLOGS" == \[download\]*\%\ of* ]]
+        then
+            #typeset -i intANZAHLzeichenLOGS=0
+            #typeset -i intANZAHLzeichenAUSSCHNEIDEN=0
+            #intLOGSzeichen=${#txtLOGS}
+            [[ "$txtLOGS" == *100\%* ]] && txtLOGS=${txtLOGS//*100\%/100\%} && txtLOGS="[download] "$txtLOGS
+            [[ "$txtLOGS" != *100\%* ]] && txtLOGS=${txtLOGS:0:140}
+        fi
+        
+        
+        while [[ "$txtLOGS" != \|*$intZEILENNUMMER\|* ]]
+        do
+            case "$intANZAHLzeichenZEILEN" in
+                (1)
+                    # -Zeilennummern haben maximal 1 Zeichen:
+                    txtLOGS="|"`printf %01d $intZEILENNUMMER`"| $txtLOGS" ;;
+                (2)
+                    # -Zeilennummern haben maximal 2 Zeichen:
+                    txtLOGS="|"`printf %02d $intZEILENNUMMER`"| $txtLOGS" ;;
+                (3)
+                    # -Zeilennummern haben maximal 3 Zeichen:
+                    txtLOGS="|"`printf %03d $intZEILENNUMMER`"| $txtLOGS" ;;
+                (4)
+                    # -Zeilennummern haben maximal 4 Zeichen:
+                    txtLOGS="|"`printf %04d $intZEILENNUMMER`"| $txtLOGS" ;;
+                (5)
+                    # -Zeilennummern haben maximal 5 Zeichen:
+                    txtLOGS="|"`printf %05d $intZEILENNUMMER`"| $txtLOGS" ;;
+                (6)
+                    # -Zeilennummern haben maximal 6 Zeichen:
+                    txtLOGS="|"`printf %06d $intZEILENNUMMER`"| $txtLOGS" ;;
+            esac
+            #echo -e "--- DEBUG --- nach-CASE - txtLOGS: $txtLOGS"
+            #echo -e "--- DEBUG --- nach-CASE - intZEILENNUMMER: $intZEILENNUMMER"
+        done
+        #echo -e "$txtLOGS" >> $dateiLOGStmp
+        echo -e "$txtLOGS" >> $dateiLOGStmp
+    done < $dateiLOGS
+    cp $dateiLOGS $dateiLOGStmpOHNEzeilennummern
+    rm $dateiLOGS
+    mv $dateiLOGStmp $dateiLOGS
+    #fncDEBUGstop "Zeilennummern"
+}
+fncLOGSzeilennummern
+
+function fncLOGSkopieren {
+    # -Eine Sicherung der Logdatei anlegen!
+    # -Mit Zeitstempel der Startzeit: $zeitSTARTdateiname
+    cp $dateiLOGS $dateiLOGSsicherung
+    rm $dateiLOGStmpOHNEzeilennummern
+}
+fncLOGSkopieren
+# ----- ENDE der Logs-Funktionen ----------------------------------------------
+
+
+
+
+
+
+done
+# ----- ENDE der Quellen Schleife ---------------------------------------------
+# -----------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # -----------------------------------------------------------------------------
+# # -----------------------------------------------------------------------------
+# # ----- START der Logs-Funktionen ---------------------------------------------
+# 
+# # -Logdatei mit Zeilennummern versehen, damit Fehlermeldungen besser
+# #  zugeordnet werden können!
+# # --Zuerst alle Zeilennummern einfügen und dann den Fehlercheck starten.
+# #
+# function fncLOGSzeilennummern {
+#     #fncDEBUGstart "Zeilennummern"
+#     # -Maximale Anzahl an Zeilen ermitteln, damit klar ist wieviele Stellen für die
+#     #  Zeilennummern gebraucht werden.
+#     typeset -i intANZAHLzeichenZEILEN=0
+#     typeset -i intZEILENNUMMER=0
+#     intANZAHLzeilenLOGS=`wc -l $dateiLOGS`
+#     #echo -e "--- DEBUG-INFO: Anzahl Zeilen: $intANZAHLzeilenLOGS"
+#     intANZAHLzeilenLOGS=${intANZAHLzeilenLOGS// */}
+#     #echo -e "--- DEBUG-INFO: Anzahl Zeilen: $intANZAHLzeilenLOGS"
+#     intANZAHLzeichenZEILEN=`echo $intANZAHLzeilenLOGS | wc -m`
+#     intANZAHLzeichenZEILEN=intANZAHLzeichenZEILEN-1
+#     #echo -e "--- DEBUG-INFO: Anzahl Zeichen: $intANZAHLzeichenZEILEN"
+#     
+#     while read txtLOGS
+#     do
+#         #txtLOGStrESCAPE=`echo -e "$txtLOGS" | tr -d '\r\n'`
+#         #txtLOGS="$txtLOGStrESCAPE"
+#         echo -e "$txtLOGS" >> $dateiLOGStmp
+#     done < $dateiLOGS
+#     
+#     while [ ! -f $dateiLOGStmp ]
+#     do
+#         sleep 0.1
+#     done
+#     mv $dateiLOGStmp $dateiLOGS
+#     while [ ! -f $dateiLOGS ]
+#     do
+#         sleep 0.1
+#     done
+#     
+#     while read txtLOGS
+#     do
+#         [[ "$txtLOGS" == "" ]] && continue
+#         intZEILENNUMMER=intZEILENNUMMER+1
+#         #echo -e "--- DEBUG ---"
+#         #echo -e "--- DEBUG --- txtLOGS original: $txtLOGS"
+#         #txtLOGStrZIFFERN=`echo -e "$txtLOGS" | tr -d '\000-\011\013\014\016-\037'`
+#         #echo -e "--- DEBUG --- txtLOGS Ziffern: $txtLOGStrZIFFERN"
+#         #txtLOGStrR=`echo -e "$txtLOGS" | tr -d '\r'`
+#         #echo -e "--- DEBUG --- txtLOGS nur r: $txtLOGStrR"
+#         #txtLOGStrN=`echo -e "$txtLOGS" | tr -d '\n'`
+#         #echo -e "--- DEBUG --- txtLOGS nur n: $txtLOGStrN"
+#         
+#         # -Download Prozentangabe wird mit $txtLOGStrESCAPE komplett ausgelesen und
+#         #  gleichzeitig bleiben Leerzeichen und Tabs erhalten!
+#         txtLOGStrESCAPE=`echo -e "$txtLOGS" | tr -d '\r'`
+#         txtLOGS="$txtLOGStrESCAPE"
+#         #echo -e "--- DEBUG --- txtLOGS r und n: $txtLOGStrESCAPE"
+#         
+#         #txtLOGS=${txtLOGS//\\r/}
+#         #echo -e "--- DEBUG --- intZEILENNUMMER: $intZEILENNUMMER"
+#         
+#         # -Fehlende Zeilennummer: Download Prozentangabe
+#         if [[ "$txtLOGS" == \[download\]*\%\ of* ]]
+#         then
+#             #typeset -i intANZAHLzeichenLOGS=0
+#             #typeset -i intANZAHLzeichenAUSSCHNEIDEN=0
+#             #intLOGSzeichen=${#txtLOGS}
+#             [[ "$txtLOGS" == *100\%* ]] && txtLOGS=${txtLOGS//*100\%/100\%} && txtLOGS="[download] "$txtLOGS
+#             [[ "$txtLOGS" != *100\%* ]] && txtLOGS=${txtLOGS:0:140}
+#         fi
+#         
+#         
+#         while [[ "$txtLOGS" != \|*$intZEILENNUMMER\|* ]]
+#         do
+#             case "$intANZAHLzeichenZEILEN" in
+#                 (1)
+#                     # -Zeilennummern haben maximal 1 Zeichen:
+#                     txtLOGS="|"`printf %01d $intZEILENNUMMER`"| $txtLOGS" ;;
+#                 (2)
+#                     # -Zeilennummern haben maximal 2 Zeichen:
+#                     txtLOGS="|"`printf %02d $intZEILENNUMMER`"| $txtLOGS" ;;
+#                 (3)
+#                     # -Zeilennummern haben maximal 3 Zeichen:
+#                     txtLOGS="|"`printf %03d $intZEILENNUMMER`"| $txtLOGS" ;;
+#                 (4)
+#                     # -Zeilennummern haben maximal 4 Zeichen:
+#                     txtLOGS="|"`printf %04d $intZEILENNUMMER`"| $txtLOGS" ;;
+#                 (5)
+#                     # -Zeilennummern haben maximal 5 Zeichen:
+#                     txtLOGS="|"`printf %05d $intZEILENNUMMER`"| $txtLOGS" ;;
+#                 (6)
+#                     # -Zeilennummern haben maximal 6 Zeichen:
+#                     txtLOGS="|"`printf %06d $intZEILENNUMMER`"| $txtLOGS" ;;
+#             esac
+#             #echo -e "--- DEBUG --- nach-CASE - txtLOGS: $txtLOGS"
+#             #echo -e "--- DEBUG --- nach-CASE - intZEILENNUMMER: $intZEILENNUMMER"
+#         done
+#         #echo -e "$txtLOGS" >> $dateiLOGStmp
+#         echo -e "$txtLOGS" >> $dateiLOGStmp
+#     done < $dateiLOGS
+#     cp $dateiLOGS $dateiLOGStmpOHNEzeilennummern
+#     rm $dateiLOGS
+#     mv $dateiLOGStmp $dateiLOGS
+#     #fncDEBUGstop "Zeilennummern"
+# }
+# fncLOGSzeilennummern
+# 
+# function fncLOGSkopieren {
+#     # -Eine Sicherung der Logdatei anlegen!
+#     # -Mit Zeitstempel der Startzeit: $zeitSTARTdateiname
+#     cp $dateiLOGS $dateiLOGSsicherung
+#     rm $dateiLOGStmpOHNEzeilennummern
+# }
+# fncLOGSkopieren
+# 
+# # ----- ENDE der Logs-Funktionen ----------------------------------------------
+# # -----------------------------------------------------------------------------
+# # -----------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function fncFERTIGbeep {
+    # -Erfolgreich Sound:
+    #beep -l 200 -f 400 -r 2 -D 100 --new -l 600 -f 600 -D 100
+    beep -l 200 -f 500 -r 2 -D 20
+}
+
+function fncFERTIGmsgbox {
+    if ( [[ "${#eingabeQUELLEarray[@]}" -gt 1 ]] )
+    then
+        #${eingabeQUELLEarray[#]}
+        # -Arbeitsverzeichnisse anzeigen:
+        txtSTATUSbearbeitet="Die folgenden Verzeichnisse wurden bearbeitet:<br>$txtInfoQuelleKomplett"
+    else
+        #txtSTATUSbearbeitet="Bearbeitetes Verzeichnis: $eingabeQUELLEkomplett"
+        txtSTATUSbearbeitet="Das folgende Verzeichnis wurde bearbeitet:<br>$txtInfoQuelleKomplett"
+    fi
+    kdialog --title "$datei.Ende `fncHHMMSS 'norm.mS2'`:" --msgbox " --- <b>$datei: Ende</b> --- <br><br> - $datei wurde$txtSTRGerfolgreich beendet!<br><br> - $txtSTATUSbearbeitet" --geometry=500x300 >/dev/null 2>&1 &
+    xset +dpms >/dev/null 2>&1
+}
+
+#fncECHOlxD "|---------"
+if ( [[ "$flagAUFRUFintern" != "true" ]] )
+then
+    fncECHOlxD "|-"
+    fncECHOlxD "|- `fncHHMMSS` $datei wurde$txtSTRGerfolgreich beendet!"
+    fncECHOlxD "$txtFEHLERnorm$txtFEHLERffmpeg$txtENDEwarum|-"
+
+    fncFERTIGmsgbox
+
+    fncFERTIGbeep
+fi
+
+exit 0;
+    
+

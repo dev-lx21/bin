@@ -1,0 +1,1308 @@
+#!/bin/bash
+# lx-tools script von -lx-
+
+
+# -------------------------------------------------------------------------------------
+# -mp4 dateien deren aufloesung kleiner als 1280x720 ist erkennen
+# -dateien in tmp verzeichnis verschieben, dabei allerdings die struktur
+#  der unterVerzeichnisse erhalten
+# -------------------------------------------------------------------------------------
+
+
+txtDATEIliste=""
+txtOPTIONENbefehl=""
+flagHILFE="false"
+flagLOGS="false"
+flagQUIET="false"
+flagTESTDRIVE="false"
+flagRENAME="false"
+flagFFMPGausgabe="info"
+flagUNTERVERZEICHNIS="false"
+flag_aufruf_intern="false"
+
+
+
+# DEBUG-INFOS:
+# echo -e "*: "$*
+# echo -e "----------"
+# typeset -i zARG=0
+# for i in "$@"
+# do
+#     zARG=zARG+1
+#     echo -e "$zARG. - $i"
+# done
+
+
+
+
+
+
+# -------------------------------------------------------------------
+# ----- START Optionen Kontrolle ------------------------------------
+# -Falls eine der eingegebenen Stringparameter nicht mit "-" anfängt
+#  wird diese als pfad gesetzt!
+strg1="-"
+for i in "$@"
+do
+    # -Stringparameter einzeln prüfen:
+    #echo -e "--- $i ---"
+    if ( [[ "$i" != "" ]] )
+    then
+        if ( [[ "$i" == "trueUVZ" ]] )
+        then
+            # -Den Befehl für ein Unterverzeichnis auslesen:
+            # --$0: Kommando
+            # --$1: flagUNTERVERZEICHNIS:"trueUVZ"
+            # --$2: Unterverzeichnis:"$uvz"
+            # --$3: flag_update:"$flag_update"
+            # --$4: flag_aufruf_intern:"true"
+            # --$5: "$pfadORIGINAL"
+            # --$6: "$uvzAKTUELL$ia/"
+            # --$7: "$txtOPTIONENbefehl"
+            flagUNTERVERZEICHNIS="true"
+            intern1uvz="$2"
+            flag_update="$3"
+            flag_aufruf_intern="true"
+            intern1pfadORIGINAL="$5"
+            intern1uvzAKTUELL="$6"
+            intern1txtOPTIONENbefehl="$7"
+            
+            pfad=$intern1uvz
+            #txtOPTIONENbefehl=$intern1txtOPTIONENbefehl
+            #break
+            #continue
+
+        fi
+        if ( [[ "$i" == -*h* ]] )
+        then
+            flagHILFE="true"
+            strg1=$strg1"h"
+            break
+        fi
+        if ( [[ "$i" == -*l* ]] )
+        then
+            flagLOGS="true"
+            strg1=$strg1"l"
+            break
+        fi
+        #if ( [[ "$i" == -*q* ]] || [[ "$intern1txtOPTIONENbefehl" == -*q* ]] )
+        if ( [[ "$i" == -*q* ]] )
+        then
+            flagQUIET="true"
+            txtOPTIONENbefehl=$txtOPTIONENbefehl"-q "
+            strg1=$strg1"q"
+        fi
+        #if ( [[ "$i" == -*t* ]] || [[ "$intern1txtOPTIONENbefehl" == -*t* ]] )
+        if ( [[ "$i" == -*t* ]] )
+        then
+            flagTESTDRIVE="true"
+            txtOPTIONENbefehl=$txtOPTIONENbefehl"-t "
+            strg1=$strg1"t"
+        fi
+        #if ( [[ "$i" == -*r* ]] || [[ "$intern1txtOPTIONENbefehl" == -*r* ]] )
+        if ( [[ "$i" == -*r* ]] )
+        then
+            flagRENAME="true"
+            txtOPTIONENbefehl=$txtOPTIONENbefehl"-r "
+            strg1=$strg1"r"
+        fi
+        if ( [[ "$i" == -v=* ]] )
+        then
+            flagFFMPGausgabe=${i//*=/}
+            txtOPTIONENbefehl=$txtOPTIONENbefehl" $i"
+        fi
+        if ( [[ "$i" == "-UVZ" ]] )
+        then
+            flagUNTERVERZEICHNIS="true"
+            flag_aufruf_intern="true"
+            #echo -e "----- UVZ INTERN TRUE -----"
+        fi
+        if ( [[ "$i" != -* ]] && [[ "$flag_aufruf_intern" != "true" ]] )
+            then
+            #echo -e "--- String fängt nicht mit "-" an! ---"
+            #echo -e "--- String ist keine Option, also Pfad! ---"
+            pfad="$i"
+        fi
+    fi
+done
+# ----- ENDE Optionen Kontrolle -------------------------------------
+# -------------------------------------------------------------------
+
+
+#pfad=$1
+#flag_update=$2
+#flag_aufruf_intern=$3
+
+
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+fmtRESET=`tput sgr0`
+
+zeitSTART=`date '+%F %T'`
+flag_rename="false"
+
+datei=${0//*\//}
+txtTITEL="LQ Videodateien erkennen und verschieben!"
+intMAXframerate=30
+
+# -die Namen der Dateien zum Loggen festlegen:
+dateiLOGS="00_$datei.LOGS.txt"
+dateiLOGStmp="00_$datei.LOGS.txt.tmp"
+
+
+
+txtHR="|--------------------------------------------------------------------------------"
+txtKOPF=\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $datei -| "
+
+txtKOPFlogs=$txtKOPF"Logdatei"\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+txtKOPF=$txtKOPF$txtTITEL\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+
+txtBENUTZUNG="|- Benutzung: \\n|- '$datei [OPTION] [PFAD]'\\n"\
+"|- Der Pfad darf keine Datei sein und muss auf ein gültiges Verzeichnis verweisen. Ist kein Pfad\\n"\
+"|- angegeben, wird das aktuelle Verzeichnis als Arbeitsverzeichnis gesetzt.\\n"\
+"|-"
+
+
+txtHILFE="|- Das Skript sucht nach Videodateien deren Auflösung kleiner als 1280x720 ist und\\n"\
+"|- verschiebt diese in ein TMP Verzeichnis. Dabei wird auch die entsprechende Struktur\\n"\
+"|- der Unterverzeichnisse erstellt, um das Zurück-Verschieben zu vereinfachen.\\n"\
+"|-\\n"\
+"|- Optionen:\\n"\
+"|- -h\\tDiesen Hilfetext anzeigen.\\n"\
+"|- -r\\tMöglichkeit zum Starten der Rename Funktion. Dabei werden kritische Sonder-\\n"\
+"|- \\tund Leerzeichen in den Dateinamen ersetzt.\\n"\
+"|- \\tHINWEIS: Diese Funktion ist sehr rechenintensiv und daher standardmäßig nicht\\n"\
+"|- \\taktiviert.\\n"\
+"|- -t\\tNur testen. D.h. Dateien entsprechend prüfen, Ergebnis ausgeben, aber keine\\n"\
+"|- \\tDateien verschieben.\\n"\
+"|- -q\\tKeine Kopfzeile oder sonstige Hinweise des Programms anzeigen.\\n"\
+"|- \\tHINWEIS: Fehlermeldungen werden immer angezeigt.\\n"\
+"|- Manche Optionen können miteinander kombiniert werden.\\n"\
+"|-\\n"\
+"|- Tipps zur Anwendung:\\n"\
+"|- -Um eine sinnvolle Struktur zu erhalten, sollten Sie das Skript in Ihrem obersten Videoverzeichnis\\n"\
+"|-  starten. Dadurch wird nur ein TMP Ordner angelegt. Und die Struktur der Unterverzeichnisse\\n"\
+"|-  wird somit exakt übernommen. Dies ermöglicht bei Bedarf ein sehr einfaches Zurück-Verschieben\\n"\
+"|-  der Dateien.\\n"\
+"|-\\n"\
+"|- -Falls Sie bestimmte Dateien vor dem Verschieben schützen möchten, so fügen Sie am Ende des"\\n\
+"|-  Dateinamens einfach '_FAV' ein. Das Skript wird diese Dateien dann nicht verschieben."\\n\
+"|- --Beispiel: 'video-datei.mp4' wird geändert in 'video-datei_FAV.mp4'\\n"\
+"|-\\n"\
+"|- -Um komplette Verzeichnisse zu schützen, muss der Verzeichnisname mit '_FAV' enden!\\n"\
+"|-"
+
+
+
+
+
+
+
+
+
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+then
+    # wird (fast) immer angezeigt:
+#     echo -e "|--------------------------------------------------------------------------------"
+#     echo -e "|- $datei -| $titel"
+#     echo -e "|--------------------------------------------------------------------------------"
+#     echo -e "|- "`date '+%F %T'`
+#     echo -e "|-"
+    # version, GPL, autor...
+    if ( [[ "$flagLOGS" == "true" ]] )
+    then
+        cat $dateiLOGS
+        exit 0;
+    fi
+    if ( [[ "$flagQUIET" != "true" ]] )
+    then
+        echo -e "$txtKOPF"
+        echo -e "$txtBENUTZUNG"
+    fi
+    if ( [[ "$flagHILFE" == "true" ]] )
+    then
+        echo -e "$txtHILFE"
+        exit 0;
+    fi
+fi
+
+
+
+
+
+
+# DEBUG-INFOS:
+# if ( [[ "$flagQUIET" == "true" ]] )
+# then
+#     echo -e "|-"\\n"|- QUIETMODUS"\\n"|-"\\n
+# fi
+
+
+
+
+
+###############################################################################
+# ----- START pfad-kontrolle -----------------------------------------------------------------
+# -den pfad pruefen, ggf korrigieren, ggf FEHLER ausgeben!
+# -ist bei internem aufruf nicht erforderlich:
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+  then
+  if ( [[ "$pfad" == "" ]] )
+    then
+    #echo -e "--- pfad-ist-leer ---"
+    # aktueller ort wird als pfad angenommen:
+    pfad=`pwd`
+    #kdialog --msgbox="Pfad: $pfad"
+  fi
+  #echo -e "--- pfad-ist-nicht-leer ---"
+  # pfad wurde uebergeben oder mittels pwd gesetzt!
+  # pfad pruefen und ggf FEHLER ausgeben:
+  if ( [[ -d "$pfad" ]] )
+    then
+    # wenn pfad auf ein existierendes Verzeichnis zeigt: kein fehler
+    # WICHTIG: den slash an den pfad haengen:
+    [[ "$pfad" != */ ]] && pfad=$pfad"/"
+    fehler=0
+  elif ( [[ -f "$pfad" ]] )
+    then
+    # -----------------------------------------------------------------------------------
+    # ----- SONDERFALL: pfad ist eine datei!!! --------------------------------
+    # -----------------------------------------------------------------------------------
+    # -wenn pfad auf eine existierende datei zeigt: kein fehler - ABER:
+    # -pfad und datei müssen getrennt werden!!!
+    pfadMITdatei=$pfad
+    pfadNURdateiname=${pfadMITdatei//*\//}
+    pfad=${pfadMITdatei//$pfadNURdateiname/}
+    if ( [[ "$pfad" == "" ]] )
+    then
+        pfad=`pwd`
+        pfad=$pfad"/"
+    fi
+#     echo -e " --- pfadMITdatei: $pfadMITdatei"
+#     echo -e " --- pfadNURdateiname: $pfadNURdateiname"
+#     echo -e " --- pfad: $pfad"
+#     exit 0;
+    # -beim aufruf einzelner dateien, werden immer wieder neue TMP Verzeichnisse angelegt!
+    # -dies ist sehr unübersichtlich und erschwert das Zurück-Kopieren erheblich, daher werden
+    #  aufrufe einzelner dateien nicht akzeptiert!!!
+    #kdialog --msgbox="Pfad: $pfad"
+    fehler=1
+    kdialog --title="FEHLER" --error="FEHLER:\nBeim Aufruf einzelner Dateien anstatt eines Verzeichnis werden immer wieder neue TMP Verzeichnisse angelegt, anstatt ein übergeordnetes TMP Verzeichnis zu nutzen. Das ist sehr unübersichtlich und nicht sinnvoll. Die Verarbeitung einzelner Dateien wird deshalb deaktiviert.\n\nVerzeichnis:\n$pfad\n\n\nDas Script wird beendet."
+    exit 21;
+  else
+    fehler=1
+    kdialog --title="FEHLER" --error="FEHLER:\nDas Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.\n\nVerzeichnis:\n$pfad\n\n\nDas Script wird beendet."
+    exit 22;
+  fi
+fi
+# ----- ENDE pfad-kontrolle ------------------------------------------------------------------
+###############################################################################
+
+
+
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+then
+    nix=1
+    #echo -e "--- Kontrolle extern --- Pfad: $pfad"
+    #echo -e "--- Kontrolle extern --- Optionen: $txtOPTIONENbefehl"
+fi
+
+# -Original Arbeitsverzeichnis und aktuelles Unterverzeichnis korrekt zuweisen, damit
+#  beim Verschieben die Verzeichnisstruktur erhalten bleibt:
+if ( [[ "$flag_aufruf_intern" == "true" ]] )
+then
+    #echo -e "--- Kontrolle intern --- Pfad: $pfad"
+    #echo -e "--- Kontrolle intern --- Optionen: $txtOPTIONENbefehl"
+    #pfad=$intern1uvz
+    #txtOPTIONENbefehl=$intern1txtOPTIONENbefehl
+    #echo -e "--- Kontrolle intern --- Optionen intern1txt: $intern1txtOPTIONENbefehl"
+    #echo -e "--- Kontrolle intern --- Pfad: $pfad"
+    #echo -e "--- Kontrolle intern --- Optionen: $txtOPTIONENbefehl"
+    
+    pfadORIGINAL=$intern1pfadORIGINAL
+    uvzAKTUELL=$intern1uvzAKTUELL
+else
+    pfadORIGINAL=$pfad
+    uvzAKTUELL=""
+fi
+
+if ( [[ "$pfadORIGINAL" != */ ]] )
+then
+    pfadORIGINAL="$pfadORIGINAL/"
+fi
+
+if ( [[ "$uvzAKTUELL" != */ ]] && [[ "$uvzAKTUELL" != "" ]] )
+then
+    uvzAKTUELL="$uvzAKTUELL/"
+fi
+
+
+
+# -Die Logdateien an den Pfad anpassen:
+dateiLOGS=$pfadORIGINAL$dateiLOGS
+#dateiLOGStmp=$pfadORIGINAL$dateiLOGStmp
+#dateiLOGS=$pfad$dateiLOGS
+dateiLOGStmp=$pfad$dateiLOGStmp
+#echo -e "--- Kontrolle extern und intern --- dateiLOGS: $dateiLOGS"
+
+dateiCacheByte=$pfadORIGINAL"00_"$datei"_Cache_Byte.txt"
+dateiCacheAnzahl=$pfadORIGINAL"00_"$datei"_Cache_Anzahl.txt"
+
+# -Logdateien erstellen: $dateiLOGS und $dateiLOGStmp
+# --Wird nur beim Ersten Aufruf der Datei ausgeführt!
+# --Alte bereits existierende Logdateien werden überschrieben!
+AKTUELLEdateiLOGS=""
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+then
+    echo -e $txtKOPFlogs > $dateiLOGS
+    AKTUELLEdateiLOGS="$dateiLOGS"
+else
+    #echo -e "|- Unterverzeichnis:" > $dateiLOGStmp
+    #AKTUELLEdateiLOGS="$dateiLOGStmp"
+    echo -e "|- Unterverzeichnis:" >> $dateiLOGS
+    AKTUELLEdateiLOGS="$dateiLOGS"
+fi
+
+
+
+
+
+
+# -----------------------------------------------
+# --- parameter liste beachten ------------------
+extension=".mp*"
+nameTMPverzeichnis="a_LQ_tmp/"
+#name_datei_playliste="00_alle_pls.m3u"
+#name_datei_update="00_alle_pls_update.sh"
+#echo -e "$extension"
+#suchpfad_speichern_pls=*$extension
+suchpfad=$pfad*$extension
+#echo -e "$suchpfad"
+flag_stop=0
+# -----------------------------------------------
+# -----------------------------------------------
+
+
+
+
+
+
+###############################################################################
+###############################################################################
+# wird nur beim ersten aufruf der datei ausgefuehrt:
+if ( [[ "$flag_aufruf_intern" != "true" ]] && [[ "$flagTESTDRIVE" != "true" ]] )
+    then
+    # --- script namen und zeit_start anzeigen:
+    echo -e "|--- START: $zeit_start"
+    echo -e "|-"
+    if ( [[ "$strg1" == -*r* ]] )
+    then
+        kdialog --title="lx-RENAME starten?" --caption="Video-2-HD" --warningcontinuecancel="== lx-video-2-HD: ===================<br><br>Das lx-RENAME Script starten?<br><br>
+Falls die Dateinamen bzgl. Leer- und Sonderzeichen<br>
+kontrolliert und korrigiert werden sollen, wählen<br>Sie bitte <b>Mit RENAME</b>!<br>" --continue-label="Ohne RENAME" --cancel-label="Mit RENAME"
+        flag_rename=$(echo -e "$?")
+        #echo $flag_rename
+    fi
+    
+    if ( [[ "$flag_rename" == "2" ]] )
+    then
+        echo -e "|--- INFO: Die Rename Funktion zum Korrigieren der Sonder- und Leerzeichen in Dateinamen"
+        echo -e "|---       wird gestartet."
+        echo -e "|--- INFO: Arbeitsverzeichnis: $pfad"
+        echo -e "|--- INFO: Bitte haben Sie etwas Geduld, denn diese Funktion ist sehr rechenintensiv. Außerdem"
+        echo -e "|---       werden auch alle Dateien in den entsprechenden Unterverzeichnissen kontrolliert."
+        # eventuelle sonder- und leerzeichen aus den dateinamen loeschen:
+        /home/lx21/bin/lxRENAME "$pfad" "false" "true"
+        echo -e "|-"
+    fi
+    
+    # --- check ob standard tmp verzeichnis existiert, falls nicht wird es erstellt!
+    if ( [[ ! -d "$pfad$nameTMPverzeichnis" ]] )
+    then
+        echo -e "|--- INFO: Das TMP Verzeichnis $pfad$nameTMPverzeichnis existiert nicht!"
+        echo -e "|--- INFO: Erstelle TMP Verzeichnis...\c"
+        mkdir $pfad$nameTMPverzeichnis 2> /dev/null
+        if ( [[ ! -d "$pfad$nameTMPverzeichnis" ]] )
+        then
+            echo -e " ...nicht möglich!"
+            echo -e "|-"
+            echo -e "|--- FEHLER: Das Verzeichnis konnte nicht erstellt werden. Bitte überprüfen Sie ihre Zugriffsrechte!"
+            echo -e "|--- FEHLER: Das Skript wird daher beendet!"
+            exit 32;
+        fi
+        echo -e " ...fertig!"
+        echo -e "|--- INFO: $pfad$nameTMPverzeichnis wurde erfolgreich erstellt!"
+        echo -e "|-"
+    fi
+fi
+###############################################################################
+###############################################################################
+
+
+txtbox_pfad="\n\nVerzeichnis:\n$pfad"
+if ( [ -f "$pfad" ] )
+then
+    txtbox_pfad="\n\nDatei:\n$pfad"
+fi
+
+if ( [ "$flag_update" != "true" ] )
+then
+    flag_update=false
+fi
+
+
+
+
+
+
+
+
+
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+function fncAUSGABEstdoutUNDlogdatei {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        echo -e "$1" >> $AKTUELLEdateiLOGS
+    fi
+}
+
+function lxecho2x {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        echo -e "$1" >> $AKTUELLEdateiLOGS
+    fi
+}
+
+function echoCHECK {
+    # -Checkt ob die Ausgabe mittels echo erfolgen darf!
+    # --Wenn der QUIETMODUS aktiv ist, wird nichts am STDOUT ausgegeben.
+    # --Ausgabe in die Logdatei erfolgt auf jeden Fall.
+    echoCHECKausgabe="$3"
+    if ( [[ "$#" -lt 2 ]] )
+    then
+        echo -e "FEHLER: Die Funktion benötigt 2 Argumente!"
+        return 2;
+    fi
+    if ( [[ "$flagQUIET" != "true" ]] && [[ "$echoCHECKausgabe" != "nurLOGS" ]] )
+    then
+        echo -e "$1" "$2"
+    fi
+    if ( [[ "$echoCHECKausgabe" != "nurSTDOUT" ]] )
+    then
+        echo -e "$1" "$2" >> $AKTUELLEdateiLOGS
+    fi
+}
+
+function fncSTRINGzeichenMAX {
+    # -Die Länge eines Strings, also die Anzahl Zeichen, kontrollieren und bei Bedarf die
+    #  Ausgabe des Strings verkürzen oder den String selbst kürzen!
+    #
+    # -Aufruf:
+    #  fncSTRINGzeichenMAX "$max01" "60" "kuerzenStringAusgabe" "max01"
+    # -- $1 - String zum Checken - aus einer Variablen oder Text in Anführungszeichen
+    # -- $2 - maximale Anzahl Zeichen - integer oder String
+    # -- $3 - Action: kuerzenString, kuerzenStringAusgabe, kuerzenAusgabe - wenn kuerzenString* muss $4 der Name des Strings sein
+    # -- $4 - wenn der String gekürzt werden soll, muss der Name des Strings ($1) gesetzt sein
+    typeset -i intSTRGzKONTROLLE=0
+    typeset -i intSTRGzMAX=0
+    typeset -i intSTRGzMAXextension=0
+    typeset -i intSTRGzEXT=0
+    strSTRINGz="$1"
+    intSTRGzMAX="$2"
+    actionSTRGzMAX="$3"
+    strSTRINGzNAME="$4"
+    
+    strSTRINGzBAK=$strSTRINGz
+    strSTRINGzEXT=""
+    txtAUSGABEfnc=""
+    if ( [[ "$strSTRINGzBAK" == *.* ]] )
+    then
+            strSTRINGzEXT=${strSTRINGz//*./}
+            intSTRGzEXT=`echo $strSTRINGzEXT | awk '{print length($strSTRINGzEXT)}'`
+    fi
+    # -Da Position mit null beginnt, muss der Kontrollwert intSTRGzKONTROLLE nicht
+    #  um eins erhöht werden.
+    # -Wenn nach der maximalen Anzahl Zeichen der String noch weitergeht, wird er gekürzt.
+    # -Wenn es sich um eine Datei handelt, wird die Extension nicht abgeschnitten.
+    intSTRGzKONTROLLE=$intSTRGzMAX
+    intSTRGz=`echo $strSTRINGz | awk '{print length($strSTRINGz)}'`
+    #strSTATUSzeichenKONTROLLE=${txtSTATUS:$intSTRGzKONTROLLE:1}
+    #if ( [[ "$strSTATUSzeichenKONTROLLE" != "" ]] )
+    if ( [[ "$intSTRGz" -gt $intSTRGzMAX ]] )
+    then
+        if ( [[ "$strSTRINGzEXT" != "" ]] )
+        then
+            intSTRGzMAXextension=intSTRGzMAX-intSTRGzEXT
+            strSTRINGz=${strSTRINGzBAK:0:$intSTRGzMAXextension}"..."
+            #echo -e $strSTRINGzEXT
+            txtAUSGABEfnc="$strSTRINGz$strSTRINGzEXT"
+        else
+            strSTRINGz=${strSTRINGzBAK:0:$intSTRGzMAX}"..."
+            txtAUSGABEfnc="$strSTRINGz"
+        fi
+    fi
+
+    if ( [[ "$actionSTRGzMAX" != *kuerzen* ]] )
+    then
+        echo -e "FEHLER: Kein korrekter Actionbefehl gesetzt!"\\n"Gültige Befehle: kuerzenString, kuerzenStringAusgabe, kuerzenAusgabe"
+        return 20;
+    fi
+    
+    if ( [[ "$actionSTRGzMAX" == *Ausgabe* ]] )
+    then
+        echo -e "$txtAUSGABEfnc"
+    fi
+    
+    if ( [[ "$actionSTRGzMAX" == *String* ]] )
+    then
+        testNAME="$strSTRINGzNAME"
+        IFS= read -r -d '' "$testNAME" <<< $txtAUSGABEfnc
+    fi
+}
+
+function fncSTRINGzeichenNORM {
+    # -Die Länge eines Strings, also die Anzahl Zeichen, angleichen!
+    # --String wird also verkürzt oder mit Leerzeichen aufgefüllt.
+    #
+    # -Aufruf:
+    #  fncSTRINGzeichenNORM "$max01" "60" "kuerzenStringAusgabe" "max01"
+    # -- $1 - String zum Checken - aus einer Variablen oder Text in Anführungszeichen
+    # -- $2 - neue Anzahl Zeichen - integer oder String
+    # -- $3 - Action: kuerzenString, kuerzenStringAusgabe, kuerzenAusgabe - wenn kuerzenString* muss $4 der Name des Strings sein
+    # -- $4 - wenn der String gekürzt werden soll, muss der Name des Strings ($1) gesetzt sein
+    typeset -i intSTRGzKONTROLLE=0
+    typeset -i intSTRGzMAX=0
+    typeset -i intSTRGzMAXextension=0
+    typeset -i intSTRGzEXT=0
+    typeset -i intSTRGz=0
+    strSTRINGz="$1"
+    intSTRGzMAX="$2"
+    actionSTRGzMAX="$3"
+    strSTRINGzNAME="$4"
+    
+    strSTRINGzBAK=$strSTRINGz
+    strSTRINGzEXT=""
+    txtAUSGABEfnc=""
+    if ( [[ "$strSTRINGzBAK" == *.* ]] )
+    then
+            strSTRINGzEXT=${strSTRINGz//*./}
+            intSTRGzEXT=`echo $strSTRINGzEXT | awk '{print length($strSTRINGzEXT)}'`
+    fi
+    # -Da Position mit null beginnt, muss der Kontrollwert intSTRGzKONTROLLE nicht
+    #  um eins erhöht werden.
+    # -Wenn nach der maximalen Anzahl Zeichen der String noch weitergeht, wird er gekürzt.
+    # -Wenn es sich um eine Datei handelt, wird die Extension nicht abgeschnitten.
+    intSTRGzKONTROLLE=$intSTRGzMAX
+    intSTRGz=`echo $strSTRINGz | awk '{print length($strSTRINGz)}'`
+    #strSTATUSzeichenKONTROLLE=${txtSTATUS:$intSTRGzKONTROLLE:1}
+    #if ( [[ "$strSTATUSzeichenKONTROLLE" != "" ]] )
+    if ( [[ "$intSTRGz" -gt "$intSTRGzMAX" ]] )
+    then
+        if ( [[ "$strSTRINGzEXT" != "" ]] )
+        then
+            intSTRGzMAXextension=intSTRGzMAX-intSTRGzEXT
+            strSTRINGz=${strSTRINGzBAK:0:$intSTRGzMAXextension}"..."
+            #echo -e $strSTRINGzEXT
+            txtAUSGABEfnc="$strSTRINGz$strSTRINGzEXT"
+        else
+            strSTRINGz=${strSTRINGzBAK:0:$intSTRGzMAX}"..."
+            txtAUSGABEfnc="$strSTRINGz"
+        fi
+    else
+        txtAUSGABEfnc=$strSTRINGzBAK
+        # -Wenn String zu kurz ist, werden Leerzeichen angefügt!
+        #while ( [[ "$intSTRGz" -lt "$intSTRGzMAX" ]] )
+        intSTRGzMAXkomplett=intSTRGzMAX+intSTRGzEXT
+        while ( [[ "$intSTRGz" -lt "$intSTRGzMAXkomplett" ]] )
+        do
+            txtAUSGABEfnc=" $txtAUSGABEfnc"
+            intSTRGz=intSTRGz+1
+        done
+    fi
+
+    if ( [[ "$actionSTRGzMAX" != *kuerzen* ]] )
+    then
+        echo -e "FEHLER: Kein korrekter Actionbefehl gesetzt!"\\n"Gültige Befehle: kuerzenString, kuerzenStringAusgabe, kuerzenAusgabe"
+        return 20;
+    fi
+    
+    if ( [[ "$actionSTRGzMAX" == *Ausgabe* ]] )
+    then
+        echo -e "$txtAUSGABEfnc"
+    fi
+    
+    if ( [[ "$actionSTRGzMAX" == *String* ]] )
+    then
+        testNAME="$strSTRINGzNAME"
+        IFS= read -r -d '' "$testNAME" <<< $txtAUSGABEfnc
+    fi
+}
+
+
+function fncRUECKGAENGIGmachenDATEI {
+    # -Beim Aufruf der RUECKGAENGIGdatei werden die Dateien wieder in ihr ursprüngliches
+    #  Verzeichnis verschoben!
+    # -Das Verzeichnis wird bei Bedarf wieder neu erstellt.
+    # -Um Datenverlust auszuschließen wird komplett kopiert und danach erst gelöscht.
+
+    # -$RUECKuvz muss angepasst werden: Slashs durch Punkte ersetzen und
+    #  den letzten Slash/Punkt entfernen
+    RUECKuvz="$uvzAKTUELL"
+    [[ "$RUECKuvz" == "" ]] && RUECKuvz="$pfad"
+    RUECKuvz=${RUECKuvz//\//.}
+    typeset -i intLAENGEstr=0
+    typeset -i intLAENGEstrFERTIG=0
+    intLAENGEstr=`echo $RUECKuvz | awk '{print length($RUECKuvz)}'`
+    intLAENGEstrFERTIG=intLAENGEstr-1
+    RUECKuvz=${RUECKuvz:0:$intLAENGEstrFERTIG}
+    
+    RUECKGAENGIGpfad="$pfadORIGINAL$nameTMPverzeichnis$uvzAKTUELL"
+    RUECKGAENGIGdatei="00_${datei}_RUECKGAENGIG.${RUECKuvz}"
+    RUECKGAENGIGfertig="$RUECKGAENGIGpfad$RUECKGAENGIGdatei"
+    if ( [[ -f "$RUECKGAENGIGfertig" ]] )
+    then
+        nix=1
+        # -Datei bereits erstellt, daher wird fncRUECKGAENGIGmachenDATEI beendet!
+        return 0;
+    fi
+    touch $RUECKGAENGIGfertig
+    echo -e "#!/bin/bash" > $RUECKGAENGIGfertig
+    echo -e "# -Der Befehl '$datei' wird im Verzeichnis $uvzAKTUELL rückgängig gemacht!" >> $RUECKGAENGIGfertig
+    echo -e "# -Die Dateien werden zurück in ihr ursprüngliches Verzeichnis verschoben." >> $RUECKGAENGIGfertig
+    echo -e "pfadQUELLE=$pfadORIGINAL$nameTMPverzeichnis$uvzAKTUELL" >> $RUECKGAENGIGfertig
+    echo -e "pfadURSPRUNG=$iNURpfad" >> $RUECKGAENGIGfertig
+    echo -e "mkdir -p $iNURpfad" >> $RUECKGAENGIGfertig
+    echo -e "for i in $pfadORIGINAL$nameTMPverzeichnis$uvzAKTUELL*.*" >> $RUECKGAENGIGfertig
+    echo -e "do" >> $RUECKGAENGIGfertig
+    echo -e "    if ( [[ \$i == *$datei* ]] )" >> $RUECKGAENGIGfertig
+    echo -e "    then" >> $RUECKGAENGIGfertig
+    echo -e "        continue" >> $RUECKGAENGIGfertig
+    echo -e "    fi" >> $RUECKGAENGIGfertig
+    echo -e "    cp \$i $iNURpfad" >> $RUECKGAENGIGfertig
+    echo -e "    rm \$i" >> $RUECKGAENGIGfertig
+    echo -e "done" >> $RUECKGAENGIGfertig
+    echo -e "beep -l 200 -f 400 -r 2 -D 100 --new -l 600 -f 600 -D 100" >> $RUECKGAENGIGfertig
+    echo -e "kdialog --title='INFO' --msgbox='Das Skript\\n\\n$RUECKGAENGIGdatei\\n\\nwurde erfolgreich beendet!\\n\\n\\n-- Die Dateien wurden alle zurück in ihr ursprüngliches\\n   Verzeichnis verschoben.\\n\\n-- Von :\\t$pfadORIGINAL$nameTMPverzeichnis$uvzAKTUELL\\n-- Nach:\\t$iNURpfad\\n' &" >> $RUECKGAENGIGfertig
+    echo -e "exit 0;" >> $RUECKGAENGIGfertig
+    chmod a+x $RUECKGAENGIGfertig
+}
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+#####################################################################
+#####################################################################
+# ---------------------------------------------------------------------------------------
+# ----- START CheckResolutionMkdirMove
+# ---------------------------------------------------------------------------------------
+#
+# --- diese funktion kontrolliert die aufloesung,
+# --- erstellt bei bedarf unterVerzeichnisse
+# --- und verschiebt die datei!!!
+typeset -i i_FileSizeByte=0
+typeset -i i_FileSizeByteKomplett=0
+typeset -i i_AnzahlDateien=0
+
+function CheckResolutionMkdirMove {
+    # ----- erwartet nur $i -----
+    # -aufloesung usw. auslesen:
+    #  mediainfo --Inform='Video;%Width%' video.mp* 
+    i_FileSizeByte=`mediainfo --Inform='General;%FileSize%' $i`
+    
+    i_width=`mediainfo --Inform='Video;%Width%' "$i"`
+    i_height=`mediainfo --Inform='Video;%Height%' "$i"`
+    # -die komplette adresse $i aufteilen: in dateinamen und pfad:
+    iMITdatei=$i
+    iNURdateiname=${iMITdatei//*\//}
+    iNURpfad=${iMITdatei//$iNURdateiname/}
+    
+    # -Aufruf:
+    #  fncSTRINGzeichenMAX "$max01" "60" "kuerzenStringAusgabe" "max01"
+    # -- $1 - String zum Checken - aus einer Variablen oder Text in Anführungszeichen
+    # -- $2 - maximale Anzahl Zeichen - integer oder String
+    # -- $3 - Action: kuerzenString, kuerzenStringAusgabe, kuerzenAusgabe - wenn kuerzenString* muss $4 der Name des Strings sein
+    # -- $4 - wenn der String gekürzt werden soll, muss der Name des Strings ($1) gesetzt sein
+    #iNURdateinameAUSGABE=`fncSTRINGzeichenMAX "$iNURdateiname" "50" "kuerzenAusgabe" "iNURdateiname"`
+    #iNURdateinameAUSGABE={fncSTRINGzeichenMAX ("$iNURdateiname" "50" "kuerzenAusgabe" "iNURdateiname")}
+    #iNURdateinameAUSGABE={fncSTRINGzeichenMAX ("$iNURdateiname" "50" "kuerzenAusgabe" "iNURdateiname")}
+    #iNURdateinameAUSGABE=fncSTRINGzeichenMAX ("$iNURdateiname" "50" "kuerzenAusgabe" "iNURdateiname")
+    iNURdateinameAUSGABE=""
+    iNURdateinameAUSGABE=`fncSTRINGzeichenNORM "$iNURdateiname" "50" "kuerzenAusgabe" "iNURdateiname"`
+    if ( [[ "$iNURdateinameAUSGABE" == "" ]] )
+    then
+        iNURdateinameAUSGABE=$iNURdateiname
+    fi
+    
+    if ( [[ $i_width -lt 1280 ]] || [[ $i_height -lt 720 ]] && [[ $iNURdateiname != *_FAV.* ]] )
+        then
+        #echoCHECK -e "|-"
+        # DEBUG-INFOS:
+        #echo -e "|- pfadORIGINAL: $pfadORIGINAL"
+        #echo -e "|- uvzAKTUELL: $uvzAKTUELL"
+        
+        #txtAUSGABEaction="|--- Verzeichnis: $iNURpfad\\tDatei: $iNURdateiname"\\n"|--- Auflösung: LQ - Verschieben wird gestartet!"
+        #txtAUSGABEaction="|--- $uvzAKTUELL\\tDatei: $iNURdateiname"\\n"|--- $uvzAKTUELL\\tAuflösung: LQ - Verschieben wird gestartet!"
+        #txtAUSGABEaction="|--- $uvzAKTUELL\\tDatei: $iNURdateiname"\\n"|--- Auflösung: Low Quality - Verschieben!"
+        #txtAUSGABEaction="|--- $uvzAKTUELL - Datei: $iNURdateiname - LQ. Kein HD Format. Datei wird verschoben..."
+        #txtAUSGABEaction="|--- $uvzAKTUELL - Datei: $iNURdateinameAUSGABE"\\n"|--- LQ. Kein HD Format. Datei wird verschoben..."
+        #txtAUSGABEaction="|-  +- $uvzAKTUELL - Datei: $iNURdateinameAUSGABE - Kein HD Format. Verschiebe Datei."
+        txtAUSGABEaction="|-  +- Datei: $iNURdateinameAUSGABE - Kein HD Format. Verschiebe Datei. - "$i_FileSizeByte"Byte"
+        i_FileSizeByteKomplett=i_FileSizeByteKomplett+i_FileSizeByte
+        i_AnzahlDateien=i_AnzahlDateien+1
+        echoCHECK -en "$txtAUSGABEaction" "nurSTDOUT"
+        #echo -e "+++ i:"
+        #echo -e "+++ $i"
+        #echo -e "+++ iNURpfad und iNURdateiname:"
+        #echo -e "+++ $iNURpfad$iNURdateiname"
+        if ( [[ "$flagTESTDRIVE" != "true" ]] )
+        then
+            if ( [[ ! -d "$pfadORIGINAL$nameTMPverzeichnis$uvzAKTUELL" ]] )
+            then
+                mkdir -p $pfadORIGINAL$nameTMPverzeichnis$uvzAKTUELL 2> /dev/null
+                if ( [[ ! -d "$pfadORIGINAL$nameTMPverzeichnis$uvzAKTUELL" ]] )
+                then
+                    echo -e ""
+                    echo -e "|-"
+                    echo -e "|--- FEHLER: Das erforderliche Unterverzeichnis konnte im TMP Ordner nicht erstellt werden."
+                    echo -e "|---         Bitte überprüfen Sie ihre Zugriffsrechte für diesen Ordner:"
+                    echo -e "|---         $pfadORIGINAL$nameTMPverzeichnis"
+                    echo -e "|--- FEHLER: Das Skript wird beendet!"
+                    exit 0;
+                fi
+            fi
+            # -damit ein abbruch des vorgangs nicht zu datenverlust führen kann, wird anstelle
+            #  eines reinen verschiebens die datei vollständig an den neuen ort kopiert und erst
+            #  danach die alte datei gelöscht!!!
+            cp "$i" "$pfadORIGINAL$nameTMPverzeichnis$uvzAKTUELL$iNURdateiname"
+            rm "$i"
+            fncRUECKGAENGIGmachenDATEI
+            txtAUSGABEactionFERTIG=" - FERTIG!"
+            echoCHECK -e "$txtAUSGABEactionFERTIG" "nurSTDOUT"
+        else
+            txtAUSGABEactionFERTIG=" - TESTMODUS!"
+            echoCHECK -e "$txtAUSGABEactionFERTIG" "nurSTDOUT"
+        fi
+    else
+        #echoCHECK -e "|-"
+        #txtAUSGABEaction="|--- Verzeichnis: $iNURpfad\\tDatei: $iNURdateiname"\\n"|--- Auflösung: HD"
+        #txtAUSGABEaction="|--- $uvzAKTUELL - Datei: $iNURdateinameAUSGABE"\\n"|--- HD Format."
+        #txtAUSGABEaction="|-  +- $uvzAKTUELL - Datei: $iNURdateinameAUSGABE - HD Format."
+        txtAUSGABEaction="|-  +- Datei: $iNURdateinameAUSGABE - HD Format."
+        
+        echoCHECK -en "$txtAUSGABEaction" "nurSTDOUT"
+        txtAUSGABEactionFERTIG=" - Nichts zu tun!"
+        echoCHECK -e "$txtAUSGABEactionFERTIG" "nurSTDOUT"
+    fi
+
+    # -Die Daten zum Loggen füllen: txtDATEIliste
+    if ( [[ "$txtDATEIliste" == "" ]] )
+    then
+        strAUSGABEumbruch=""
+    else
+        strAUSGABEumbruch="\\n"
+    fi
+    #txtDATEIliste=$txtDATEIliste$strAUSGABEumbruch"|- \ +- $stsBEFEHLtxt${i_Dateiname%.mp4}_HD.mp4"
+    txtDATEIliste="$txtDATEIliste$strAUSGABEumbruch$txtAUSGABEaction$txtAUSGABEactionFERTIG"
+    #echo -e $txtDATEIliste >> $dateiLOGS
+#     echo -e "----- START txtDATEIliste ------------------------"
+#     echo -e "$txtDATEIliste"
+#     #lxecho2x $txtDATEIliste
+#     echo -e "----- ENDE txtDATEIliste -------------------------"
+    
+}
+# ---------------------------------------------------------------------------------------
+# ----- ENDE CheckResolutionMkdirMove
+# ---------------------------------------------------------------------------------------
+###############################################################################
+###############################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ---------------------------------------------------------------------------------------
+# ----- START CheckVideoConvert
+# --- diese funktion kontrolliert die aufloesung, Framerate,...
+# --- startet bei bedarf FFMPEG
+# --- und erstellt die SICHERUNGSDATEI *.bak
+# ---------------------------------------------------------------------------------------
+function CheckVideoConvert {
+    # ----- erwartet nur $i -----
+
+#     i_check=${i//[a-zA-Z0-9_\-\.\/]/}
+#     if ( [ -n "$i_check" ] && [ "$flag_rename" == "2" ] )
+#         then
+#         debug="Pfad: $pfad - I: $i --- vor rename aufruf ---\n"
+#         #echo $debug
+#         #kdialog --title="DEBUG: $debug" --warningcontinuecancel="$txtbox_debug1$debug$txtbox_debug2$txtbox_weiter"
+#         /home/lx21/bin/lxRENAME "$i" "false" "einzelne_datei"
+#         #echo -e "alter dateiname: $i"
+#         i=${i// /_}
+#         i=${i//[^a-zA-Z0-9_\-\.\/]/x}
+#         i=${i//_\-_YouTube/}
+#         i=${i//YouPorn_\-_/}
+#         #echo -e "neuer dateiname: $i"
+#     fi
+
+    # -Dateiname ohne Pfad:
+    i_Dateiname=${i//*\//}
+    # -aufloesung usw. auslesen:
+    #  mediainfo --Inform='Video;%Width%' video.mp*
+    i_FileSizeByte=`mediainfo --Inform='General;%FileSize%' $i`
+    
+    i_width=`mediainfo --Inform='Video;%Width%' $i`
+    i_height=`mediainfo --Inform='Video;%Height%' $i`
+    i_BitRate=`mediainfo --Inform='Video;%BitRate%' $i`
+    i_FrameRate=`mediainfo --Inform='Video;%FrameRate%' $i`
+    i_FrameRate=${i_FrameRate//\.*/}
+    #echo -e "--- aufloesung: $i_width x $i_height"
+    #echo -e "--- Bitrate: $i_BitRate - Framerate: $i_FrameRate"
+    txtBEFEHLaufloesung=""
+    txtBEFEHLframerate=""
+    
+    if ( [ "$i_width" -gt 1280 ] || [ "$i_height" -gt 720 ] )
+    then
+        # seitenverhaeltnis ermitteln und beibehalten
+        # varINT=`echo -e "(8+5)*2" | bc`
+        verhaeltnis=`echo -e "$i_width/$i_height" | bc -l`
+        max_width=1280
+        max_height=`echo -e "scale=0 ; 1280/$verhaeltnis" | bc -l`
+        max_height_check=`echo -e "scale=1 ; $max_height/2" | bc -l`
+        #echo -e "--- max_height: $max_height --- max_height_check: $max_height_check"
+        if ( [[ "$max_height_check" != *.0 ]] )
+        then
+            max_height=`echo -e "scale=0 ; $max_height+1" | bc -l`
+        fi
+        #echo -e "--- NEUE aufloesung: $max_width x $max_height"
+        aufloesung=$max_width"x"$max_height
+        #txtAUSGABEtmp="|- Datei: $i_Dateiname"\\n"|- Zeit: `date '+%F %T'` --- ffmpeg -START-"
+        #txtAUSGABEtmp="|-  +- Datei: $i_Dateiname"\\n"|-   - START ffmpeg max Auflösung [`date '+%T'`]"
+        txtAUSGABEtmp="|-  +- Datei: "$i_FileSizeByte"Byte\\t$i_Dateiname"\\n"|-   - START ffmpeg max Auflösung [`date '+%T'`]"
+        i_FileSizeByteKomplett=i_FileSizeByteKomplett+i_FileSizeByte
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        function fncBEFEHL () {
+            if ( [[ "$flagTESTDRIVE" == "false" ]] )
+            then
+                actionBEFEHL="echo -e $txtBEFEHL"
+                `$actionBEFEHL`
+                stsBEFEHL=$?
+            fi
+        }
+        # ------------------------------------------------------------
+        # -Bei Bedarf die Befehlszusätze zusammenbauen:
+        # --für die Auflösung: $txtBEFEHLaufloesung
+        # --für die Framerate: $txtBEFEHLframerate
+        txtBEFEHLaufloesung=" -s $aufloesung"
+        if ( [[ "$i_FrameRate" -gt "$intMAXframerate" ]] )
+        then
+            txtBEFEHLframerate=" -r $intMAXframerate"
+        fi
+        # ------------------------------------------------------------
+        #txtBEFEHL="ffmpeg -v $flagFFMPGausgabe -i $i -c:v h264 -b:v 1024k -r $intMAXframerate -s $aufloesung -acodec libmp3lame ${i%.mp4}_HD.mp4"
+        txtBEFEHL="ffmpeg -v $flagFFMPGausgabe -i $i -c:v h264 -b:v 1024k$txtBEFEHLframerate$txtBEFEHLaufloesung -acodec copy ${i%.mp4}_HD.mp4"
+        
+        # -Zu lange Befehle verursachen Zeilenumbruch! Deshalb wird $txtBEFEHL
+        #  in kurze Stücker zerteilt:
+#         while ( {$txtBEFEHL:$zPOSITION:$zLAENGE} != "" )
+#         do
+#             # -Ausgabe der Teilstücke:
+#             nix=1
+#         done
+        
+        txtAUSGABEtmp="|-   - $txtBEFEHL"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        fncBEFEHL
+        #txtAUSGABEtmp="|- Zeit: `date '+%F %T'` --- ffmpeg -ENDE- [Status:$stsBEFEHL]"
+        txtAUSGABEtmp="|-   - ENDE ffmpeg [Status:$stsBEFEHL] [`date '+%T'`]"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        stsBEFEHLtxt="[Status:$stsBEFEHL] ERFOLGREICH:\\t"
+        if ( [[ "$stsBEFEHL" -gt 0 ]] )
+        then
+            stsBEFEHLtxt="[Status:$stsBEFEHL] FEHLER:\\t"
+        else
+            if ( [[ "$flagTESTDRIVE" == "false" ]] )
+            then
+                mv $i $i".bak"
+            else
+                stsBEFEHLtxt="[Status:TESTMODUS]\\t"
+            fi
+        fi
+        if ( [[ "$txtDATEIliste" == "" ]] )
+        then
+            strAUSGABEumbruch=""
+        else
+            strAUSGABEumbruch="\\n"
+        fi
+        txtDATEIliste=$txtDATEIliste$strAUSGABEumbruch"|- \ +- $stsBEFEHLtxt${i_Dateiname%.mp4}_HD.mp4"
+
+    elif ( [[ "$i_FrameRate" -gt "$intMAXframerate" ]] )
+    then
+        #txtAUSGABEtmp="|-"\\n"|- Zeit: `date '+%F %T'` --- ffmpeg -START-"\\n"|- Korrigiere Framerate in Datei: $i_Dateiname"
+        #txtAUSGABEtmp="|- Korrigiere Framerate in Datei: $i_Dateiname"\\n"|- Zeit: `date '+%F %T'` --- ffmpeg -START-"
+        txtAUSGABEtmp="|-  +- Datei: "$i_FileSizeByte"Byte\\t$i_Dateiname"\\n"|-   - START ffmpeg max Framerate [`date '+%T'`]"
+        i_FileSizeByteKomplett=i_FileSizeByteKomplett+i_FileSizeByte
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        function fncBEFEHL () {
+            if ( [[ "$flagTESTDRIVE" == "false" ]] )
+            then
+                actionBEFEHL="echo -e $txtBEFEHL"
+                `$actionBEFEHL`
+                stsBEFEHL=$?
+            fi
+        }
+        # ------------------------------------------------------------
+        # -Bei Bedarf die Befehlszusätze zusammenbauen:
+        # --für die Auflösung: $txtBEFEHLaufloesung
+        # --für die Framerate: $txtBEFEHLframerate
+        txtBEFEHLaufloesung=""
+        txtBEFEHLframerate=" -r $intMAXframerate"
+        # ------------------------------------------------------------
+        #txtBEFEHL="ffmpeg -v $flagFFMPGausgabe -i $i -c:v h264 -b:v 1024k -r $intMAXframerate -acodec libmp3lame ${i%.mp4}_HD.mp4"
+        txtBEFEHL="ffmpeg -v $flagFFMPGausgabe -i $i -c:v h264 -b:v 1024k$txtBEFEHLframerate$txtBEFEHLaufloesung -acodec copy ${i%.mp4}_HD.mp4"
+        txtAUSGABEtmp="|-   - $txtBEFEHL"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        fncBEFEHL
+        #txtAUSGABEtmp="|- Zeit: `date '+%F %T'` --- ffmpeg -ENDE- [Status:$stsBEFEHL]"
+        txtAUSGABEtmp="|-   - ENDE ffmpeg [Status:$stsBEFEHL] [`date '+%T'`]"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+        stsBEFEHLtxt="[Status:$stsBEFEHL] ERFOLGREICH:\\t"
+        if ( [[ "$stsBEFEHL" -gt 0 ]] )
+        then
+            stsBEFEHLtxt="[Status:$stsBEFEHL] FEHLER:\\t"
+        else
+            if ( [[ "$flagTESTDRIVE" == "false" ]] )
+            then
+                mv $i $i".bak"
+            else
+                stsBEFEHLtxt="[Status:TESTMODUS]\\t"
+            fi
+        fi
+        if ( [[ "$txtDATEIliste" == "" ]] )
+        then
+            strAUSGABEumbruch=""
+        else
+            strAUSGABEumbruch="\\n"
+        fi
+        txtDATEIliste=$txtDATEIliste$strAUSGABEumbruch"|- \ +- $stsBEFEHLtxt${i_Dateiname%.mp4}_HD.mp4"
+
+    else
+        txtAUSGABEtmp="|-  +- Datei: $i_Dateiname"\\n"|-   - Keine Umwandlung erforderlich! [`date '+%T'`]"
+        fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+    fi
+}
+# ---------------------------------------------------------------------------------------
+# ----- ENDE CheckVideoConvert
+# ---------------------------------------------------------------------------------------
+
+
+
+#echo -e "|--------------------------------------------------------------------------------"
+
+
+
+
+
+# -Leerzeile bei Bedarf einfügen:
+if ( [[ "$flag_aufruf_intern" == "true" ]] )
+then
+    #strAUSGABE_deko_umbruch="|-"\\n
+    strAUSGABE_deko_umbruch=""
+else
+    strAUSGABE_deko_umbruch=""
+fi
+
+txtAUSGABEtmp=$strAUSGABE_deko_umbruch"|- -+- Verzeichnis: $pfad"
+#fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+echoCHECK -e "$txtAUSGABEtmp"
+
+
+
+
+
+i=$pfad
+
+# debug="Pfad: $pfad - I: $i\n"
+# #echo $debug
+# txtbox_debug1="--- DEBUG-Info: ----------------------------------------------\n"
+# txtbox_debug2="------------------------------------------------------------------\n"
+# txtbox_weiter="\nMöchten Sie das Skript weiter ausführen oder abbrechen?\n$0\n"
+# #kdialog --title="DEBUG: $debug" --warningcontinuecancel="$txtbox_debug1$debug$txtbox_debug2$txtbox_weiter"
+
+
+
+zeitSTARTaction=`date '+%F %T'`
+###############################################################################
+# ----- START schleife um dateien zu überprüfen -------------------------------------
+# NORMALFALL: pfad ist verzeichnis und wird mittels suchpfad abgearbeitet
+#echoCHECK -e "|-"
+for i in $suchpfad
+do
+    #echo -e "suchpfad: $suchpfad --- datei: $i"
+    if ( [[ -f "$i" ]] )
+        then
+        nix=$i
+        CheckResolutionMkdirMove
+    fi
+done
+# ----- ENDE schleife um dateien zu überprüfen --------------------------------------
+
+
+
+# echoCHECK -e "----- START txtDATEIliste ------------------------"
+# echoCHECK -e "$txtDATEIliste"
+# echoCHECK -e "----- ENDE txtDATEIliste -------------------------"
+
+
+
+# -Logdatei Daten für Zusammenfassung:
+# --Falls Dateiliste leer ist, einen entsprechenden Hinweis ausgeben:
+if ( [[ "$txtDATEIliste" == "" ]] )
+then
+    #txtDATEIliste="|-\\n|- Verzeichnis:\\t$pfad\\n|- Keine der untersuchten Dateien musste umgewandelt werden!\\n"
+    #txtDATEIliste="|- -+- Verzeichnis:$pfad\\n|-  +- Keine der untersuchten Dateien musste umgewandelt werden!"
+    txtDATEIliste="|-  +- Keine der untersuchten Dateien musste umgewandelt werden!"
+    # --Die Dateiliste mit den Statusmeldungen sichern:
+    echoCHECK -e "$txtDATEIliste"
+else
+    #txtDATEIliste="|-\\n|- Verzeichnis:\\t$pfad\\n$txtDATEIliste"
+    txtDATEIliste="$txtDATEIliste"
+    # --Die Dateiliste mit den Statusmeldungen sichern:
+    echoCHECK -e "$txtDATEIliste" "nurLOGS"
+fi
+
+
+echoCHECK -e "|-"
+
+
+
+
+
+# ----- START schleife um unterVerzeichnisse einzubinden ----------------------------
+# WICHTIG: wird nur ausgefuehrt wenn pfad wirklich ein verzeichnis ist!!!
+if ( [[ -d "$pfad" ]] )
+    then
+    nix=$i
+    for ia in $(ls --group-directories-first $pfad)
+    do
+        #echo -e "Pfad: $pfad --- Verzeichnis: $ia"
+        uvz="$pfad$ia/"
+        if ( [[ -d "$uvz" ]] && [[ "$uvz" != "$pfad$nameTMPverzeichnis" ]] && [[ $uvz != *_FAV* ]] )
+            then
+            #echo -e "|- sprung in unterverzeichnis: $uvz"
+            #echo -e "|- pfad: $pfad"
+            #echo -e "|- pfadORIGINAL: $pfadORIGINAL"
+            
+            # -Den Befehl für ein Unterverzeichnis füllen:
+            # --$0: Kommando
+            # --$1: flagUNTERVERZEICHNIS:"trueUVZ"
+            # --$2: Unterverzeichnis:"$uvz"
+            # --$3: flag_update:"$flag_update"
+            # --$4: flag_aufruf_intern:"true"
+            # --$5: "$pfadORIGINAL"
+            # --$6: "$uvzAKTUELL$ia/"
+            # --$7: "$txtOPTIONENbefehl"
+            # DEBUG-INFOS:
+            #echo -e $0 "trueUVZ" "$uvz" "$flag_update" "true" "$pfadORIGINAL" "$uvzAKTUELL$ia/" "$txtOPTIONENbefehl"
+            $0 "trueUVZ" "$uvz" "$flag_update" "true" "$pfadORIGINAL" "$uvzAKTUELL$ia/" "$txtOPTIONENbefehl"
+            #$0 $txtOPTIONENbefehl "-UVZ" $uvz
+            #continue
+        fi
+    done
+fi
+# ----- ENDE schleife um unterVerzeichnisse einzubinden -----------------------------
+###############################################################################
+
+
+
+
+
+
+
+# 
+# # -Überschrift bei Bedarf anzeigen:
+# if ( [[ "$flag_aufruf_intern" != "true" ]] )
+# then
+#     txtAUSGABEtmp="|-"\\n"|- Zusammenfassung:"
+# else
+#     txtAUSGABEtmp="|-"
+# fi
+# echo -e $txtAUSGABEtmp >> $dateiLOGS
+# #fncAUSGABEstdoutUNDlogdatei "$txtAUSGABEtmp"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # -Falls Skript in UVZ lief, gibt es eine $dateiLOGStmp!
+# # --$dateiLOGStmp wird ausgelesen: $txtDATEIliste als Zusammenfassung anzeigen
+# #   und in der normalen Logdatei mittels fncAUSGABEstdoutUNDlogdatei speichern!
+# txtDATEIlisteSTART="$txtDATEIliste"
+# txtDATEIliste=""
+# txtDATEIlisteUVZ=""
+# strAUSGABEumbruch="\\n"
+# if ( [[ "$flag_aufruf_intern" != "true" ]] && [[ -f "$dateiLOGStmp" ]] )
+# then
+#     nix=1
+#     while read txtDATEIlisteTMP
+#     do
+#         if ( [[ "$txtDATEIlisteUVZ" == "" ]] )
+#         then
+#             txtDATEIlisteUVZ=$txtDATEIlisteTMP
+#             continue
+#         fi
+#         txtDATEIlisteUVZ=$txtDATEIlisteUVZ\\n$txtDATEIlisteTMP
+#     done < $dateiLOGStmp
+#     txtDATEIliste=$txtDATEIlisteUVZ
+#     rm $dateiLOGStmp
+# else
+#     txtDATEIliste="|- Keine Zusammenfassung gefunden. Bitte überprüfen Sie die Rechtevergabe"\\n"|- für das gewählte Verzeichnis und für dieses Skript!"
+# fi
+
+
+
+if ( [[ "$flag_aufruf_intern" == "true" ]] )
+then
+    
+    if ( [[ "$i_FileSizeByteKomplett" -gt "0" ]] )
+    then
+        if ( [[ -f "$dateiCacheByte" ]] )
+        then
+            # -Die Cache Werte auslesen:
+            iCacheAuslesenByte=`cat $dateiCacheByte`
+            iCacheAuslesenAnzahl=`cat $dateiCacheAnzahl`
+            # -Die Werte aktualisieren:
+            iCacheEintragenByte=`echo -e "scale=0 ; $i_FileSizeByteKomplett+$iCacheAuslesenByte" | bc -l`
+            iCacheEintragenAnzahl=`echo -e "scale=0 ; $i_AnzahlDateien+$iCacheAuslesenAnzahl" | bc -l`
+        else
+            iCacheEintragenByte="$i_FileSizeByteKomplett"
+            iCacheEintragenAnzahl="$i_AnzahlDateien"
+        fi
+        # -Die Cache Dateien füllen:
+        echo -e "$iCacheEintragenByte" > $dateiCacheByte
+        echo -e "$iCacheEintragenAnzahl" > $dateiCacheAnzahl
+    fi
+
+fi
+
+
+
+
+zeit_ende=`date '+%F %T'`
+if ( [[ "$flag_aufruf_intern" != "true" ]] )
+then
+#     fncAUSGABEstdoutUNDlogdatei "|-"
+#     fncAUSGABEstdoutUNDlogdatei "$txtDATEIliste"
+#     fncAUSGABEstdoutUNDlogdatei "|-"
+    
+    if ( [[ -f "$dateiCacheByte" ]] )
+    then
+        # -Die Cache Werte auslesen:
+        iCacheAuslesenByte=`cat $dateiCacheByte`
+        iCacheAuslesenAnzahl=`cat $dateiCacheAnzahl`
+        # -Die Werte aktualisieren:
+        i_FileSizeByteKomplett=`echo -e "scale=0 ; $i_FileSizeByteKomplett+$iCacheAuslesenByte" | bc -l`
+        i_AnzahlDateien=`echo -e "scale=0 ; $i_AnzahlDateien+$iCacheAuslesenAnzahl" | bc -l`
+        # -Die Cache Dateien löschen:
+        rm $dateiCacheByte
+        rm $dateiCacheAnzahl
+    fi
+    
+    beep -l 600 -f 600 -D 100
+    #beep -l 200 -f 400 -r 2 -D 100 --new -l 600 -f 600 -D 100
+    #kdialog --title="INFO" --msgbox="Das Skript\n$0\nwurde erfolgreich ausgeführt!\n$txtbox_pfad\n\n\n" &
+
+    fncAUSGABEstdoutUNDlogdatei "|------------------------------------------------------------"
+    fncAUSGABEstdoutUNDlogdatei "|- Arbeitsverzeichnis\\t: $pfad"
+    
+    if ( [[ "$i_FileSizeByteKomplett" -gt "0" ]] )
+    then
+        i_FileSizeByteKomplett_kB=`echo -e "scale=1 ; $i_FileSizeByteKomplett/1024" | bc -l`
+        i_FileSizeByteKomplett_MB=`echo -e "scale=1 ; $i_FileSizeByteKomplett/1024/1024" | bc -l`
+        i_FileSizeByteKomplett_kB=${i_FileSizeByteKomplett_kB//./,}
+        i_FileSizeByteKomplett_MB=${i_FileSizeByteKomplett_MB//./,}
+        #fncAUSGABEstdoutUNDlogdatei "|- Daten (insgesamt)\\t: $i_FileSizeByteKomplett Byte"
+        #fncAUSGABEstdoutUNDlogdatei "|- \\t\\t\\t: $i_FileSizeByteKomplett_kB kB"
+        #fncAUSGABEstdoutUNDlogdatei "|- \\t\\t\\t: $i_FileSizeByteKomplett_MB MB"
+        fncAUSGABEstdoutUNDlogdatei "|- Daten (insgesamt)\\t: $i_FileSizeByteKomplett_MB MB ($i_FileSizeByteKomplett)"
+        fncAUSGABEstdoutUNDlogdatei "|- Anzahl Dateien\\t: $i_AnzahlDateien"
+    else
+        fncAUSGABEstdoutUNDlogdatei "|- Es wurden keine entsprechenden Dateien gefunden."
+    fi
+    
+    fncAUSGABEstdoutUNDlogdatei "|----------------------------------------"
+    fncAUSGABEstdoutUNDlogdatei "|- Ende      : normal"
+    fncAUSGABEstdoutUNDlogdatei "|- Aufgerufen: $zeitSTART"
+    fncAUSGABEstdoutUNDlogdatei "|- Gestartet : $zeitSTARTaction"
+    fncAUSGABEstdoutUNDlogdatei "|- Beendet   : $zeit_ende"
+    fncAUSGABEstdoutUNDlogdatei "|------------------------------------------------------------"
+fi
+
+
+exit 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,182 @@
+#!/bin/bash 
+# lx21 Tool zur Prozessausgabe
+
+
+#zeitSTART=`date '+%F %T:%N'`
+zeitSTART=`date`
+
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+fmtRESET=`tput sgr0`
+
+datei=${0//*\//}
+txtTITEL="Prozessliste anzeigen und durchsuchen!"
+nutzer=`ps --pid $$ -o user=`
+
+
+
+
+txtHR="|--------------------------------------------------------------------------------"
+
+txtKOPF=\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $datei -| "
+
+txtKOPFmini=$txtKOPF$zeitSTART
+
+txtKOPFlogs=$txtKOPF"Logdatei"\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+txtKOPF=$txtKOPF$txtTITEL\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+
+
+
+txtBENUTZUNG=\
+"|- Benutzung:"\\n\
+"|- '$datei [OPTIONEN] [SUCHSTRING]'"\\n\
+"|- Zum Anzeigen und Durchsuchen der Prozessliste. Die Ausgabe erfolgt vereinfacht und"\\n\
+"|- die Suchoptionen sind verbessert."\\n\
+"|-"
+
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Optionen:"\\n\
+"|- -h\\tDiesen Hilfetext anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- -q\\tDie Quietoption verhindert das Anzeigen der Kopfzeile."\\n\
+"|- -s\\tDie Suchoption erfordert Suchstring..."\\n\
+"|-"\\n\
+"|-"\\n\
+"|- Beispiel:"\\n\
+"|- $datei -s foo"\\n\
+"|- -..."\\n\
+"|-"
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tZuwenige oder unzulässige Argumente übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+txtENDEzeit=\\n\
+"|-"\\n\
+"|- Start:\t$zeitSTART"\\n\
+"|- Ende:\t"
+
+
+txtbox_pfad="\n\n------------------------------\nVerzeichnis:\n$pfad\n------------------------------"
+
+
+
+# -Parameter und Flags:
+flagACTION="false"
+flagQUIET="false"
+
+
+
+
+
+# -Die Hilfe anzeigen:
+if ( [[ "$1" == -*h* ]] )
+then
+    echo -e $txtKOPF
+    echo -e $txtHILFE
+    exit 0;
+fi
+
+
+# -Die normale Kopfzeile: quiet oder normal
+if ( [[ "$1" == -*q* ]] )
+then
+    shift
+    flagQUIET="true"
+else
+    echo -e $txtKOPFmini
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if ( [[ "$1" == -*pid* ]] && [[ "$2" != "" ]] ) 
+then
+    # -Nur die PID ausgeben: SUCHSTRING
+    #
+    # -Suchstring Abfrage: Prozessname
+    arrPSalle=`ps -All | grep -i $2`
+    arrPSalle=($arrPSalle)
+    strPID=${arrPSalle[3]}
+    txtAUSGABE=$strPID
+    # -Ausgabe: ProzessID
+    echo $txtAUSGABE
+    exit 0;
+elif ( [[ "$1" == -*pid* ]] && [[ "$2" == "" ]] )
+then
+    # -Nur die PID ausgeben: alle
+    #
+    # -Suchstring Abfrage: Prozessname
+    arrPSalle=`ps -A -o pid=`
+    txtAUSGABE=$arrPSalle
+    # -Ausgabe: ProzessID
+    echo $txtAUSGABE
+    exit 0;
+fi
+
+
+# -Die Child-Prozesse auslesen, indem nach Prozessen gesucht wird, deren
+#  PPID die PID ist!
+# if ( [[ "$1" == "-cpid" ]] && [[ "$2" != "" ]] ) 
+# then
+#     #echo -e "ps -C $2 -o pgid="
+#     ps -C $2 -o pid=
+#     exit 0;
+# fi
+
+
+
+if ( [[ "$1" == -*s* ]] && [[ "$2" == "" ]] ) 
+then
+	#echo -e "ps -All"
+	#shift
+	ps -All
+	exit 0;
+elif ( [[ "$1" == -*s* ]] && [[ "$2" != "" ]] ) 
+then
+	#echo -e "ps -All | grep -i $1" 
+	shift
+	ps -All | grep -i $1 
+	exit 0;
+fi 
+
+
+if ( [ "$1" == "" ] ) 
+then
+    [[ "$flagQUIET" == "false" ]] && echo -e "|- ps -All" 
+    ps -All
+    exit 0;
+else
+    [[ "$flagQUIET" == "false" ]] && echo -e "|- ps -All | grep -i $1" 
+    ps -All | grep -i $1
+    exit 0;
+fi 
+
+
+
+
+echo -e $txtBENUTZUNG
+exit 0;
+

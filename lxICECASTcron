@@ -1,0 +1,1149 @@
+#!/bin/bash
+# skript von -lx-
+
+# -Bash Einstellungen verfügbar machen:
+#source /home/lx21/.bashrc   
+
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+# -Pls täglich sichern
+# -Pls keine leeren Updates
+#
+# ----- DONE:
+# -Pls Update nur wenn Veränderung
+#
+# ----- Bugs:
+# -Fehler.124: timeout, weil das eigentliche Kommando die Zeit überschritten hat
+# --Falls Environment Variablen nicht gesetzt sind, kann Cron die Shell Befehle nicht
+#   ausführen! FIX: Sollte im Startskript erfolgen: 'env > /etc/...' && 'darkice'
+# --Bei Timeout der Songrec Abfrage, z.Bsp. wegen Netzwerkproblemen oder weil der Song
+#   unbekannt ist. FIX: Nicht möglich
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+# -------------------------------------------------------------------
+# ----- START Cronjob Anpassung: dbus Session -----------------------
+if [[ `tty` != *dev* ]]
+then
+    # --- Cronjob!!! ---
+    # -Da tput nur mit $TERM funktioniert, werden keine Format Werte gesetzt.
+    fmtFETT=""
+    fmtINVERS=""
+    fmtUNTERSTRICHEN=""
+    fmtRESET=""
+else
+    # --- KEIN Cronjob!!! ---
+    nix="1"
+fi
+# ----- ENDE Cronjob Anpassung: dbus Session ------------------------
+# -------------------------------------------------------------------
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+    
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+    
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+    
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+    
+    # -Nur den Infotext ausschneiden: 
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+    
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+    
+}
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+function fncYEAR1231 {
+    case "$1" in
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y%m%d'`
+            ;;
+    esac
+}
+
+function fncTime2SekSek2Time {
+    # -Zeitangaben vereinfacht umrechnen: 
+    # --Erwartet wird $1 mit einer Zeitangabe im Format HH:MM:SS oder
+    #   mit einer Zeitangabe in Sekunden (als Ganzzahl)
+    # -HH:MM:SS wird zu Sekunden und Sekunden werden zu HH:MM:SS
+    #
+    # -$1 Check:
+    local txtFncFehlerStart="FEHLER: fncTime2SekSek2Time:"
+    [ ! "$1" ] && echo -e "|- $txtFncFehlerStart Es wurde kein Argument übergeben!" && return
+    
+    local flagT2SS2T=""
+    local intT2SS2TOriginal="$1"
+    local intS2Tfertig=""
+    local intT2Sfertig=""
+    
+    # ---------------------------------------------------------------------------------------------
+    # ---------- Eingabe kontrollieren und entsprechende Flags setzen: ----------------------------
+    #if ( [[ "$intT2SS2TOriginal" == *:*:* ]] )
+    if ( [[ "$intT2SS2TOriginal" =~ ^[0-5][0-9]:[0-5][0-9]$ ]] )
+    then
+        # -Flag setzen: MM:SS zu Sekunden
+        flagT2SS2T="MMSStime2sek"
+    elif ( [[ "$intT2SS2TOriginal" =~ ^[0-9][0-9]:[0-5][0-9]:[0-5][0-9]$ ]] )
+    then
+        # -Flag setzen: HH:MM:SS zu Sekunden
+        flagT2SS2T="HHMMSStime2sek"
+    elif ( [[ "$intT2SS2TOriginal" =~ ^[1-9][0-9]*$ ]] )
+    then
+        # -Flag setzen: Sekunden zu HH:MM:SS
+        flagT2SS2T="sek2time"
+    else
+        # -$1 entspricht nicht den Anforderungen!
+        echo -e "|- $txtFncFehlerStart Das übergebene Argument ($1) ist fehlerhaft!"
+        echo -e "|- Gültige Zeitangaben sind MM:SS oder HH:MM:SS. Mit führender Null!"
+        echo -e "|- Die reine Sekundenangabe erfordert eine positive ganze Zahl. Ohne führende Null!"
+        return
+    fi
+    # ---------------------------------------------------------------------------------------------
+    
+    # ---------------------------------------------------------------------------------------------
+    # ---------- Umrechnen: HH:MM:SS zu Sekunden --------------------------------------------------
+    if ( [[ "$flagT2SS2T" == "MMSStime2sek" ]] )
+    then
+        # -MM:SS zu Sekunden:
+        intT2Sfertig=`echo -e "scale=0 ; ${intT2SS2TOriginal:0:2}*60 + ${intT2SS2TOriginal:3:2}" | bc -l`
+        echo -e "$intT2Sfertig"
+        return
+    fi
+    if ( [[ "$flagT2SS2T" == "HHMMSStime2sek" ]] )
+    then
+        # -HH:MM:SS zu Sekunden:
+        intT2Sfertig=`echo -e "scale=0 ; ${intT2SS2TOriginal:0:2}*3600 + ${intT2SS2TOriginal:3:2}*60 + ${intT2SS2TOriginal:6:2}" | bc -l`
+        echo -e "$intT2Sfertig"
+        return
+    fi
+    # ---------------------------------------------------------------------------------------------
+    
+    # ---------------------------------------------------------------------------------------------
+    # ---------- Umrechnen: Sekunden zu HH:MM:SS --------------------------------------------------
+    function fncTime2SekSek2TimeInternS2Ttmp {
+        # -Ergebnis der letzten Berechnung prüfen und zuweisen:
+        # --Bei Bedarf ':' als Abstandhalter einbauen:
+        [ "$intS2Tfertig" ] && intS2Tfertig="$intS2Tfertig"":"
+        # --Berechnung $intS2Ttmp einbauen:
+        intS2Tfertig="$intS2Tfertig""$intS2Ttmp"
+    }
+    if ( [[ "$flagT2SS2T" == "sek2time" ]] )
+    then
+        intS2Ttmp=`echo -e "scale=0 ; $intT2SS2TOriginal/3600" | bc -l`
+        intS2Ttmp=`printf '%02d' $intS2Ttmp`
+        fncTime2SekSek2TimeInternS2Ttmp
+        # -Sonderfall: Wenn HH gleich 00 ist, werden diese gar nicht angezeigt:
+        [ "$intS2Ttmp" -lt 1 ] && intS2Tfertig=""
+        
+        intS2Ttmp=`echo -e "scale=0 ; $intT2SS2TOriginal%3600/60" | bc -l`
+        intS2Ttmp=`printf '%02d' $intS2Ttmp`
+        fncTime2SekSek2TimeInternS2Ttmp
+        
+        intS2Ttmp=`echo -e "scale=0 ; $intT2SS2TOriginal%60" | bc -l`
+        intS2Ttmp=`printf '%02d' $intS2Ttmp`
+        fncTime2SekSek2TimeInternS2Ttmp
+        echo -e "$intS2Tfertig"
+        return
+    fi
+    # ---------------------------------------------------------------------------------------------
+}
+
+function fncZeitspanneStartEndeHHMMSS {
+    # -Zeitspanne zwischen Zeitpunkten berechnen und als HHMMSS ausgeben:
+    # -Zeitangaben in beliebigem Datumsformat, Start und Ende können dabei
+    #  auch unterschiedlich formatiert sein
+    # --$1 Start Zeitpunkt
+    # --$2 Ende Zeitpunkt
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+    [[ -z "$2" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+    local zeitpunktStart="$1"
+    local zeitpunktEnde="$2"
+    
+    echo -e "$(fncTime2SekSek2Time "$(echo -e $(date -d $zeitpunktEnde +%s)-$(date -d $zeitpunktStart +%s) | bc)")"
+}
+
+
+function fncECHOlx () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        echo -e "$1" >> "$dateiLOGS"
+    fi
+}
+
+function fncECHOlxD () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        #echo -e "$1" >> $dateiLOGS
+    fi
+}
+
+function fncECHOlxL () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        #echo -e "$1"
+        echo -e "$1" >> "$dateiLOGS"
+    fi
+}
+
+function fncECHOlxP {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe in die Playliste
+    if ( [[ "$1" != "" ]] )
+    then
+        #echo -e "$1"
+        echo -e "$1" >> "$dateiPlaylistAktuell"
+    fi
+}
+
+function fncECHOlxn () {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -en "$1"
+        echo -en "$1" >> "$dateiLOGS"
+    fi
+}
+
+
+typeset -i intLayoutMaxSpalten=0
+typeset -i intLayoutMaxSpaltenVorgabe=120
+function fncLayoutMaxSpalten {
+    # -Den Anzeigebereich des eigenen Layouts auf 80% der vorhandenen Bildschirmbreite
+    #  begrenzen: ($zSPALTEN/10)*8
+    
+    typeset -i zZEILEN=$LINES
+    typeset -i zSPALTEN=$COLUMNS
+
+    intLayoutMaxSpaltenSCALE1=`echo -e "scale=1 ; ($zSPALTEN/10)*8" | bc -l`
+    intLayoutMaxSpalten=${intLayoutMaxSpaltenSCALE1//\.*/}
+    [ "$intLayoutMaxSpalten" -le 0 ] && intLayoutMaxSpalten=$intLayoutMaxSpaltenVorgabe
+}
+fncLayoutMaxSpalten
+
+
+function fncAusgabeHRMaxSpalten {
+    # -HRMaxSpalten erstellen und ausgeben!
+    # -Argumente:
+    # --$1: Die Zeichen mit denen die Linie anfangen soll.
+    # --$2: Das Zeichen mit dem die Linie gefüllt wird.
+    # -Werden keine Argumente übergeben, wird Standard genutzt:
+    txtHRAnfang="|"
+    txtHRFuellen="-"
+    
+    typeset -i zHRAnfang=0
+    typeset -i zHRFuellen=0
+    typeset -i zHRMaxSpalten=0
+    
+    [ $1 ] && txtHRAnfang="$1"
+    zHRAnfang=${#txtHRAnfang}
+    [ $2 ] && txtHRFuellen="$2"
+    zHRFuellen=${#txtHRFuellen}
+    
+    txtHRMaxSpalten="$txtHRAnfang""$txtHRFuellen"
+    zHRMaxSpalten=intLayoutMaxSpalten-zHRAnfang-zHRFuellen
+    for ((zHR=0; zHR<$zHRMaxSpalten; zHR++))
+    do
+        #echo -en "$zzHR - "
+        txtHRMaxSpalten="$txtHRMaxSpalten""$txtHRFuellen"
+    done
+    echo -e "\\r$txtHRMaxSpalten"
+}
+
+
+function fncLayoutHRFullScreen {
+    # -Fullscreen HR erstellen und in $txtHRFullScreen speichern.
+    # -Argumente:
+    # --$1: txtHRFullScreenANFANG
+    # --$2: txtHRFullScreenENDE
+    
+    typeset -i zZEILEN=$LINES
+    typeset -i zSPALTEN=$COLUMNS
+    typeset -i zHRanfang=0
+    typeset -i zHRmitte=0
+    typeset -i zHRende=0
+    typeset -i zzHR=0
+    
+    txtHRFullScreenANFANG="|- $datei "
+    #txtHRFullScreenANFANG="|"
+    [ $1 ] && txtHRFullScreenANFANG="$1"
+    zHRanfang=${#txtHRFullScreenANFANG}
+    
+    #txtHRFullScreenENDE=" $datei -|"
+    txtHRFullScreenENDE="|"
+    [ $2 ] && txtHRFullScreenENDE="$2"
+    zHRende=${#txtHRFullScreenENDE}
+    
+    txtHRFullScreenMITTE=""
+    zHRmitte=zSPALTEN-zHRanfang-zHRende
+    for ((zzHR=0; zzHR<$zHRmitte; zzHR++))
+    do
+        #echo -en "$zzHR - "
+        txtHRFullScreenMITTE="$txtHRFullScreenMITTE""-"
+    done
+    txtHRFullScreen="$txtHRFullScreenANFANG""$txtHRFullScreenMITTE""$txtHRFullScreenENDE"
+    echo -e "\\r$txtHRFullScreen"
+}
+fncLayoutHRFullScreen >/dev/null
+
+
+function fncKILLpid {
+#     if ( [[ "$1" == "" ]] )
+#     then
+#         return 10
+#     fi
+
+    # -EINSCHALTEN: Tastatureingaben ausgeben/darstellen:
+    #stty echo
+    
+    strKILLsignal=""
+    if ( [[ "$2" != "" ]] )
+    then
+        strKILLsignal="$2 "
+    fi
+    
+    if ( [[ "$1" != "" ]] )
+    then
+        intKILLpid="$1"
+#         if ( [[ `ps -p $intKILLpid | grep -i $intKILLpid` == $intKILLpid* ]] )
+#         then
+#             #kill $intKILLpid >/dev/null 2>&1
+#             # -Die Ausgabe wegen Fehlermeldungen nach Kill abschalten:
+#             #exec >/dev/null 2>&1
+#             # -Der Kill Befehl:
+#             #kill $intKILLpid >/dev/null 2>&1
+#             kill $intKILLpid >/dev/null 2>&1
+#             # -Die Ausgabe wieder auf den Bildschirm legen:
+#             #exec >`tty` 2>&1
+#         fi
+        typeset -i zKILL=0
+        flagDONEkill="false"
+        #while ( [[ `ps -p $intKILLpid | grep -i $intKILLpid` == $intKILLpid* ]] )
+        #while ( [[ `ps -p $intKILLpid -o pid=` == "$intKILLpid" ]] )
+        while ( [[ `ps -p $intKILLpid -o pid=` != "" ]] )
+        do
+            txtPROZESSname="`ps -p $intKILLpid -o comm=`"
+            if ( [[ "$flagDONEkill" != "true" ]] )
+            then
+                #fncECHOlxL "|- "`fncHHMMSS`" INFO $intID: "\ "+- Befehl: Kill SIGTERM $intKILLpid Prozess $txtPROZESSname"
+                exec >/dev/null 2>&1
+                # -Die Ausgabe in /dev/null umleiten wegen Fehlermeldungen nach Kill Befehl:
+                kill $strKILLsignal$intKILLpid >/dev/null 2>&1 &
+                exec >`tty` 2>&1
+            fi
+            #kdialog --title "Status.KILL.`fncHHMMSS 'norm.mS2'`" --passivepopup "--- KILL PID: $intKILLpid<br><br>--- Taste: $eingabeTASTE" 10 --geometry=260x100 &
+            zKILL=zKILL+1
+            sleep 0.05
+            # -Maximale Wartezeit: 10 Sekunden
+            #  10 Sekunden / sleep 0.05 = 200 Durchläufe der while Schleife
+            #  8 Sekunden / sleep 0.05 = 160 Durchläufe der while Schleife
+            [ $zKILL -ge 199 ] && flagDONEkill="true"
+            #[ $zKILL -ge 40 ] && fncECHOlxL "|- "`fncHHMMSS`" INFO $intID: "\ "+- Befehl: Kill SIGKILL Prozess $txtPROZESSname"
+            [ $zKILL -ge 200 ] && kill -9 $intKILLpid >/dev/null 2>&1 &
+            [ $zKILL -ge 200 ] && break
+            
+        done
+    fi
+    #xset +dpms >/dev/null 2>&1
+}
+
+
+function fncCheckPaketInstalliertVar {
+    # -Überprüfen ob ein bestimmtes Paket installiert ist. Erfordert mindestens einen
+    #  Paketnamen als Argument.
+    # -Übergabe der Informationen mittels zweier Variablen:
+    #  $stsCheckPaketAusgabe: Paket installiert: true oder false
+    #  $stsCheckPaketExitcode: Ausgabestatus der Funktion
+    # -Wird $2 übergeben und enthält "stsCheckPaketAusgabe", wird $stsCheckPaketAusgabe mittels echo
+    #  ausgegeben. Somit kann die Funktion direkt in einem Vergleich genutzt werden!
+    #[ ! "$1" ] && stsCheckPaketAusgabe="FEHLER" && stsCheckPaketExitcode="1" && return
+    [[ -z "$1" ]] && stsCheckPaketExitcode="$?" && stsCheckPaketAusgabe="FEHLER: Keine Argumente übergeben!"
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+    
+    #[[ `apt list $1 --installed 2>/dev/null` == *$1* ]] && stsCheckPaketAusgabe="true" || stsCheckPaketAusgabe="false"
+    tmpCheckPaket="`apt list $1 --installed 2>/dev/null`"
+    stsCheckPaketExitcode="$?"
+    [[ "$tmpCheckPaket" == *$1* ]] && stsCheckPaketAusgabe="true" || stsCheckPaketAusgabe="false"
+    #stsCheckPaketExitcode="$?"
+    
+    [[ "$2" ]] && [[ "$2" == "stsCheckPaketAusgabe" ]] && echo -en "$stsCheckPaketAusgabe"
+}
+
+function fncTXTPaketInstalliert {
+    # -Die fncCheckPaketInstalliertVar mit dem stsCheckPaketAusgabe Flag starten und
+    #  das Ergebnis direkt auswerten:
+    [[ `fncCheckPaketInstalliertVar "$1" "stsCheckPaketAusgabe"` == "true" ]] && txtCheckPaketAusgabe="$1 ist installiert." && echo -e "(ist installiert)"
+    [[ `fncCheckPaketInstalliertVar "$1" "stsCheckPaketAusgabe"` == "false" ]] && txtCheckPaketAusgabe="$1 ist nicht installiert." && echo -e "(ist NICHT installiert)"
+}
+
+
+function fncBEFEHL {
+    # -Argumente:
+    # --$1: Befehl zum Ausführen
+    # --$2: Text oder Zeichen am Anfang der Ausgabe
+    
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return 11
+    [[ -z "$2" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return 12
+    
+    # -Der Name der Datei:
+    [ -z "$datei" ] && datei=${0//*\//}
+    # -Befehl zum Ausführen: $txtBEFEHL oder $1
+    [ -n "$1" ] && txtBEFEHL="$1"
+    [ -n "$2" ] && txtAUSGABEanfang="$2" || txtAUSGABEanfang="--- $datei."
+    
+    # -Zusatzoptionen beim Installieren:
+    # --empfohlen: --install-recommends
+    # --vorgeschlagen: --install-suggests
+    #txtBefehlZusatzInstallieren="apt --install-recommends --install-suggests"
+    #[[ "$txtBEFEHL" == "apt install"* ]] && txtBEFEHL=${txtBEFEHL//apt/$txtBefehlZusatzInstallieren}
+    
+    txtBefehlFehler="Keine Fehlermeldung vorhanden."
+    [[ "${txtBEFEHL: -1}" == " " ]] && txtBEFEHL="${txtBEFEHL:0 :-1}"
+    
+    [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""full-upgrade" ]] && [ -z "$flagCheckAusgabeAptUpdate" ] && return
+    
+    if ( [[ "$flagTESTDRIVE" != "true" ]] )
+    then
+        echo -e "$txtAUSGABEanfang""AUSFÜHREN: '$txtBEFEHL'"
+        actionBEFEHL="echo -e $txtBEFEHL"
+        #[[ "$txtBEFEHL" == "apt update" ]] && `$actionBEFEHL` >$dateiTMPBefehlAusgabe 2>$dateiTMPBefehlFehler || `$actionBEFEHL` 2>$dateiTMPBefehlFehler
+        [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && `$actionBEFEHL` 2>$dateiTMPBefehlFehler | tee $dateiTMPBefehlAusgabe || `$actionBEFEHL` 2>$dateiTMPBefehlFehler
+        stsBEFEHL=$?
+        
+        #[ -f $dateiTMPBefehlAusgabe ] && cat $dateiTMPBefehlAusgabe
+        [[ -f $dateiTMPBefehlFehler ]] && [[ -n "`cat $dateiTMPBefehlFehler`" ]] && txtBefehlFehler="`cat $dateiTMPBefehlFehler`"
+        
+        # -Ausgabe von 'apt update' auswerten:
+        [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && fncCheckAusgabeAptUpdate "$dateiTMPBefehlAusgabe"
+        
+        # -Exit-Status auswerten:
+        #[ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""ERFOLGREICH: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""ERFOLGREICH: Status: '$stsBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Status: '$stsBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Info:   '$txtBefehlFehler'"
+        [ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""ERFOLGREICH: Befehl: '$txtBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: Befehl: '$txtBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Status: '$stsBEFEHL'"\\n"$txtAUSGABEanfang""FEHLER: Info:   '$txtBefehlFehler'"
+        [[ -f $dateiTMPBefehlAusgabe ]] && rm $dateiTMPBefehlAusgabe
+        [[ -f $dateiTMPBefehlFehler ]] && rm $dateiTMPBefehlFehler
+        
+        # -Info PopUp bzgl Aktualisierung:
+        if ( [[ "$flagInfoPopup" == "true" ]] )
+        then
+            [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && [ -z "$flagCheckAusgabeAptUpdate" ] && kdialog --title "$datei.$$" --sorry "<b>$datei.Info:</b><br><br>Es sind keine Aktualisierungen verfügbar!<br><br>" 2>/dev/null &
+            [[ "$txtBEFEHL" == "apt ""$strBefehlAutoYes""update" ]] && [ -n "$flagCheckAusgabeAptUpdate" ] && kdialog --title "$datei.$$" --msgbox "<b>$datei.Info:</b><br><br>Es sind Aktualisierungen verfügbar!<br><br>" 2>/dev/null &
+        fi
+    else
+        echo -e "$txtAUSGABEanfang""TESTMODUS: '$txtBEFEHL'"
+        stsBEFEHL=$?
+    fi
+    echo -e "$txtAUSGABEanfang"
+    return $stsBEFEHL;
+}
+# -------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Standardparameter setzen ------------------------------------------------------------
+pfad="$1"
+flag_update="$2"
+flag_aufruf_intern="$3"
+zeitSTARTutc=`date '+%s'`
+zeitSTART=`date -d @$zeitSTARTutc`
+zeitSTARTdateiname=`date -d @$zeitSTARTutc '+%F_%T'`
+zeitSTARTdateiname=${zeitSTARTdateiname//\-/}
+zeitSTARTdateiname=${zeitSTARTdateiname//:/}
+zeitSTARTdateiname=${zeitSTARTdateiname//_/\-}
+flagACTION="false"
+
+
+# -------------------------------------------------------------------
+# ----- START Cronjob Anpassung: Format Werte setzen ----------------
+if [[ `tty` != *dev* ]]
+then
+    # --- Cronjob!!! ---
+    # -Da tput nur mit $TERM funktioniert, werden keine Format Werte gesetzt.
+    fmtFETT=""
+    fmtINVERS=""
+    fmtUNTERSTRICHEN=""
+    fmtRESET=""
+else
+    # --- KEIN Cronjob!!! ---
+    # echo -e "${fmtFETT}text...blabla${fmtRESET}"
+    fmtFETT=`tput bold`
+    fmtINVERS=`tput rev`
+    fmtUNTERSTRICHEN=`tput smul`
+
+    fmtCOLORfgBLAU=`tput setf 1`
+    fmtCOLORfgGRUEN=`tput setf 2`
+    fmtCOLORfgGELB=`tput setf 3`
+    fmtCOLORfgROT=`tput setf 4`
+    fmtCOLORbgBLAU=`tput setb 1`
+    fmtCOLORbgGRUEN=`tput setb 2`
+    fmtCOLORbgGELB=`tput setb 3`
+    fmtCOLORbgROT=`tput setb 4`
+
+    fmtRESET=`tput sgr0`
+fi
+# ----- ENDE Cronjob Anpassung: Format Werte setzen -----------------
+# -------------------------------------------------------------------
+
+
+
+[[ ! $dateiVersionInfoNr ]] && fncAUSLESENversion
+[[ -z "$datei" ]] && echo -e "[FEHLER: Variable konnte nicht gelesen werden: 'datei']" && exit 22;
+txtTITEL="Einfache Verwaltung für Audio Streaming Server!"
+
+
+strVerzeichnisLogs="/aa_daten/bak/log/icecast2/$datei"
+[[ ! -d "$strVerzeichnisLogs" ]] && $(mkdir -p "$strVerzeichnisLogs")
+
+#strVerzeichnisTmp="/home/$nutzer/tmp"
+strVerzeichnisTmp="$strVerzeichnisLogs"
+[[ ! -d "$strVerzeichnisTmp" ]] && $(mkdir -p "$strVerzeichnisTmp")
+
+dateiLOGS="$strVerzeichnisLogs/$datei.LOGS.txt"
+dateiLOGStmp="$dateiLOGS"".tmp"
+dateiLogsSongInfo="$strVerzeichnisLogs""/""$datei.SongInfo.txt"
+
+dateiCacheUpdate="$strVerzeichnisLogs/$datei.Cache.Update.txt"
+
+strVerzeichnisPls="/aa_daten/bak/log/icecast2"
+dateiPlaylistAktuell="$strVerzeichnisPls/$datei.PLS.txt"
+
+
+txtCheckPaketAusgabe=""
+stsCheckPaketAusgabe=""
+stsCheckPaketExitcode=""
+
+layoutAusgabeAnfang="|- "
+
+flagNowPlayingDJset="false"
+
+typeset -i intLogZeilenNummer="0"
+function fncLogZeileStartNummeriert {
+    intLogZeilenNummer=intLogZeilenNummer+7
+    txtLogZeilenNummer="$intLogZeilenNummer"
+    
+    #(( $intLogZeilenNummer < 10000 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
+    (( $intLogZeilenNummer < 1000 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
+    (( $intLogZeilenNummer < 100 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
+    (( $intLogZeilenNummer < 10 )) && txtLogZeilenNummer=" $txtLogZeilenNummer"
+    logZeileStart="[$(fncYEAR1231 '1231') $(fncHHMMSS 'norm.mS3')]"
+    echo -en "$txtLogZeilenNummer $logZeileStart "
+}
+
+function fncLogZeileStart {
+    logZeileStart="[$(fncYEAR1231 '1231') $(fncHHMMSS 'norm.mS3')]"
+    echo -en "$logZeileStart"
+}
+
+# fncLogZeileStart
+# fncLogZeileStart
+# fncLogZeileStart
+# intLogZeilenNummer="42"
+# fncLogZeileStart
+# fncLogZeileStart
+# fncLogZeileStart
+# intLogZeilenNummer="666"
+# fncLogZeileStart
+# fncLogZeileStart
+# fncLogZeileStart
+
+
+# ----- ENDE Standardparameter setzen -------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------------
+# ----- START -------------------------------------------------------------------------------------
+# ----- ENDE --------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Server Status überprüfen ------------------------------------------------------------
+# -Erforderlich: icecast2, darkice
+
+#arrProzesseErforderlich=(icecast2 zwiebelsuppe darkice)
+arrProzesseErforderlich=(icecast2 darkice)
+
+function fncCheckProzesseErforderlich {
+    # -Check ob die erforderlichen Programme laufen:
+    # --$1 ist der Prozessname!!!
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+    
+    strProzessSucheErgebnis=(`ps -A -o comm= | grep -i $1`)
+    [[ -z "$strProzessSucheErgebnis" ]] && echo -e "$(fncLogZeileStart) EE FEHLER: $1 läuft nicht! [${FUNCNAME[0]}]" && exit 22;
+}
+
+for i in "${arrProzesseErforderlich[@]}"
+do
+    #echo -e "--> Prozess prüfen: $i"
+    fncCheckProzesseErforderlich "$i"
+    #echo -e "--> Prozess läuft: $i"
+done
+
+# ----- ENDE Server Status überprüfen -------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Action Argument auswerten -----------------------------------------------------------
+strAction="$1"
+# -case $strAction
+# --Start Stop
+# ---icecast2 darkice
+# --Titel Update
+# ---songrec
+# ---qdbus
+# -esac
+# ----- ENDE Action Argument auswerten ------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+# -Jack Connection Kit starten:
+#jackd -d alsa --device hw:2 --rate 44100 --period 128 &
+#jackd -d alsa --device hw:MKII --rate 44100 --period 128 &
+#jackd -d alsa &
+#jackd -d alsa --rate 44100 --period 128 &
+#jackd -d alsa --rate 44100 --period 128 &
+
+#fncKILLpid `ps -C jackd -o pid=`
+
+
+# systemctl start icecast2
+# 
+# sleep 0.5
+# 
+# darkice
+
+
+
+
+###################################################################################################
+###################################################################################################
+# -Titel Infos auslesen:
+# --Mittels songrec Interpret und Titel ermitteln
+# --Mittels qdbus/mpris die Metadaten direkt vom streamenden Mediaplayer abfragen
+# -Titel Infos vergleichen und sinnvolle Daten updaten:
+# --id3SongrecTitel==id3QdbusMprisTitel -> id3SongrecTitel
+# --id3SongrecTitel!=id3QdbusMprisTitel -> id3QdbusMprisTitel
+
+#songrec recognize
+# ##### START Ausgabe #########################################################
+# Using device alsa_output.pci-0000_00_1b.0.analog-stereo.monitor
+# L.P. Rhythm - In the House (feat. Gaskin)
+# ##### ENDE Ausgabe ##########################################################
+
+#qdbus org.mpris.MediaPlayer2.clementine /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Metadata
+# ##### START Ausgabe #########################################################
+# bitrate: 268
+# mpris:artUrl: file:///tmp/clementine-art-VcmLAI.jpg
+# mpris:length: 8974000000
+# mpris:trackid: /org/clementineplayer/Clementine/Track/233
+# xesam:album: aa DefGorgonCity
+# xesam:artist: Gorgon City
+# xesam:autoRating: 78
+# xesam:comment: https://www.youtube.com/watch
+# xesam:contentCreated: 2023-12-17T08:56:45
+# xesam:lastUsed: 2024-01-21T04:17:39
+# xesam:title: Gorgon City - Live @ Brooklyn Mirage, New York 2023
+# xesam:trackNumber: 63
+# xesam:url: file:///aa_daten/musik/aa/aaa_mix-house/aa_DefGorgonCity/152_Gorgon_City_-_Live_@_Brooklyn_Mirage_New_York_2023.mp3
+# xesam:useCount: 6
+# year: 2023
+# ##### ENDE Ausgabe ##########################################################
+
+# fncECHOlxL "$(fncLogZeileStart) --- Ausführung im Terminal:"
+# fncECHOlxL "---- PATH: /usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/home/lx21/bin:/home/lx21/.cargo/bin"
+# fncECHOlxL "---- SHELL: /bin/sh"
+# fncECHOlxL "---- DISPLAY: :0"
+# fncECHOlxL "---- DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus"
+# fncECHOlxL "---"
+
+# fncECHOlxL "$(fncLogZeileStart) II -Environment Variablen anzeigen:"
+# fncECHOlxL "$(fncLogZeileStart) II -PATH: $PATH"
+# fncECHOlxL "$(fncLogZeileStart) II -SHELL: $SHELL - DISPLAY: $DISPLAY"
+# fncECHOlxL "$(fncLogZeileStart) II -DBUS_SESSION_BUS_ADDRESS: $DBUS_SESSION_BUS_ADDRESS"
+# fncECHOlxL "$(fncLogZeileStart)"
+
+
+
+
+#source /home/lx21/.environment
+#source /aa_daten/bak/system/environment-vars.txt
+
+PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/home/lx21/bin:/home/lx21/.cargo/bin"
+SHELL="/bin/sh"
+DISPLAY=":0"
+DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/1000/bus"
+
+
+
+
+# fncECHOlxL "$(fncLogZeileStart) II -Environment Variablen mit source einbinden:"
+# fncECHOlxL "$(fncLogZeileStart) II -PATH: $PATH"
+# fncECHOlxL "$(fncLogZeileStart) II -SHELL: $SHELL - DISPLAY: $DISPLAY"
+# fncECHOlxL "$(fncLogZeileStart) II -DBUS_SESSION_BUS_ADDRESS: $DBUS_SESSION_BUS_ADDRESS"
+# fncECHOlxL "$(fncLogZeileStart)"
+
+
+
+
+
+
+#fncDEBUGstart
+
+function fncUpdateMetadaten_Auslesen {
+    [[ -f $dateiLogsSongInfo ]] && rm $dateiLogsSongInfo
+    #timeout 50 songrec recognize -d "alsa_output.pci-0000_00_1b.0.analog-stereo.monitor" > "$dateiLogsSongInfo" 2>&1
+    timeout 55 songrec recognize > "$dateiLogsSongInfo" 2>&1
+    #/usr/bin/timeout 50 /home/lx21/.cargo/bin/songrec recognize > "$dateiLogsSongInfo" 2>&1
+    stsExitcodeTimeout="$?"
+    #[[ "$stsExitcodeTimeout" != "0" ]] && echo -e "$(fncLogZeileStart) EE -FEHLER: '$stsExitcodeTimeout'"\\n"$(fncLogZeileStart) EE 'songrec', '${FUNCNAME[0]}', '$datei'" > "$dateiLogsSongInfo" && echo -e "Fehler.Timeout" >> "$dateiLogsSongInfo"
+    
+    # -Die temporäre $dateiLogsSongInfo neu erstellen und Fehlerinfo hinein schreiben, da Qdbus die
+    #  Datei erwartet:
+    [[ "$stsExitcodeTimeout" != "0" ]] && echo -e "--> FEHLER: '$stsExitcodeTimeout' - $datei.${FUNCNAME[0]}.songrec" >> "$dateiLogsSongInfo" && echo -e "Fehler.$stsExitcodeTimeout" >> "$dateiLogsSongInfo"
+    
+    # -Die komplette $dateiLogsSongInfo zur Fehlerdiagnose in die Logdatei übertragen:
+    [[ "$stsExitcodeTimeout" != "0" ]] && fncECHOlxL "$(fncLogZeileStart) EE +++++ Debug Info START +++++" && cat $dateiLogsSongInfo >> $dateiLOGS && fncECHOlxL "$(fncLogZeileStart) EE +++++ Debug Info ENDE +++++"
+    
+    qdbus org.mpris.MediaPlayer2.clementine /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Metadata >> "$dateiLogsSongInfo" 2>&1
+}
+fncUpdateMetadaten_Auslesen
+
+#fncDEBUGstop
+
+
+
+
+strMetaAktuellArtist=""
+strMetaAktuellTitle=""
+strMetaAktuellDJset=""
+strMetaAktuellUpdateInfo=""
+function fncUpdateMetadaten_Check {
+    # -Lokale Variablen:
+    local lcIntZeileAktuell="0"
+    typeset -i lcIntZeileAktuell="0"
+    local lcStrMetaSongrec=""
+    local lcStrMetaSongrecArtist=""
+    local lcStrMetaSongrecTitle=""
+    local lcStrMetaQdbus=""
+    local lcStrMetaQdbusArtist=""
+    local lcStrMetaQdbusTitle=""
+    local lcIntMetaQdbusLength=""
+    typeset -i lcIntMetaQdbusLength=""
+    local lcIntDJsetLengthMinimumSek="1200"
+    typeset -i lcIntDJsetLengthMinimumSek="1200"
+    
+    while read id3SongInfoTmp
+    do
+        #nix=1
+        if ( [[ "$id3SongInfoTmp" != "" ]] )
+        then
+            #nix=1
+            lcIntZeileAktuell=lcIntZeileAktuell+1
+            
+            # -Ausgabe des Songrec Befehls erkennen und zuweisen:
+            #
+            # --Altes System, Ausgabe hat immer (norm und Fehler) nur 2 Zeilen:
+            #[[ "$lcIntZeileAktuell" -lt 3 ]] && [[ "$id3SongInfoTmp" != Using\ device* ]] && lcStrMetaSongrec="$id3SongInfoTmp" && continue
+            #
+            # --Neues System, norm Ausgabe hat 2 Zeilen, Fehler Ausgabe hat 3 Zeilen:
+            # --Ausgabe norm:
+            [[ "$lcIntZeileAktuell" -eq 2 ]] && [[ "$id3SongInfoTmp" != *FEHLER* ]] && lcStrMetaSongrec="$id3SongInfoTmp" && continue
+            # --Ausgabe Fehler:
+            [[ "$lcIntZeileAktuell" -eq 2 ]] && [[ "$id3SongInfoTmp" == *FEHLER* ]] && continue
+            [[ "$lcIntZeileAktuell" -eq 3 ]] && [[ "$lcStrMetaSongrec" == "" ]] && lcStrMetaSongrec="$id3SongInfoTmp" && continue
+            
+            
+            # -Ausgabe des Qdbus Befehls erkennen und zuweisen:
+            [[ "$id3SongInfoTmp" == mpris:length:* ]] && lcIntMetaQdbusLength="${id3SongInfoTmp//mpris:length:\ /}" && continue
+            [[ "$id3SongInfoTmp" == xesam:album:* ]] && lcStrMetaQdbusAlbum="${id3SongInfoTmp//xesam:album:\ /}" && continue
+            [[ "$id3SongInfoTmp" == xesam:artist:* ]] && lcStrMetaQdbusArtist="${id3SongInfoTmp//xesam:artist:\ /}" && continue
+            [[ "$id3SongInfoTmp" == xesam:title:* ]] && lcStrMetaQdbusTitle="${id3SongInfoTmp//xesam:title:\ /}" && break
+            
+            #[[ "$id3SongInfoTmp" == "" ]]
+        fi
+    done < "$dateiLogsSongInfo"
+    
+    # -Songrec Daten aufteilen:
+    lcStrMetaSongrecArtist="${lcStrMetaSongrec//\ \-\ */}"
+    lcStrMetaSongrecTitle="${lcStrMetaSongrec//*\ \-\ /}"
+    #[[ "$lcStrMetaSongrec" == *FEHLER* ]] &&
+    
+    #echo -e "--- DEBUG Songrec Artist: $lcStrMetaSongrecArtist"
+    #echo -e "--- DEBUG Songrec Title: $lcStrMetaSongrecTitle"
+    #echo -e "---"
+    
+    lcIntMetaQdbusLength=$(echo -e " $lcIntMetaQdbusLength/1000000 " | bc)
+    [[ "$lcIntMetaQdbusLength" -gt "$lcIntDJsetLengthMinimumSek" ]] && flagNowPlayingDJset="true"
+    
+    [[ "$lcStrMetaQdbusArtist" == "$lcStrMetaSongrecArtist" ]] && lcStrMetaQdbusTitle="${lcStrMetaQdbusTitle//$lcStrMetaQdbusArtist*\-/}"
+    #echo -e "--- DEBUG Qdbus Length: $lcIntMetaQdbusLength"
+    #echo -e "--- DEBUG Qdbus Album: $lcStrMetaQdbusAlbum"
+    #echo -e "--- DEBUG Qdbus Artist: $lcStrMetaQdbusArtist"
+    #echo -e "--- DEBUG Qdbus Title: $lcStrMetaQdbusTitle"
+    #echo -e "---"
+    
+    strMetaAktuellDJset="$lcStrMetaQdbusTitle"
+    [[ "$lcStrMetaQdbusTitle" != *$lcStrMetaQdbusArtist* ]] && strMetaAktuellDJset="$lcStrMetaQdbusArtist $lcStrMetaQdbusTitle"
+    
+    [[ "$flagNowPlayingDJset" == "true" ]] && strMetaAktuellArtist="$lcStrMetaSongrecArtist" && strMetaAktuellTitle="$lcStrMetaSongrecTitle" && strMetaAktuellUpdateInfo="$lcStrMetaSongrecTitle - $strMetaAktuellArtist - DJ-Set: $strMetaAktuellDJset"
+    
+    [[ "$flagNowPlayingDJset" == "false" ]] && strMetaAktuellArtist="$lcStrMetaQdbusArtist" && strMetaAktuellTitle="$lcStrMetaQdbusTitle" && strMetaAktuellUpdateInfo="$lcStrMetaSongrecTitle - $strMetaAktuellArtist"
+    
+    #echo -e "--- DEBUG Aktuell Artist: $strMetaAktuellArtist"
+    #echo -e "--- DEBUG Aktuell Title: $strMetaAktuellTitle"
+    #echo -e "---"
+    
+}
+fncUpdateMetadaten_Check
+
+# function fncTest {
+# logZeileStart="[$(fncYEAR1231 '1231') $(fncHHMMSS 'norm.mS3')]"
+# fncECHOlxL "$logZeileStart - Artist:\\t$strMetaAktuellArtist"
+# logZeileStart="[$(fncYEAR1231 '1231') $(fncHHMMSS 'norm.mS3')]"
+# fncECHOlxL "$logZeileStart - Title:\\t$strMetaAktuellTitle"
+# logZeileStart="[$(fncYEAR1231 '1231') $(fncHHMMSS 'norm.mS3')]"
+# fncECHOlxL "$logZeileStart - DJ-Set:\\t$strMetaAktuellDJset"
+# }
+# fncTest
+
+
+
+###################################################################################################
+###################################################################################################
+# -Titel URL codieren:
+# python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "G/C - live@Club"
+# -> "G/C%20-%20live%40Club"
+# -Da ein Slash nicht codiert wird, muss dies ggf hier noch händisch gemacht werden:
+# ${URL2encode//\//$2F}
+
+strTxtEncoded=""
+function fncURLEncode {
+    [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+    strTxt2Encode="$1"
+    #echo -e "$strTxt2Encode"
+    
+    strTxtEncoded="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$strTxt2Encode")"
+    strTxtEncoded="${strTxtEncoded//\//\%2F}"
+    #echo -e "$strTxtEncoded"
+}
+#fncURLEncode "You can't do that... - @ Stage/Tour"
+fncURLEncode "$strMetaAktuellUpdateInfo"
+
+# -Bei Songrec Fehlermeldungen wird nur die DJSet Info aktualisiert:
+[[ "$strMetaAktuellTitle" == *Fehler* ]] && fncURLEncode "$strMetaAktuellDJset"
+
+txtEncodedUpdateInfo="$strTxtEncoded"
+#echo -e "$txtEncodedUpdateInfo"
+#echo -e "-->"
+
+
+
+###################################################################################################
+###################################################################################################
+# -Stream Update:
+# --Beispiel:
+#   curl "http://u:pwd@i4u.spdns.de:8000/admin/metadata?mount=%2Fdu&mode=updinfo&song=BO%20of%20Music"
+
+#fncECHOlxL "$(fncLogZeileStart) --- Update-Info: $strMetaAktuellUpdateInfo"
+
+
+function fncUpdateMetadaten_Curl {
+    curl "http://lx21:eisPASSwort@i4u.spdns.de:8000/admin/metadata?mount=%2Fdu&mode=updinfo&song=$txtEncodedUpdateInfo" >> $dateiLogsSongInfo 2>&1
+
+    while read id3SongInfoTmp
+    do
+        #nix=1
+        if ( [[ "$id3SongInfoTmp" != "" ]] )
+        then
+            #nix=1
+            [[ "$id3SongInfoTmp" == *Metadata\ update\ successful* ]] && flagUpdateMetadatenErfolgreich="true" && break
+            
+            #[[ "$id3SongInfoTmp" == "" ]]
+        fi
+    done < "$dateiLogsSongInfo"
+}
+fncUpdateMetadaten_Curl
+
+
+
+
+
+
+
+
+
+
+
+# #############################################################################
+# ##### START Daten Update: in Playliste, in Logdatei #########################
+
+# in Logdatei eintragen:
+#fncECHOlxP "$(fncLogZeileStart) - Update (komplett):\\t$strMetaAktuellUpdateInfo"
+#fncECHOlxL "$(fncLogZeileStart) - Status des Update: $flagUpdateMetadatenErfolgreich"
+#fncECHOlxL "$(fncLogZeileStart)"
+
+
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# -Doppelte Einträge in Playliste vermeiden:
+# --Letztes Update aus der Cachedatei laden.
+# --Cache mit aktuellen Daten vergleichen und nur bei Änderung neues
+#   Update durchführen.
+
+# -Cache laden:
+typeset -i zCache=0
+flagUpdatePlsErforderlich="false"
+while read txtCacheUpdate
+do
+    [[ "$txtCacheUpdate" == "" ]] && break
+    zCache=zCache+1
+    #echo -e "--- DEBUG $txtCacheUpdate" >> "$dateiLogsSongInfo"
+    # -Vergleichen: Aktuelle Daten != Cachedaten
+    #  Zeile 1: Titel==Cache, Zeile 2: Artist==Cache, Zeile 3: DJSet==Cache
+    (( "$zCache" == 1 )) && [[ "$txtCacheUpdate" != "$strMetaAktuellTitle" ]] && flagUpdatePlsErforderlich="true"
+    (( "$zCache" == 2 )) && [[ "$txtCacheUpdate" != "$strMetaAktuellArtist" ]] && flagUpdatePlsErforderlich="true"
+    (( "$zCache" == 3 )) && [[ "$txtCacheUpdate" != "$strMetaAktuellDJset" ]] && flagUpdatePlsErforderlich="true" #flagUpdatePlsErforderlich="false"
+done < $dateiCacheUpdate
+
+[[ ! -f "$dateiPlaylistAktuell" ]] && flagUpdatePlsErforderlich="true"
+
+function fncUpdatePls {
+    #flagUpdateMetadatenErforderlich="false"
+    fncECHOlxP "$(fncLogZeileStart) - Titel:\\t$strMetaAktuellTitle"
+    fncECHOlxP "$(fncLogZeileStart) - Artist:\\t$strMetaAktuellArtist"
+    fncECHOlxP "$(fncLogZeileStart) - DJ-Set:\\t$strMetaAktuellDJset"
+    fncECHOlxP "$(fncLogZeileStart) - Status des Update: $flagUpdateMetadatenErfolgreich"
+    fncECHOlxP "$(fncLogZeileStart)"
+}
+
+# -Daten eintragen in Playliste:
+[[ "$flagUpdatePlsErforderlich" == "true" ]] && fncUpdatePls
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+# -Daten eintragen in Logdatei:
+fncECHOlxL "$(fncLogZeileStart) -- Inhalt des Update: $strMetaAktuellUpdateInfo"
+fncECHOlxL "$(fncLogZeileStart) -- Status des Update: $flagUpdateMetadatenErfolgreich"
+fncECHOlxL "$(fncLogZeileStart)"
+
+
+# -Daten eintragen in Cache.Update:
+#[[ -f "$dateiCacheUpdate" ]] && rm "$dateiCacheUpdate"
+echo -e "$strMetaAktuellTitle" > "$dateiCacheUpdate" 2>> "$dateiLOGS"
+echo -e "$strMetaAktuellArtist" >> "$dateiCacheUpdate" 2>> "$dateiLOGS"
+echo -e "$strMetaAktuellDJset" >> "$dateiCacheUpdate" 2>> "$dateiLOGS"
+echo -e "$flagUpdateMetadatenErfolgreich" >> "$dateiCacheUpdate" 2>> "$dateiLOGS"
+
+
+# ##### ENDE Daten Update: in Playliste, in Logdatei #########################
+# #############################################################################
+
+
+
+
+
+
+exit 0;
+
+
+
+
+
+
+###################################################################################################
+###################################################################################################
+# -Stream Update:
+
+# curl "http://lx21:eisPASSwort@i4u.spdns.de:8000/admin/metadata?mount=%2Fdu&mode=updinfo&song=Strictly%20House%20Music"
+
+#curl "http://lx21:eisPASSwort@i4u.spdns.de:8000/admin/metadata?mount=%2Fdu&mode=updinfo&song=best%20of%20house%20rock%20hiphop"
+
+# --data-urlencode ""
+
+curl "http://lx21:eisPASSwort@i4u.spdns.de:8000/admin/metadata?mount=%2Fdu&mode=updinfo&song=Gorgon%20City"
+
+curl --data-urlencode "mount=/du" --data-urlencode "mode=updinfo" --data-urlencode "song=Gorgon City" "http://lx21:eisPASSwort@i4u.spdns.de:8000/admin/metadata"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit 0;

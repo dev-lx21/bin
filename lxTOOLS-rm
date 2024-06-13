@@ -1,0 +1,839 @@
+#!/bin/bash
+# script von -lx-
+
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+    
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+    
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+    
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+    
+    # -Nur den Infotext ausschneiden: 
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+    
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+    
+}
+[ -z $dateiVersionInfoNr ] && fncAUSLESENversion
+
+
+function fncECHOlx {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    strSONDERZEICHENuvz=""
+    if ( [[ "$1" != "" ]] )
+    then
+        #[[ "$flagAUFRUFintern" == "true" ]] && strSONDERZEICHENuvz=" -!!!-"
+        echo -e "$1$strSONDERZEICHENuvz"
+        echo -e "$1$strSONDERZEICHENuvz" >> $dateiLOGS
+        #echo -e "$1$strSONDERZEICHENuvz" >> $dateiLOGSarchiv
+    fi
+    strSONDERZEICHENuvz=""
+}
+function fncECHOlxL {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        #echo -e "$1"
+        echo -e "$1" >> $dateiLOGS
+        #echo -e "$1" >> $dateiLOGSarchiv
+    fi
+}
+function fncECHOlxD {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        #echo -e "$1" >> $dateiLOGS
+    fi
+}
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Prozess Option --------------------------------------------------------------------------
+# -Der Elternprozess und dessen Kindprozesse müssen gesucht werden!
+#arrPROZESSE=($datei youtube-dl)
+arrPROZESSE=($datei)
+
+if ( [[ "$1" == "-PS" ]] )
+then
+    echo -e "-"\\n"--- Eigene Prozesse anzeigen: ---------------------------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        echo -e "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            echo -e "$ausgabe"
+        else
+            echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        echo -e "-"
+    done
+    exit 0;
+fi
+
+if ( [[ "$1" == "-PSK" ]] )
+then
+    echo -e "-"\\n"--- Eigene Prozesse anzeigen und beenden (kill): --------------------------------------------------"\\n"-"
+    for i in "${arrPROZESSE[@]}"
+    do
+        echo -e "- Prozess: $i:"
+        ausgabe=`lxPS -q $i`
+        if ( [[ "$ausgabe" != "" ]] )
+        then
+            echo -e "$ausgabe"
+            ausgabePIDs=`lxPS -pid $i`
+            ausgabePIDs=${ausgabePIDs//$$/}
+            for ii in $ausgabePIDs
+            do
+                nix=1
+                #echo -e "- PIDs: "$ii
+                #ps -ppid $ii -o pid=
+                ausgabeCHILDPIDsTMP=`ps --ppid $ii -o pid=`
+                ausgabeCHILDPIDs=$ausgabeCHILDPIDs" "$ausgabeCHILDPIDsTMP
+            done
+            #echo -e "- PIDs: "$ausgabePIDs
+            #echo -e "- CPIDs:"$ausgabeCHILDPIDs
+            if ( [[ "$ausgabePIDs" != "" ]] )
+            then
+                echo -e "- kill -9 "$ausgabePIDs $ausgabeCHILDPIDs
+                kill -9 $ausgabePIDs $ausgabeCHILDPIDs
+            else
+                echo -e "- INFO: Keine Prozesse zum Beenden gefunden!"
+            fi
+        else
+            echo -e "- INFO: $i wurde nicht in der Prozessliste gefunden!"
+        fi
+        echo -e "-"
+    done
+    exit 0;
+fi
+
+# ----- ENDE Prozess Option ---------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+zeitSTARTutc=`date '+%s'`
+zeitSTART=`date -d @$zeitSTARTutc`
+zeitSTARTdateiname=`date -d @$zeitSTARTutc '+%F_%T'`
+zeitSTARTdateiname=${zeitSTARTdateiname//\-/}
+zeitSTARTdateiname=${zeitSTARTdateiname//:/}
+zeitSTARTdateiname=${zeitSTARTdateiname//_/\-}
+
+fmtFETT=`tput bold`
+fmtINVERS=`tput rev`
+fmtUNTERSTRICHEN=`tput smul`
+fmtRESET=`tput sgr0`
+
+datei=${0//*\//}
+txtTITEL="Dateien oder Verzeichnisse löschen!"
+nutzer=`ps --pid $$ -o user=`
+
+# -Anzahl der zu kopierenden Quellen:
+typeset -i intANZAHLquellen=1
+typeset -i intZ=1
+
+# -die Namen der Dateien zum Zwischenspeichern und Loggen festlegen:
+#dateiURLS="00_$datei.URLS.txt"
+dateiLOGS="00_$datei.LOGS.txt"
+dateiLOGStmp="00_$datei.LOGS.txt.tmp"
+
+flagACTION="false"
+flagTESTDRIVE="false"
+txtTESTDRIVE=""
+flagQuietmode="false"
+flagClearX="true"
+
+
+strg1="-"
+strg2="-"
+strg3="-"
+# -Die Argumente kontrollieren und neu aufteilen:
+# --ALLE normalen Optionen (-q,-h,...) werden im $strg1 gespeichert
+# --die Shutdown Optionen (-off...) werden im $strg2 gespeichert
+for i in "$@"
+do
+    # -Pfad aus Kommandozeile übernehmen:
+    #[[ -d "$i" ]] && echo -e "--- DEBUG Verzeichnis"
+    [[ -d "$i" ]] && pfad="$i" && continue
+    [[ "$i" == */* ]] && continue
+    
+    if ( [[ "$i" == -*f* ]] && [[ "$i" != -off* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"f"
+        #echo -e "|- \"$i\" * einzel Vergleich: -f gesetzt"
+    fi
+    if ( [[ "$i" == -*h* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"h"
+        flagClearX="false"
+    fi
+    if ( [[ "$i" == -*l* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"l"
+        flagClearX="false"
+    fi
+    if ( [[ "$i" == -*t* ]] && [[ "$i" != -url* ]] )
+    then
+        #strg1=$strg1"l"
+        flagTESTDRIVE="true"
+        txtTESTDRIVE=" Testmodus"
+    fi
+    if ( [[ "$i" == -*q* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"q"
+        flagQuietmode="true"
+        flagClearX="false"
+    fi
+    if ( [[ "$i" == -*qq* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == -*qqq* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+done
+
+[[ -z "$pfad" ]] && pfad="`pwd`"
+[[ "$pfad" != */ ]] && pfad=$pfad"/"
+#echo -e "--- DEBUG Pfad: '$pfad'"
+
+
+
+
+
+
+
+txtHR="|--------------------------------------------------------------------------------"
+
+
+txtKOPF=\
+"$txtHR"\\n\
+"|- $datei -| $txtTITEL"\\n\
+"|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt)"\\n\
+"$txtHR"\\n\
+"|- $zeitSTART"\\n\
+"|-"
+
+txtKOPFlogs="$txtKOPF"
+
+
+txtBENUTZUNG=\
+"|- Benutzung:"\\n\
+"|- '$datei [OPTION]...'"\\n\
+"|- Komfortabel Dateien oder Verzeichnisse löschen. Es können entweder bestimmte Dateien"\\n\
+"|- im gewählten Verzeichnis oder das gewählte Verzeichnis selbst gelöscht werden."\\n\
+"|- Optional kann festgelegt werden, ob der Löschvorgang auch in den Unterverzeichnissen"\\n\
+"|- ausgeführt werden soll."\\n\
+"|-"\\n\
+"|- Standard:"\\n\
+"|- -1. Datei(en) zum Löschen auswählen oder Abbrechen und direkt weiter zur Verzeichnisauswahl."\\n\
+"|- -2. Verzeichnis in dem die Dateien gelöscht werden sollen auswählen oder das Verzeichnis das"\\n\
+"|-     gelöscht werden soll auswählen."\\n\
+"|-     Falls keine Datei(en) und kein Verzeichnis gewählt wurden, wird das Skript beendet!"\\n\
+"|- -3. Abfrage ob beim Löschvorgang auch Unterverzeichnisse (rekursiv) durchsucht werden sollen."\\n\
+"|- -4. Löschvorgang wird gestartet."\\n\
+"|-"
+
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Optionen:"\\n\
+"|- -h\\tDiesen Hilfetext anzeigen. Andere Optionen werden ignoriert."\\n\
+"|- -q\\tQuietmode: Keine Ausgabe von Kopfzeile und anderen Informationen, die Sicherheitsfrage"\\n\
+"|-   \\tüberspringen und direkt das Skript starten."\\n\
+"|- -t\\tDen Testmodus starten."\\n\
+"|- -l\\tDie Logdatei im aktuellen Verzeichnis anzeigen. Andere Optionen werden ignoriert."\\n\
+"|-"\\n\
+"|- Manche Optionen können kombiniert werden. Dabei ist '-qf' das gleiche wie '-fq'."\\n\
+"|-"
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tKein zulässiges Argument übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+txtENDEzeitFEHLER=\\n\
+"|-"\\n\
+"|- Skript Start:\t$zeitSTART"\\n\
+"|- Skript Ende: \t"
+
+txtENDEzeit=\\n\
+"|- Skript Start:  \t$zeitSTART"\\n\
+"|- Kopieren Start:\t"
+
+
+
+
+
+
+# -Die Hilfe anzeigen:
+if ( [[ "$strg1" == -*h* ]] )
+then
+    echo -e $txtKOPF
+    echo -e $txtHILFE
+    exit 0;
+fi
+
+# -Die Logdatei anzeigen:
+if ( [[ "$strg1" == -*l* ]] )
+then
+    cat $pfad$dateiLOGS
+    echo -e \\n$txtHR
+    exit 0;
+fi
+
+
+
+
+
+
+
+
+# -ClearX bei Bedarf starten:
+[[ "$flagClearX" == "true" ]] && fncClearX
+
+
+# -Quietmode beachten:
+[[ "$flagQuietmode" == "false" ]] && echo -e $txtKOPF
+
+
+
+
+
+
+
+
+
+
+
+
+eingabeDateien=""
+function fncEingabeDateien {
+    # -Es können mehrere Dateien gewählt werden!
+    
+    vorgabePFAD="$pfad"
+    vorgabeFILTER=""
+    #eingabeDATEIfavoriten=$(kdialog --title="Favoriten wählen:" --getopenfilename "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+    
+    eingabeDateien=$(kdialog --title="Dateien zum Löschen wählen:" --getopenfilename --multiple "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+    checkDIALOG=$(echo -e "$?")
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+            checkDIALOGfehler="" ;;
+        (1)
+            # -abbruchBENUTZER
+            checkDIALOGfehler="|- Sie haben die Auswahl der Dateien abgebrochen. Das Skript startet nun die Verzeichnisauswahl." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER: Status $checkDIALOG"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Prozess beendet wurde. Entweder"\\n\
+    "|- gab es einen internen Fehler oder ein anderer Benutzer/Prozess hat das Programm"\\n\
+    "|- geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Nähere Informationen finden Sie in der Logdatei und in der Ausgabe der Konsole. Zum Aufrufen"\\n\
+    "|- der Hilfe geben Sie bitte '$datei -h' ein." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    [ "$checkDIALOG" -gt 1 ] && echo -e $checkDIALOGfehler && echo -e "|-" && exit $checkDIALOG;
+    [ "$checkDIALOG" -eq 1 ] && echo -e $checkDIALOGfehler
+#     if ( [[ "$checkDIALOGfehler" != "" ]] )
+#     then
+#         # -Fehlermeldung ausgeben und Skript beenden:
+#         echo -e $checkDIALOGfehler
+#         echo -e "|-"
+#         exit $checkDIALOG;
+#     fi
+    
+}
+fncEingabeDateien
+arrLoeschenDateien=($eingabeDateien)
+
+#[[ -z "$eingabeDateien" ]] && echo -e "|- Keine Dateien ausgewählt! - eingabeDateien"
+#[[ -z "$arrLoeschenDateien" ]] && echo -e "|- Keine Dateien ausgewählt! - arrLoeschenDateien"
+
+
+
+
+
+for i in "${arrLoeschenDateien[@]}"
+do
+    # -Wenn die Dateien als Muster zum Löschen genutzt werden, ist der Pfad unwichtig. Deshalb
+    #  wird ein Array nur mit den Dateinamen gebildet.
+    strLoeschenDateien=$i
+    [[ -z "$strLoeschenDateienOhnePfad" ]] && strLoeschenDateienOhnePfad=${i//*\//} && continue
+    [[ -n "$strLoeschenDateienOhnePfad" ]] && strLoeschenDateienOhnePfad="$strLoeschenDateienOhnePfad "${i//*\//}
+    
+done
+
+arrLoeschenDateinamen=($strLoeschenDateienOhnePfad)
+
+# echo -e "|-"
+# echo -e "|- Dateien zum Löschen:"
+# echo -e "|- $eingabeDateien"
+# echo -e "|-"
+
+
+
+
+
+
+
+eingabeVerzeichnis="/"
+function fncEingabeVerzeichnis {
+    # -Das Arbeitsverzeichnis für die Löschung wählen!
+    
+    vorgabePFAD="$pfad"
+    vorgabeFILTER=""
+    #eingabeDATEIfavoriten=$(kdialog --title="Favoriten wählen:" --getopenfilename "$vorgabePFAD" "$vorgabeFILTER" 2>/dev/null)
+    
+    txtEingabeVerzeichnisDialog="In welchem Verzeichnis soll gelöscht werden?"
+    [[ -z "$arrLoeschenDateien" ]] && txtEingabeVerzeichnisDialog="Welches Verzeichnis soll gelöscht werden?"
+    #while ( [[ "$eingabeVerzeichnis" =! "/" ]] && [[ "$eingabeVerzeichnis" =! "/home" ]] && [[ "$eingabeVerzeichnis" =! "/boot" ]] && [[ "$eingabeVerzeichnis" =! "/root" ]] && [[ "$eingabeVerzeichnis" =! "/usr" ]] && [[ "$eingabeVerzeichnis" =! "/var" ]] )
+    #while [[ "$eingabeVerzeichnis" == / ]]
+    #while (( [[ "$eingabeVerzeichnis" == / ]] || [[ "$eingabeVerzeichnis" == "//" ]] || [[ "$eingabeVerzeichnis" == /home ]] || [[ "$eingabeVerzeichnis" == /boot ]] || [[ "$eingabeVerzeichnis" == /root ]] || [[ "$eingabeVerzeichnis" == /usr ]] || [[ "$eingabeVerzeichnis" == /var ]] ) && ( [[ "$flagTESTDRIVE" == "false" ]] ))
+    while ( [[ "$eingabeVerzeichnis" == / ]] || [[ "$eingabeVerzeichnis" == "//" ]] || [[ "$eingabeVerzeichnis" == /home ]] || [[ "$eingabeVerzeichnis" == /boot ]] || [[ "$eingabeVerzeichnis" == /root ]] || [[ "$eingabeVerzeichnis" == /usr ]] || [[ "$eingabeVerzeichnis" == /var ]] )
+    do
+        eingabeVerzeichnis=$(kdialog --title="$txtEingabeVerzeichnisDialog" --getexistingdirectory "$vorgabePFAD" 2>/dev/null)
+        checkDIALOG=$(echo -e "$?")
+        checkDIALOGfehler=""
+        [[ "$eingabeVerzeichnis" == /*/ ]] && eingabeVerzeichnis="${eingabeVerzeichnis:0:-1}"
+        # -Case für Fensterüberwachung:
+        case "$checkDIALOG" in
+            (0)
+                # -Case für Eingabeüberwachung:
+                checkDIALOGfehler="" ;;
+            (1)
+                # -abbruchBENUTZER
+                checkDIALOGfehler="|- Sie haben die Auswahl des Verzeichnis abgebrochen. Das Skript wird nun beendet." ;;
+            (*)
+                # -abbruchFEHLER
+                checkDIALOGfehler="|- FEHLER: Status $checkDIALOG"\\n\
+        "|- Ihre Eingabe konnte nicht gespeichert werden, da der Prozess beendet wurde. Entweder"\\n\
+        "|- gab es einen internen Fehler oder ein anderer Benutzer/Prozess hat das Programm"\\n\
+        "|- geschlossen. Bitte starten Sie $datei neu!"\\n\
+        "|-"\\n\
+        "|- Nähere Informationen finden Sie in der Logdatei und in der Ausgabe der Konsole. Zum Aufrufen"\\n\
+        "|- der Hilfe geben Sie bitte '$datei -h' ein." ;;
+        esac
+        # -Fehlerausgabe und Skript beenden:
+        [ "$checkDIALOG" -gt 0 ] && echo -e $checkDIALOGfehler && echo -e "|-" && exit $checkDIALOG;
+        #[ "$checkDIALOG" -eq 1 ] && echo -e $checkDIALOGfehler
+    done
+}
+fncEingabeVerzeichnis
+
+strVerzeichnisLoeschen="$eingabeVerzeichnis"
+
+
+
+#echo -e "|-"
+#echo -e "|- Arbeitsverzeichnis für die Löschung:"
+#echo -e "|- $strVerzeichnisLoeschen"
+
+#echo -e "|-"
+
+
+
+
+
+
+[[ -z "$arrLoeschenDateien" ]] && txtInfoAktion="Verzeichnis löschen"
+[[ -n "$arrLoeschenDateien" ]] && txtInfoAktion="Dateien in Verzeichnis löschen"
+
+eingabeUVZEbenen=""
+txtUVZEbenen=""
+strBefehlSucheUVZEbenen=" -maxdepth 1"
+function fncEingabeUVZEbenen {
+    # -Aktion nur im gewählten Verzeichnis oder auch rekursiv in den Unterverzeichnissen
+    #  ausführen?
+    
+    eingabeUVZEbenen=$(kdialog --title="Verzeichnisebenen wählen (1,2,rekursiv):" --radiolist="<h3><center>|--- $datei ---|</center></h3><br>\
+    <b>Gewählte Aktion: $txtInfoAktion</b><br><br>\
+    Soll die Aktion nur im von Ihnen gewählten Verzeichnis oder<br>\
+    auch in den Unterverzeichnissen ausgeführt werden?<br><br>\
+    <b>-Nur im Verzeichnis:</b><br>\
+    Aktion wird nur im gewählten Verzeichnis ausgeführt!<br><br>\
+    <b>-Im Verzeichnis und erste Ebene UVZ:</b><br>\
+    Aktion wird im gewählten Verzeichnis und in direkt<br>\
+    darunter liegenden Unterverzeichnissen ausgeführt.<br><br>\
+    <b>-Im Verzeichnis und allen UVZ (rekursiv):</b><br>\
+    Aktion wird im gewählten Verzeichnis und in allen<br>\
+    Unterverzeichnissen ausgeführt.<br><br>\
+    Verzeichnis: $strVerzeichnisLoeschen" \
+    "UVZ-1" "Nur im Verzeichnis - 1" on \
+    "UVZ-2" "Im Verzeichnis und erste Ebene UVZ - 2" off \
+    "UVZ-R" "Im Verzeichnis und allen UVZ - rekursiv" off 2>/dev/null)
+    #actionGRAFIK "Nur Grafik (wget)" off  --geometry="600x500")
+    checkDIALOG=$(echo -e "$?")
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -Case für Eingabeüberwachung:
+            case "$eingabeUVZEbenen" in
+                ("UVZ-1")
+                    txtUVZEbenen="Nur im Verzeichnis - 1"
+                    strBefehlSucheUVZEbenen=" -maxdepth 1"
+                    ;;
+                ("UVZ-2")
+                    txtUVZEbenen="Im Verzeichnis und erste Ebene UVZ - 2"
+                    strBefehlSucheUVZEbenen=" -maxdepth 2"
+                    ;;
+                ("UVZ-R")
+                    txtUVZEbenen="Im Verzeichnis und allen UVZ - rekursiv"
+                    strBefehlSucheUVZEbenen=""
+                    ;;
+                (*)
+                    strBefehlSucheUVZEbenen=" -maxdepth 1"
+                    ;;
+            esac ;;
+        (1)
+            # -abbruchBENUTZER
+            checkDIALOGfehler="|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER: Status $checkDIALOG"\\n\
+    "|- Ihre Eingabe konnte nicht gespeichert werden, da der Prozess beendet wurde. Entweder"\\n\
+    "|- gab es einen internen Fehler oder ein anderer Benutzer/Prozess hat das Programm"\\n\
+    "|- geschlossen. Bitte starten Sie $datei neu!"\\n\
+    "|-"\\n\
+    "|- Nähere Informationen finden Sie in der Logdatei und in der Ausgabe der Konsole. Zum Aufrufen"\\n\
+    "|- der Hilfe geben Sie bitte '$datei -h' ein." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    [ "$checkDIALOG" -gt 0 ] && echo -e $checkDIALOGfehler && echo -e "|-" && exit $checkDIALOG;
+    
+}
+
+[[ -n "$arrLoeschenDateien" ]] && fncEingabeUVZEbenen
+[[ -z "$arrLoeschenDateien" ]] && strBefehlSucheUVZEbenen="" && txtUVZEbenen="komplettes Verzeichnis, also rekursiv"
+
+
+#echo -e "|-"
+
+
+
+
+
+#echo -e "|-"
+#echo -e "|-------------------------------------------------------------------------------"
+[[ "$flagTESTDRIVE" == "true" ]] && echo -e "|- INFO: Testmodus"
+[[ -z "$arrLoeschenDateien" ]] && echo -e "|- INFO: Keine Dateien zum Löschen ausgewählt."
+[[ -n "$arrLoeschenDateien" ]] && echo -e "|- INFO: Dateien zum Löschen: $strLoeschenDateienOhnePfad"
+[[ -z "$arrLoeschenDateien" ]] && echo -en "|- INFO: Verzeichnis das gelöscht werden soll: "
+[[ -n "$arrLoeschenDateien" ]] && echo -en "|- INFO: Verzeichnis in dem gelöscht werden soll: "
+echo -e "$strVerzeichnisLoeschen"
+echo -e "|- INFO: Gewählte Verzeichnistiefe: $txtUVZEbenen"
+echo -e "|- INFO: Gewählte Aktion: $txtInfoAktion"
+echo -e "|-"
+
+
+
+
+# strBefehlSucheDateienKomplett=""
+# for i in "${arrLoeschenDateinamen[@]}"
+# do
+#     # -Wenn die Dateien als Muster zum Löschen genutzt werden, ist der Pfad unwichtig. Deshalb
+#     #  wird ein Array nur mit den Dateinamen gebildet.
+#     strBefehlSucheDateien=$i
+#     [[ -z "$strBefehlSucheDateienKomplett" ]] && strBefehlSucheDateienKomplett="-name $strBefehlSucheDateien" && continue
+#     [[ -n "$strBefehlSucheDateienKomplett" ]] && strBefehlSucheDateienKomplett="$strBefehlSucheDateienKomplett -o -name $strBefehlSucheDateien"
+#     
+# done
+# strBefehlSucheDateienKomplett="\( "$strBefehlSucheDateienKomplett" \)"
+# strBefehlSucheExecute=" -exec rm '{}' +"
+# strBefehlSucheAktionTest="find $strVerzeichnisLoeschen$strBefehlSucheUVZEbenen -type f $strBefehlSucheDateienKomplett -print | sort -g"
+# strBefehlSucheAktion="find $strVerzeichnisLoeschen$strBefehlSucheUVZEbenen -type f $strBefehlSucheDateienKomplett -print$strBefehlSucheExecute | sort -g"
+
+
+strBefehlSucheAktionTestKomplett=""
+strBefehlSucheAktionKomplett=""
+txtBefehlSucheAktion=""
+typeset -i stsBefehlSucheAktion=0
+typeset -i stsBefehlSucheAktionKomplett=0
+for i in "${arrLoeschenDateinamen[@]}"
+do
+    # -Wenn die Dateien als Muster zum Löschen genutzt werden, ist der Pfad unwichtig. Deshalb
+    #  wird ein Array nur mit den Dateinamen gebildet.
+    strBefehlSucheDateien=$i
+    strBefehlSucheExecute=""
+    #strBefehlSucheAktionTest="find $strVerzeichnisLoeschen$strBefehlSucheUVZEbenen -type f -name $strBefehlSucheDateien -print$strBefehlSucheExecute | sort -g"
+    strBefehlSucheAktionTest="find $strVerzeichnisLoeschen$strBefehlSucheUVZEbenen -type f -name $strBefehlSucheDateien -print$strBefehlSucheExecute"
+    #strBefehlSucheExecute=" -exec rm '{}' +"
+    strBefehlSucheExecute=" -exec rm {} +"
+    #strBefehlSucheAktion="find $strVerzeichnisLoeschen$strBefehlSucheUVZEbenen -type f -name $strBefehlSucheDateien -print$strBefehlSucheExecute | sort -g"
+    strBefehlSucheAktion="find $strVerzeichnisLoeschen$strBefehlSucheUVZEbenen -type f -name $strBefehlSucheDateien -print$strBefehlSucheExecute"
+    
+    # -Die Befehle zusammenbauen:
+    #[[ -z "$strBefehlSucheAktionTestKomplett" ]] && strBefehlSucheAktionTestKomplett=`$strBefehlSucheAktionTest` && strBefehlSucheAktionKomplett=`$strBefehlSucheAktion` && stsBefehlSucheAktion=$? && txtBefehlSucheAktion="|- '$strBefehlSucheAktion' Status:$stsBefehlSucheAktion" && continue
+    #[[ -n "$strBefehlSucheAktionTestKomplett" ]] && strBefehlSucheAktionTestKomplett="$strBefehlSucheAktionTestKomplett"\\n`$strBefehlSucheAktionTest` && strBefehlSucheAktionKomplett="$strBefehlSucheAktionKomplett"\\n`$strBefehlSucheAktion` && stsBefehlSucheAktion=$? && txtBefehlSucheAktion="$txtBefehlSucheAktion AND $strBefehlSucheAktion Status:$stsBefehlSucheAktion"
+    if ( [[ "$flagTESTDRIVE" == "true" ]] )
+    then
+        # -Beim ersten Durchlauf:
+        [[ -z "$strBefehlSucheAktionTestKomplett" ]] && strBefehlSucheAktionTestKomplett=`$strBefehlSucheAktionTest` && stsBefehlSucheAktion=$? && txtBefehlSucheAktion="|- '$strBefehlSucheAktionTest' Status: '$stsBefehlSucheAktion'" && stsBefehlSucheAktionKomplett=stsBefehlSucheAktionKomplett+stsBefehlSucheAktion && continue
+        # -Bei allen weiteren Durchläufen:
+        [[ -n "$strBefehlSucheAktionTestKomplett" ]] && strBefehlSucheAktionTestKomplett="$strBefehlSucheAktionTestKomplett"\\n`$strBefehlSucheAktionTest` && stsBefehlSucheAktion=$? && txtBefehlSucheAktion="$txtBefehlSucheAktion"\\n"|- '$strBefehlSucheAktionTest' Status: '$stsBefehlSucheAktion'" && stsBefehlSucheAktionKomplett=stsBefehlSucheAktionKomplett+stsBefehlSucheAktion && continue
+    else
+        # -Beim ersten Durchlauf:
+        [[ -z "$strBefehlSucheAktionKomplett" ]] && strBefehlSucheAktionKomplett=`$strBefehlSucheAktion` && stsBefehlSucheAktion=$? && txtBefehlSucheAktion="|- '$strBefehlSucheAktion' Status: '$stsBefehlSucheAktion'" && stsBefehlSucheAktionKomplett=stsBefehlSucheAktionKomplett+stsBefehlSucheAktion && continue
+        # -Bei allen weiteren Durchläufen:
+        [[ -n "$strBefehlSucheAktionKomplett" ]] && strBefehlSucheAktionKomplett="$strBefehlSucheAktionKomplett"\\n`$strBefehlSucheAktion` && stsBefehlSucheAktion=$? && txtBefehlSucheAktion="$txtBefehlSucheAktion"\\n"|- '$strBefehlSucheAktion' Status: '$stsBefehlSucheAktion'" && stsBefehlSucheAktionKomplett=stsBefehlSucheAktionKomplett+stsBefehlSucheAktion && continue
+    fi
+    
+    # -Aktuellen Status übernehmen und speichern in $stsBefehlSucheAktionKomplett:
+    #stsBefehlSucheAktionKomplett=stsBefehlSucheAktionKomplett+stsBefehlSucheAktion
+    
+done
+
+txtAUSGABEBefehlSucheAktion="$strBefehlSucheAktionKomplett"
+[[ "$flagTESTDRIVE" == "true" ]] && txtAUSGABEBefehlSucheAktion="$strBefehlSucheAktionTestKomplett"
+
+
+
+
+
+
+
+
+eingabeSicherheitsfrageVerzeichnisLoeschen=""
+function fncSicherheitsfrageVerzeichnisLoeschen {
+    # -Sicherheitsfrage vor dem Löschen des Verzeichnis:
+    
+    # -Zum Auflisten der zu löschenden Unterverzeichnisse:
+    # --Da find relativ lange braucht, wird nur in der ersten UVZ Ebene gesucht!
+    #[[ "$strVerzeichnisLoeschen" != */ ]] && strVerzeichnisLoeschen="$strVerzeichnisLoeschen""/"
+    #strBefehlVerzeichnisLoeschen="find $strVerzeichnisLoeschen -maxdepth 1 -type d"
+    #strBefehlVerzeichnisLoeschen="find '$strVerzeichnisLoeschen' -maxdepth 1 -type d -print0"
+    strBefehlVerzeichnisLoeschen="find '$strVerzeichnisLoeschen' -maxdepth 1 -type d -print0 | xargs -0"
+    #echo -e $(find $strVerzeichnisLoeschen -maxdepth 1 -type d -print0 | xargs -0)
+    txtAusgabeVerzeichnis=$(find $strVerzeichnisLoeschen -maxdepth 1 -type d -print0 | xargs -0)
+    
+    txtAUSGABEBefehlVerzeichnisLoeschen=${txtAusgabeVerzeichnis// /<br>}
+    #echo -e "--- DEBUG txtAUSGABEBefehlVerzeichnisLoeschen: $txtAUSGABEBefehlVerzeichnisLoeschen"
+    
+    eingabeSicherheitsfrageVerzeichnisLoeschen=$(kdialog --title="Bitte das Löschen bestätigen!" --warningcontinuecancel="<h3><center>|--- $datei ---|</center></h3><br><br>\
+    WICHTIG: Diese Aktion lässt sich <b>nicht rückgängig</b> machen.<br>\
+    Bitte bestätigen Sie daher den geplanten Löschvorgang!<br><br>\
+    Zum Löschen ausgewählt:<br>\
+    <b>$txtAUSGABEBefehlVerzeichnisLoeschen</b><br><br>\
+    Soll der Löschvorgang unwiderruflich ausgeführt werden?<br>" --continue-label="Abbrechen!" --cancel-label="Fortsetzen!" 2>/dev/null)
+    checkDIALOG=$(echo -e "$?")
+    eingabeSicherheitsfrageVerzeichnisLoeschen="$checkDIALOG"
+    checkDIALOGfehler=""
+    # -Case für Fensterüberwachung:
+    case "$checkDIALOG" in
+        (0)
+            # -WICHTIG: continue und cancel wurden getauscht
+            # --0 ist cancel
+            checkDIALOGfehler="|- Sie haben den Vorgang abgebrochen. Das Skript wird nun beendet." ;;
+        (1)
+            # -WICHTIG: continue und cancel wurden getauscht
+            # --1 ist continue
+            checkDIALOGfehler="" ;;
+        (2)
+            # -WICHTIG: continue und cancel wurden getauscht
+            # --2 ist cancel
+            checkDIALOGfehler="|- Sie haben den Vorgang abgebrochen. Das Skript wird nun beendet." ;;
+        (*)
+            # -abbruchFEHLER
+            checkDIALOGfehler="|- FEHLER: Status $checkDIALOG"\\n\ 
+            "|- Ihre Eingabe konnte nicht gespeichert werden, da der Prozess beendet wurde. Entweder"\\n\
+            "|- gab es einen internen Fehler oder ein anderer Benutzer/Prozess hat das Programm"\\n\
+            "|- geschlossen. Bitte starten Sie $datei neu!"\\n\
+            "|-"\\n\
+            "|- Nähere Informationen finden Sie in der Logdatei und in der Ausgabe der Konsole. Zum Aufrufen"\\n\
+            "|- der Hilfe geben Sie bitte '$datei -h' ein." ;;
+    esac
+    # -Fehlerausgabe und Skript beenden:
+    [ "$checkDIALOG" -ne 1 ] && echo -e $checkDIALOGfehler && echo -e "|-" && exit $checkDIALOG;
+    #[ "$checkDIALOG" -eq 1 ] && echo -e $checkDIALOGfehler
+}
+[[ -z "$arrLoeschenDateien" ]] && fncSicherheitsfrageVerzeichnisLoeschen
+
+function fncBEFEHL {
+    # -Argumente:
+    # --$1: Befehl zum Ausführen
+    # --$2: Text oder Zeichen am Anfang der Ausgabe
+    
+    # -Der Name der Datei:
+    [ -z "$datei" ] && datei=${0//*\//}
+    # -Befehl zum Ausführen: $txtBEFEHL oder $1
+    [ -n "$1" ] && txtBEFEHL="$1"
+    [ -n "$2" ] && txtAUSGABEanfang="$2" || txtAUSGABEanfang="|- "
+    
+    if ( [[ "$flagTESTDRIVE" != "true" ]] )
+    then
+        echo -e "$txtAUSGABEanfang""AUSFÜHREN: '$txtBEFEHL'"
+        actionBEFEHL="echo -e $txtBEFEHL"
+        #`$actionBEFEHL` 2>/dev/null
+        `$actionBEFEHL`
+        stsBEFEHL=$?
+        # -Exit-Status auswerten:
+        [ $stsBEFEHL -eq 0 ] && echo -e "$txtAUSGABEanfang""KEIN FEHLER: '$stsBEFEHL'" || echo -e "$txtAUSGABEanfang""FEHLER: '$stsBEFEHL'"
+    else
+        echo -e "$txtAUSGABEanfang""TESTMODUS: '$txtBEFEHL'"
+        stsBEFEHL=$?
+    fi
+    return $stsBEFEHL;
+}
+[[ "$eingabeSicherheitsfrageVerzeichnisLoeschen" != "" ]] && (( $eingabeSicherheitsfrageVerzeichnisLoeschen == 1 )) && fncBEFEHL "rm -rv $strVerzeichnisLoeschen"
+
+
+
+
+
+
+
+
+# echo -e "++++++++++"
+# echo -e "+ Testen: Testmodus, Verzeichnis"
+# echo -e "+ Exit Status Kontrolle"
+# echo -e "+ execdir einbauen"
+# echo -e "++++++++++"
+
+txtBefehlPlural=""
+[[ "${#arrLoeschenDateinamen[@]}" -gt 1 ]] && txtBefehlPlural="e"
+
+echo -e "|-"
+echo -e "|- Befehl$txtBefehlPlural ausführen und Status anzeigen: (txtBefehlSucheAktion):"
+echo -e "$txtAUSGABEBefehlSucheAktion" | sort -g
+echo -e "|-"
+echo -e "$txtBefehlSucheAktion"
+echo -e "|-"
+
+# echo -e "|-"
+# echo -e "|- Test Befehl ausführen und Ergebnis anzeigen:"
+# echo -e "$strBefehlSucheAktionTestKomplett" | sort -g
+# echo -e "|-"
+# echo -e "|- Befehl ausführen und Ergebnis anzeigen:"
+# echo -e "$strBefehlSucheAktionKomplett" | sort -g
+
+echo -e "|-"
+[ $stsBefehlSucheAktionKomplett -eq 0 ] && echo -e "|- $datei$txtTESTDRIVE Status: KEINE FEHLER! '$stsBefehlSucheAktionKomplett'" || echo -e "|- $datei$txtTESTDRIVE Status: FEHLER! '$stsBefehlSucheAktionKomplett'"
+
+
+
+
+
+#fncDEBUGstart
+#fncBEFEHL "$strBefehlSucheAktionTestKomplett"
+#echo -e "|------------------------------------"
+#echo -e $strBefehlSucheAktionTestKomplett
+#fncDEBUGstop
+
+
+# echo -e "|------------------------------------"
+# echo -e "$strBefehlSucheAktionTestKomplett"
+# echo -e "|------------------------------------ sort -n"
+# echo -e "$strBefehlSucheAktionTestKomplett" | sort -n
+# echo -e "|------------------------------------ sort -nr"
+# echo -e "$strBefehlSucheAktionTestKomplett" | sort -nr
+
+
+
+
+# -Verschiedene find Varianten:
+#
+# find /aa_daten/musik_tmp/aa_test/lxtools-rm/rm-01 -maxdepth 1 -type f -name 00_alle_pls_update.sh -o -name 00_alle_pls.m3u | sort -g
+# find /aa_daten/musik_tmp/aa_test/lxtools-rm/rm-01 -maxdepth 1 -type f \( -name 00_alle_pls_update.sh -o -name 00_alle_pls.m3u \) | sort -g
+#
+#
+# -Nur im angegebenen Verzeichnis suchen, mittels print den Dateinamen ausgeben, mittels 'exec rm' löschen, Pipe zum 'sort' Befehl
+# find /aa_daten/musik_tmp/aa_test/lxtools-rm -maxdepth 1 -type f \( -name 00_alle_pls_update.sh -o -name 00_alle_pls.m3u \) -print -exec rm '{}' + | sort -g
+#
+# -Nur im angegebenen Verzeichnis und im ersten Unterverzeichnis suchen, mittels print den Dateinamen ausgeben, mittels 'exec rm' löschen, Pipe zum 'sort' Befehl
+# find /aa_daten/musik_tmp/aa_test/lxtools-rm -maxdepth 2 -type f \( -name 00_alle_pls_update.sh -o -name 00_alle_pls.m3u \) -print -exec rm '{}' + | sort -g
+#
+# -Nur im ersten Unterverzeichnis suchen, mittels print den Dateinamen ausgeben, mittels 'exec rm' löschen, Pipe zum 'sort' Befehl
+# find /aa_daten/musik_tmp/aa_test/lxtools-rm -maxdepth 2 -mindepth 2 -type f \( -name 00_alle_pls_update.sh -o -name 00_alle_pls.m3u \) -print -exec rm '{}' + | sort -g
+#
+#
+# -Im angegebenen Verzeichnis und rekursiv in allen Unterverzeichnissen suchen, mittels print den Dateinamen ausgeben, mittels 'exec rm' löschen, Pipe zum 'sort' Befehl
+# find /aa_daten/musik_tmp/aa_test/lxtools-rm -type f \( -name 00_alle_pls_update.sh -o -name 00_alle_pls.m3u \) -print -exec rm '{}' + | sort -g
+
+
+exit 0;
+

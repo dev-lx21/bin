@@ -1,0 +1,437 @@
+#!/bin/bash
+# lx-tools script von -lx-
+
+pfad=$1
+flag_update=$2
+flag_aufruf_intern=$3
+zeit_start=`date`
+
+
+datei=${0//*\//}
+titel="Leer- und Sonderzeichen in Dateinamen entfernen!"
+benutzung="|- Benutzung: \\n|- '$datei [PFAD]' \\n|- Ohne Pfadangabe wird das aktuelle Verzeichnis verwendet.\\n|-"
+
+
+debug="Pfad: $pfad - I: $i - aufruf: $flag_aufruf_intern --- $0"
+#echo $debug
+txtbox_debug1="--- DEBUG-Info: ----------------------------------------------\n"
+txtbox_debug2="------------------------------------------------------------------\n"
+txtbox_weiter="\nMöchten Sie das Skript weiter ausführen oder abbrechen?\n$0\n"
+#kdialog --title="DEBUG: $debug" --warningcontinuecancel="$txtbox_debug1$debug$txtbox_debug2$txtbox_weiter"
+
+
+
+
+
+function fncRenameDirectory {
+    arrVERZEICHNISSE=(`find "$pfad" -type d`)
+}
+
+
+
+
+
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# ----- START RenameFILEandVARIABLE ---------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------
+function RenameFILEandVARIABLE () {
+    # -$i muss gesetzt sein und ein gültiger dateipfad sein!!!
+    #
+    # WICHTIG: -rename Variante
+    #          -nach jedem rename der Datei muss $i auch entsprechend geändert werden,
+    #           ansonsten könnte die Datei nicht mehr über die Variable identifiziert werden!!!
+    # WICHTIG: -mv Variante
+    #          -$i wird gesichert in $iSICHERUNG, danach wird nur die Variable $i
+    #           gecheckt und geändert, danach erfolgt mv $iSICHERUNG $i
+    iSICHERUNG="$i"
+    
+#     # -rename Variante
+#     `rename 's/ /_/g' "$i"`
+#     i=${i// /_}
+#     `rename 's/[^a-zA-Z0-9_\-\.\/]/x/g' "$i"`
+#     i=${i//[^a-zA-Z0-9_\-\.\/]/x}
+#     `rename 's/_\-_YouTube//g' "$i"`
+#     i=${i//_\-_YouTube/}
+#     `rename  's/YouPorn_\-_//g' "$i"`
+#     i=${i//YouPorn_\-_/}
+#     `rename 's/\-ph[a-zA-Z0-9]\./\./g' "$i"`
+#     i=${i//\-ph[a-zA-Z0-9]\./\.}
+
+    
+    # -mv Variante
+    i=${i// /_}
+    i=${i//[^a-zA-Z0-9_\-\.\/]/x}
+    i=${i//_\-_YouTube/}
+    i=${i//YouPorn_\-_/}
+    i=${i//\-ph[a-zA-Z0-9]\./\.}
+    echo -e "|- $datei"
+    echo -e "|- $datei - alter Name: \\t$iSICHERUNG"
+    echo -e "|- $datei - neuer Name: \\t$i"
+    [[ "$iSICHERUNG" != "$i" ]] && mv "$iSICHERUNG" "$i"
+
+    
+    #`rename 's/[\-]+[a-z]*[a-z0-9]*[\.]+/\./g' "$i"`
+    #i=${i//[\-]+[a-z]*[a-z0-9]*[\.]+/\.} ----- VORSICHT FEHLER
+    
+    # -da die eindeutige kennung am ende des dateinamens nun entfernt wird, muss
+    #  geprüft werden ob der name bereits in dem Verzeichnis vorhanden ist!
+    # -falls vorhanden wird eine 2 stellige fortlaufende nummer als kennung eingefügt:
+    #iTEST=${i//[\-]+[a-zA-Z0-9]*[\.]+/\.}
+    iKENNUNG=${i//*\-/\-}
+    #echo -e "--- iKENNUNG: $iKENNUNG"
+    iEXTENSION=${iKENNUNG//*\./\.}
+    #echo -e "--- iEXTENSION: $iEXTENSION"
+    # -iKENNUNG abschneiden: aber nur wenn folgende zeichen
+    #  enthalten sind: "-" UND 0-9 ODER a-z0-9 UND ".*"
+    #if ( [[ "$iKENNUNG" == -+([0-9]).* ]] || [[ "$iKENNUNG" == -+([a-z])+([0-9]).* ]] )
+    #if ( [[ "$iKENNUNG" == -+([0-9]).* ]] || [[ "$iKENNUNG" == -+([a-z])+([0-9]).* ]] || [[ "$iKENNUNG" == -+([0-9])+([a-z]).* ]] )
+    if ( [[ "$iKENNUNG" == -+([0-9]).* ]] || [[ "$iKENNUNG" == -+([a-z0-9]).* ]] && [[ "$iKENNUNG" != -+([a-z]).* ]] )
+    then
+        #echo -e "--- --- --- kennung: TRUE"
+        iPFAD=${i//$iKENNUNG/}
+        flagKENNUNGvorhanden=true
+    else
+        #echo -e "--- --- --- kennung: FALSE"
+        iPFAD=${i//$iEXTENSION/}
+        flagKENNUNGvorhanden=false
+    fi
+    iTEST=$iPFAD$iEXTENSION
+    #echo -e "--- iTEST: $iTEST"
+    if ( [[ -f "$iTEST" ]] && [[ "$flagKENNUNGvorhanden" == "true" ]] )
+    then
+        echo -e "--- --- --- dateiname: DOPPELT"
+        typeset -i z=1
+        while [[ -f "$iTEST" ]]
+        do
+            if [[ $z -lt 10 ]]
+            then
+                zz=0$z
+            else
+                zz=$z
+            fi
+            #iTEST=${iTEST//*\./_$zz\.}
+            iTEST=$iPFAD"_"$zz$iEXTENSION
+            #echo -e "--- --- --- NEU iTEST: $iTEST"
+            z=z+1
+        done
+        # anstatt des rename wird einfach mittels mv verschoben:
+        echo -e "--- mv $i $iTEST"
+        #echo -e "--- --- ---"
+        mv $i $iTEST
+        i=$iTEST
+        #exit 0;
+    elif [[ "$flagKENNUNGvorhanden" == "true" ]]
+    then
+        echo -e "--- --- --- dateiname: NICHT DOPPELT"
+        echo -e "--- mv $i $iTEST"
+        mv $i $iTEST
+        i=$iTEST
+    fi
+}
+# ---------------------------------------------------------------------------------------------------------------
+# ----- ENDE RenameFILEandVARIABLE ----------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ----------------------------------------------------------------
+# --- START SONDERFALL: intern und einzelne Datei ----------------
+# ----------------------------------------------------------------
+if ( [ "$flag_aufruf_intern" == "einzelne_datei" ] )
+    then
+    debug="Pfad: $pfad - I: $i -einzelne datei-\n"
+    #kdialog --title="DEBUG: $debug" --warningcontinuecancel="$txtbox_debug1$debug$txtbox_debug2$txtbox_weiter"
+    # -die datei uebernehmen, rename ausfuehren und beenden:
+    i=$pfad
+    
+    RenameFILEandVARIABLE
+    
+    debug="Pfad: $pfad - I: $i -einzelne datei- -fertig-\n"
+    #kdialog --title="DEBUG: $debug" --warningcontinuecancel="$txtbox_debug1$debug$txtbox_debug2$txtbox_weiter"
+    exit 0;
+fi
+# ----------------------------------------------------------------
+# --- ENDE SONDERFALL: intern und einzelne Datei -----------------
+# ----------------------------------------------------------------
+
+
+
+
+
+
+#echo -e "Pfad: $pfad ----- BEVOR backslash replacw"
+
+#pfad=${pfad//\\/}
+
+#echo -e "Pfad: $pfad ----- NACH backslash replacw"
+
+
+
+
+
+# START pfad-kontrolle -----------------------------------
+# den pfad pruefen, ggf korrigieren, ggf FEHLER ausgeben!
+# -ist bei internem aufruf nicht erforderlich:
+if ( [ "$flag_aufruf_intern" != "true" ] )
+  then
+  if ( [ "$pfad" == "" ] )
+    then
+    #echo -e "--- pfad-ist-leer ---"
+    # aktueller ort wird als pfad angenommen:
+    pfad=`pwd`
+    #kdialog --msgbox="Pfad: $pfad"
+  fi
+  #echo -e "--- pfad-ist-nicht-leer ---"
+  # pfad wurde uebergeben oder mittels pwd gesetzt!
+  # pfad pruefen und ggf FEHLER ausgeben:
+  if ( [ -d "$pfad" ] )
+    then
+    # wenn pfad auf ein existierendes Verzeichnis zeigt: kein fehler
+    # WICHTIG: den slash an den pfad haengen:
+    [[ "$pfad" != */ ]] && pfad=$pfad"/"
+    fehler=0
+  elif ( [ -f "$pfad" ] )
+    then
+    # wenn pfad auf eine existierende datei zeigt: kein fehler
+    #kdialog --msgbox="Pfad: $pfad"
+    fehler=0
+  else
+    fehler=1
+    kdialog --title="FEHLER" --error="FEHLER:\nDas Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.\n\nVerzeichnis:\n$pfad\n\n\nDas Script wird beendet."
+    exit 0;
+  fi
+fi
+# ENDE pfad-kontrolle -----------------------------------
+
+
+
+txtbox_pfad="\n\nVerzeichnis:\n$pfad"
+
+if ( [ "$flag_update" != "true" ] )
+ then
+ flag_update=false
+fi
+
+if ( [ "$flag_aufruf_intern" != "true" ] )
+ then
+ flag_aufruf_intern=false
+fi
+
+echo -e "|-"
+echo -e "|- $datei - $0"
+
+if ( [ "$flag_aufruf_intern" != "true" ] )
+ then
+ echo -e "|- Gestartet: $zeit_start"
+ echo -e "|- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
+ echo -e "|- ::::::::::::::::::: rename script von -lx- ::::::::::::::::::::"
+ echo -e "|- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::"
+ echo -e "|-"
+fi
+
+
+extension=".*"
+#name_datei_playliste="00_alle_pls.m3u"
+#name_datei_update="00_alle_pls_update.sh"
+#echo -e "$extension"
+suchpfad=$pfad*$extension
+#echo -e "$suchpfad"
+flag_stop=0
+
+
+
+
+
+
+# -SONDERFALL: pfad ist datei
+# -nur moeglich wenn es kein interner aufruf ist!
+#
+if ( [ "$flag_aufruf_intern" != "true" ] && [ -f "$pfad" ] )
+  then
+  suchpfad=$pfad
+  i=$pfad
+  # wenn pfad auf eine existierende datei zeigt: direkt die rename
+  # befehle ausfuehren und script beenden:
+  #echo -e "::::: ---> Pfad: $pfad ::: ---> I: $i :::::"
+  
+  RenameFILEandVARIABLE
+    
+  zeit_ende=`date`
+  kdialog --title="INFO" --msgbox="Umbenennen der Datei erfolgreich!\n\n\nAlt: $pfad\n\nNeu: $i\n\n\n\n-ende:eine-datei-"
+  echo -e "::: ENDE: eine-datei"
+  echo -e "::: Check Datei      : $suchpfad"
+  echo -e "::: Check beendet    : $zeit_ende"
+  exit 0;
+fi
+
+
+
+
+
+
+# -NORMALFALL: pfad ist Verzeichnis
+#
+#echo -e ":::"
+#echo -e "::: Check Verzeichnis: $suchpfad"
+for i in $suchpfad
+ do
+ #echo -e "suchpfad-i: $i"
+ if [[ -f $i ]]
+  then
+  RenameFILEandVARIABLE
+ fi
+done
+
+
+
+# for i in $suchpfad
+#  do
+#  #echo -e "suchpfad-i: $i"
+#  if [[ -f $i ]]
+#   then
+#   rename 's/[^a-zA-Z0-9_\-\.\/]//g' "$i"
+#  fi
+# done
+# for i in $suchpfad
+#  do
+#  #echo -e "suchpfad-i: $i"
+#  if [[ -f $i ]]
+#   then
+#   rename  's/_\-_YouTube//g' "$i"
+#  fi
+# done
+# for i in $suchpfad
+#  do
+#  #echo -e "suchpfad-i: $i"
+#  if [[ -f $i ]]
+#   then
+#   rename  's/YouPorn_\-_//g' "$i"
+#  fi
+# done
+
+
+
+# --- START schleife um unterVerzeichnisse einzubinden ---------------------
+for ia in $(ls --group-directories-first $pfad)
+  do
+  nix=0
+  #echo -e "-----------------------------------"
+  #echo -e "-flag_aufruf_intern: $flag_aufruf_intern"
+  #echo -e "-ia: $ia"
+  #echo -e "-pfad: $pfad"
+
+  if ( [[ -d "$pfad" ]] && [[ $pfad!="" ]] )
+    then
+    ia=$pfad$ia
+    #zusatz=""
+    #echo -e "---PFAD KOMPLETT: $ia"
+    #else
+    #zusatz="../"
+    #echo -e "---PFAD KOMPLETT: $pfad"
+  fi
+
+  if ( [[ -d "$ia" ]] )
+    then
+    pfad_uvz="$ia/"
+    suchpfad=$ia/*$extension
+    datei=$ia"/"$name_datei_playliste
+    datei_update=$ia"/"$name_datei_update
+    #echo -e "---VERZEICHNIS: $ia"
+    $0 "$pfad_uvz" "$flag_update" "true"
+    #flag_aufruf_intern=false
+    continue
+  elif ( [[ -d "$pfad" ]] )
+    then
+    suchpfad=$pfad*$extension
+    datei=$pfad$name_datei_playliste
+    datei_update=$pfad$name_datei_update
+    flag_stop=1
+    #flag_aufruf_intern=false
+  else
+    suchpfad=*$extension
+    datei=$name_datei_playliste
+    datei_update=$name_datei_update
+    flag_stop=1
+    #flag_aufruf_intern=false
+  fi
+
+    zeit_ende=`date`
+    if (($flag_stop==1))
+    then
+        #echo -e "...done - suchpfad: $suchpfad"
+        # if ( [ ! $flag_aufruf_intern ] )
+        if [[ "$flag_aufruf_intern" != true ]]
+        then
+            if [[ "$flag_update" == true ]]
+            then
+                kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_01-"
+            else
+                #echo -e "...MSGBOX flag_stop"
+                kdialog --title="INFO" --msgbox="Umbenennen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:flag_stop-"
+            fi
+        echo -e "::: ENDE: flag_stop"
+        echo -e "::: Check Verzeichnis: $suchpfad"
+        echo -e "::: Check beendet    : $zeit_ende"
+        fi
+        exit 0;
+    fi
+
+  #echo -e "...done - suchpfad: $suchpfad"
+  # ende der ia schleife
+done
+# --- ENDE schleife um unterVerzeichnisse einzubinden ----------------------
+
+
+
+
+
+
+zeit_ende=`date`
+if ( [ "$flag_update" == true ] && [ "$flag_aufruf_intern" != true ] )
+ then
+ #echo -e "...MSGBOX update"
+ kdialog --title="INFO" --msgbox="Update erfolgreich!$txtbox_pfad\n\n\n-ende:update_02-"
+ echo -e "::: ENDE: update"
+ echo -e "::: Check Verzeichnis: $suchpfad"
+ echo -e "::: Check beendet    : $zeit_ende"
+ exit 0;
+fi
+
+zeit_ende=`date`
+if ( [ "$flag_aufruf_intern" != true ] )
+ then
+ #echo -e "...MSGBOX normal"
+ kdialog --title="INFO" --msgbox="Umbenennen der Dateien erfolgreich!$txtbox_pfad\n\n\n-ende:normal-"
+ echo -e "::: ENDE: normal"
+ echo -e "::: Check Verzeichnis: $suchpfad"
+ echo -e "::: Check beendet    : $zeit_ende"
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+

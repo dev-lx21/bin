@@ -1,0 +1,244 @@
+#!/bin/bash
+# skript von -lx21-
+
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+#
+# ----- BUGS:
+#
+# ----- DONE:
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+
+
+
+
+
+function fncDEBUGstart {
+    flagFNCdebug="true"
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--------------------------------------------------------------------------------"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - START Debug: $txtDEBUGtitel"
+    PS4='+ ${LINENO}:'`echo -en '\\t'`
+    set -x
+}
+
+function fncDEBUGstop {
+    # -Damit fncDEBUGstop nur ausgeführt wird, wenn vorher fncDEBUGstart aufgerufen wurde.
+    [ ! "$flagFNCdebug" ] && return
+    set +x
+    [ "$1" ] && txtDEBUGtitel="$1" || txtDEBUGtitel="$0"
+    echo -e "--- [`fncHHMMSS 'norm.mS3'`] - ENDE Debug: $txtDEBUGtitel"
+    echo -e "--------------------------------------------------------------------------------"
+}
+
+
+function fncClearX {
+    # -Da 'clear -x' einen Bug hat und deshalb den sichtbaren Teil der letzten
+    #  Befehle einfach löscht, werden soviele leere Zeilen ausgegeben, wie der
+    #  Bildschirm Zeilen hat.
+    # -Beim Aufruf von 'clear -x' löscht der Befehl dann diese leeren Zeilen
+    #  und die History wird nicht überschrieben.
+    typeset -i intAnzahlScreenZeilen=$(tput lines)
+    for ((iZeilen=1; iZeilen<$intAnzahlScreenZeilen; iZeilen++))
+    do
+        echo -e "$iZeilen"
+    done
+    clear -x
+}
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -n $datei ] && dateiNameKurz=${datei//zz_inc_/}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+    
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+    
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+    
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+    
+    # -Nur den Infotext ausschneiden: 
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+    
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+    
+}
+[ -z $dateiVersionInfoNr ] && fncAUSLESENversion
+
+
+
+
+
+
+
+argVerzeichnis=""
+argDatei=""
+
+flagACTION="false"
+flagTESTDRIVE="false"
+txtTESTDRIVE=""
+flagQuietmode="false"
+flagClearX="true"
+
+
+strg1="-"
+strg2="-"
+strg3="-"
+# -Die Argumente kontrollieren und neu aufteilen:
+# --ALLE normalen Optionen (-q,-h,...) werden im $strg1 gespeichert
+# --die Shutdown Optionen (-off...) werden im $strg2 gespeichert
+for i in "$@"
+do
+    # -Pfad aus Kommandozeile übernehmen:
+    #[[ -d "$i" ]] && echo -e "--- DEBUG Verzeichnis"
+    [[ -d "$i" ]] && argVerzeichnis="$i" && continue
+    [[ -f "$i" ]] && argDatei="$i" && continue
+    
+    if ( [[ "$i" == -*h* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"h"
+        flagClearX="false"
+    fi
+    if ( [[ "$i" == -*l* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"l"
+        flagClearX="false"
+    fi
+    if ( [[ "$i" == -*t* ]] && [[ "$i" != -url* ]] )
+    then
+        #strg1=$strg1"l"
+        flagTESTDRIVE="true"
+        txtTESTDRIVE=" Testmodus"
+    fi
+    if ( [[ "$i" == -*q* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"q"
+        flagQuietmode="true"
+        flagClearX="false"
+    fi
+    if ( [[ "$i" == -*qq* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == -*qqq* ]] && [[ "$i" != -url* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+done
+
+
+
+[[ -n "$argDatei" ]] && argDateiName="${argDatei//*\//}"
+
+
+
+
+
+
+
+
+# -Programm zum Öffnen auswählen:
+#
+#"/usr/bin/vlc --started-from-file %U" "VLC - Video Player" on \
+#"/usr/bin/kid3 dir %U" "Kid3 - Meta Tag Bearbeitung" off \
+#
+auswahlACTION=$(kdialog --title="lx21.$dateiNameKurz" --radiolist="<div align=center><h3>Programm Auswahl: mp3</h3></div><br> \
+<div align=left>Standard: vlc<br> \
+Datei:<br> \
+\"$argDateiName\"<br><br> \
+Die Datei mit einem der folgenden Programme öffnen:<br></div>" \
+"/usr/bin/vlc --started-from-file $argDateiName" "VLC - Video Player" on \
+"/usr/bin/kid3 dir $argDateiName" "Kid3 - Meta Tag Bearbeitung" off \
+"exit 1;" "Vorgang abbrechen..." off)
+#actionGRAFIK "Nur Grafik (wget)" off  --geometry="600x500")
+checkDIALOG=$(echo -e "$?")
+checkDIALOGfehler=""
+# -Case für Fensterüberwachung:
+case "$checkDIALOG" in
+    (0)
+        # -Case für Eingabeüberwachung:
+        case "$auswahlACTION" in
+            ("/usr/bin/vlc --started-from-file $argDateiName")
+                actionBEFEHL="$auswahlACTION"
+                ;;
+            ("/usr/bin/kid3 dir $argDateiName")
+                actionBEFEHL="$auswahlACTION"
+                ;;
+            ("exit 1;")
+                actionBEFEHL="$auswahlACTION"
+                ;;
+            (*)
+                checkDIALOGfehler="FEHLER:<br>Die Auswahl hat keine Daten übermittelt! Bitte erneut auswählen."
+                ;;
+        esac ;;
+    (1)
+        # -abbruchBENUTZER
+        checkDIALOGfehler="|- Sie haben die Eingabe abgebrochen. Das Skript wird daher beendet." ;;
+    (*)
+        # -abbruchFEHLER
+        checkDIALOGfehler="|- FEHLER:"\\n\
+"|- Ihre Eingabe konnte nicht gespeichert werden, da der Fensterprozess beendet"\\n\
+"|- wurde. Entweder gab es einen internen Fehler oder ein anderer Benutzer/Prozess"\\n\
+"|- hat das Programm geschlossen. Bitte starten Sie $datei neu!"\\n\
+"|-"\\n\
+"|- Um nähere Informationen zu erhalten, sollten Sie ihre Logdateien kontrollieren"\\n\
+"|- und die Ausgabe in der Konsole beachten." ;;
+esac
+# -Fehlerausgabe und Skript beenden:
+if ( [[ "$checkDIALOGfehler" != "" ]] )
+then
+    # -Fehlermeldung ausgeben und Skript beenden:
+    echo -e $checkDIALOGfehler
+    echo -e "|-"
+    exit $checkDIALOG;
+else
+    nix=0
+fi
+
+
+
+
+
+# -Auswahl wird ausgeführt:
+
+`$auswahlACTION &`
+
+exit 0;
+
+
+
+
+
+
+

@@ -1,0 +1,1258 @@
+#!/bin/bash
+# skript von -lx-
+
+
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# ----- ToDo:
+#
+# ----- DONE:
+#
+# ----- Bugs:
+#
+# ---------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# [[ -z "$1" ]] && echo -e "[FEHLER: ${FUNCNAME[0]} - Kein oder fehlerhaftes Argument übergeben! - '$*']" && return
+
+
+
+
+
+dateiVersionInfoNr=""
+function fncAUSLESENversion {
+    [ -z $datei ] && datei=${0//*\//}
+    [ -z $nutzer ] && nutzer=`ps --pid $$ -o user=` && [[ "$nutzer" == "root" ]] && nutzer=`id -un 1000`
+    strVERZEICHNISbin="/home/$nutzer/bin-bak/"
+    iaLSarray=(`ls -r $strVERZEICHNISbin$datei"_"* 2>/dev/null`)
+    iaLSarrayANZAHL=${#iaLSarray[@]}
+    dateiNameKomplett=${iaLSarray[0]}
+    dateiVersionKomplett=${iaLSarray[0]}
+    
+    #  foo/bar/lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Bis zum letzten Slash abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//*\//}
+    #  lxDOWNLOAD_2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Dateiname bis Unterstrich abschneiden:
+    dateiVersionKomplett=${dateiVersionKomplett//`echo -e $datei`_/}
+    #  2.17.05-01-01_TODO_einbauen-dateiVersionNrTxt
+    
+    # -Unterstrich bis zum Ende abschneiden: dateiVersionInfoNr
+    dateiVersionInfoNr=${dateiVersionKomplett//_*/}
+    #  2.17.05-01-01
+    
+    # -Bis zum Unterstrich abschneiden: dateiVersionKomplettTxt
+    dateiVersionKomplettTxt=${dateiVersionKomplett//$dateiVersionInfoNr\_/}
+    #  TODO_einbauen-dateiVersionNrTxt
+    
+    # -Nur die Kategorie ausschneiden:
+    dateiVersionInfoKategorie=${dateiVersionKomplettTxt//_*/}
+    #  TODO
+    
+    # -Nur den Infotext ausschneiden: 
+    dateiVersionInfoTxt=${dateiVersionKomplettTxt//$dateiVersionInfoKategorie\_/}
+    #  einbauen-dateiVersionNrTxt
+    
+    dateiVersionInfoNr="$dateiVersionInfoNr"
+    dateiVersionInfoKategorie="$dateiVersionInfoKategorie"
+    dateiVersionInfoTxt="$dateiVersionInfoTxt"
+    
+}
+[ -z $dateiVersionInfoNr ] && fncAUSLESENversion
+
+
+
+
+function fncHHMMSS {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%H%M%S'` ;;
+        ( nurSS )
+            echo -en `date '+%S'` ;;
+        ( nurSS.S )
+            echo -en `date '+%S.%N'` ;;
+        ( nurSS.mS3 )
+            HMSmS=`date '+%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS2 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:2}
+            echo -en $HMSxyz"."$mSxyz ;;
+        ( norm.mS3 )
+            HMSmS=`date '+%H:%M:%S.%N'`
+            HMSxyz=${HMSmS//.*/}
+            mSxyz=${HMSmS//*./}
+            mSxyz=${mSxyz:0:3}
+            echo -en $HMSxyz"."$mSxyz ;;
+        (*)
+            echo -en `date '+%H:%M:%S'` ;;
+    esac
+    #echo -en `date '+%H:%M:%S'`
+}
+
+function fncYEAR1231 {
+    case "$1" in
+        ( nurZAHLEN )
+            echo -en `date '+%Y%m%d'`
+            ;;
+        ( YEAR )
+            echo -en `date '+%Y'`
+            ;;
+        ( 12 )
+            echo -en `date '+%m'`
+            ;;
+        ( 31 )
+            echo -en `date '+%d'`
+            ;;
+        ( 1231 )
+            echo -en `date '+%m%d'`
+            ;;
+        (*)
+            echo -en `date '+%Y-%m-%d'`
+            ;;
+    esac
+}
+
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Format Parameter setzen ------------------------------------------------------------
+# -Display testen:
+if [[ `tty` != *dev* ]]
+then
+    # -Wenn KEIN Display vorhanden ist, handelt es sich um einen Cronjob!
+    # -da tput nur mit $TERM funktioniert werden die Format Variablen geleert:
+    fmtFETT=""
+    fmtINVERS=""
+    fmtUNTERSTRICHEN=""
+    fmtRESET=""
+else
+    fmtFETT=`tput bold`
+    fmtINVERS=`tput rev`
+    fmtUNTERSTRICHEN=`tput smul`
+    fmtRESET=`tput sgr0`
+fi
+# ----- ENDE Format Parameter setzen -------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# ----- START Standard Parameter setzen ----------------------------------------------------------
+datei=${0//*\//}
+txtTITEL="Daten und Einstellungen sichern!"
+benutzung="|- Benutzung: \\n|- '$datei [OPTIONEN]' \\n|-"
+zeitSTART=`date`
+
+dateiLOGS="/aa_daten/bak/log/$datei.aktuell.log"
+dateiLOGSarchiv="/aa_daten/bak/log/$datei.archiv.log"
+dateiLOGStmp="/aa_daten/bak/log/$datei.tmp.log"
+
+icoLIstart="++"
+# ----- ENDE Standard Parameter setzen -----------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+function fncECHOlx {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    # --Ausgabe in die Logdatei
+    strSONDERZEICHENuvz=""
+    if ( [[ "$1" != "" ]] )
+    then
+        #[[ "$flagAUFRUFintern" == "true" ]] && strSONDERZEICHENuvz=" -!!!-"
+        echo -e "$1$strSONDERZEICHENuvz"
+        if ( [[ "$strg1" != -*l* ]] )
+        then
+            echo -e "$1$strSONDERZEICHENuvz" >> $dateiLOGS
+            echo -e "$1$strSONDERZEICHENuvz" >> $dateiLOGSarchiv
+        fi
+    fi
+    strSONDERZEICHENuvz=""
+}
+function fncECHOlxL {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe in die Logdatei
+    if ( [[ "$1" != "" ]] )
+    then
+        #echo -e "$1"
+        echo -e "$1" >> $dateiLOGS
+        echo -e "$1" >> $dateiLOGSarchiv
+    fi
+}
+function fncECHOlxD {
+    # -Erwartet einen String zum Ausgeben: $1
+    # --Ausgabe am Bildschirm
+    if ( [[ "$1" != "" ]] )
+    then
+        echo -e "$1"
+        #echo -e "$1" >> $dateiLOGS
+    fi
+}
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Argumente aus Kommandozeile übernehmen ----------------------------------------------
+strg1="-"
+
+txtInfoTESTDRIVE=""
+flagTESTDRIVE="false"
+flagQUIETmode="false"
+
+argVerzeichnisse=""
+argOptionen=""
+
+for i in "$@"
+do
+    # -Argument Verzeichnisse übernehmen:
+    if ( [[ "$i" != -* ]] )
+    then
+        if ( [[ -d "$i" ]] )
+        then
+            if ( [[ "$i" != */ ]] )
+            then
+                i=$i"/"
+            fi
+            [[ "$argVerzeichnisse" == "" ]] && argVerzeichnisse="$i" || argVerzeichnisse="$argVerzeichnisse $i"
+        fi
+    fi
+    # -Argument Optionen übernehmen:
+    if ( [[ "$i" == -*v* ]] )
+    then
+        argOptionen="$argOptionen""v"
+    fi
+
+    if ( [[ "$i" == -*h* ]] )
+    then
+        strg1=$strg1"h" && break
+    fi
+    
+    if ( [[ "$i" == -*l* ]] )
+    then
+        if ( [[ "$i" == -*lc* ]] )
+        then
+            strg1=$strg1"lc"
+        else
+            strg1=$strg1"l"
+        fi
+    fi
+    
+    if ( [[ "$i" == -*t* ]] )
+    then
+        flagTESTDRIVE="true"
+        txtInfoTESTDRIVE="Testmodus"
+    fi
+    
+    if ( [[ "$i" == -*k* ]] )
+    then
+        strg1=$strg1"k"
+    fi
+    
+    if ( [[ "$i" == -*q* ]] )
+    then
+        strg1=$strg1"q" && flagQUIETmode="true"
+    fi
+    if ( [[ "$i" == -*qq* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+    if ( [[ "$i" == -*qqq* ]] )
+    then
+        strg1=$strg1"q"
+    fi
+
+done
+# ----- ENDE Argumente aus Kommandozeile übernehmen -----------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+# -Sonderfälle UPDATE und AUFRUF_INTERN
+if ( [[ "$flag_update" != "true" ]] && [[ "$flag_aufruf_intern" != "true" ]] && [[ "$1" != -*q* ]] && [[ "$1" != -*h* ]] && [[ "$1" != -*l* ]] )
+then
+    # -Die Sicherheitsfrage:
+    # --Die Includedatei prüft ob Display oder Cronjob läuft.
+    # --1. Argument: die Vorbelegung: WEITER oder ABBRECHEN
+    # --2. Argument: die Datei die gestartet werden soll
+    # --3. Argument: der Titel der Datei die gestartet werden soll
+    flagSICHERHEITSFRAGE=`/home/$nutzer/bin/zz_inc_sicherheitsfrage.sh "WEITER" "$datei" "$txtTITEL"`
+    flagSICHERHEITSFRAGE=$?
+    # -Wenn der Rückgabewert nicht 0 ist, wurde entweder abgebrochen oder es gab einen Fehler!
+    if ( [[ "$flagSICHERHEITSFRAGE" != "0" ]] )
+    then
+        # -Die Sicherheitsfrage beendet das Skript!
+        #echo -e "--- Sicherheitsfrage: $flagSICHERHEITSFRAGE"
+        exit 0;
+    fi
+fi
+# -------------------------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
+
+
+
+
+txtHR="|--------------------------------------------------------------------------------"
+
+txtKOPF=\
+"$txtHR"\\n\
+"|- $datei -| $txtTITEL"\\n\
+"|- $dateiVersionInfoNr ($dateiVersionInfoKategorie: $dateiVersionInfoTxt)"\\n\
+"$txtHR"\\n\
+"|- $zeitSTART $txtInfoTESTDRIVE"\\n\
+"|-"
+
+txtKOPFlogs="$txtKOPF"
+
+
+
+
+
+
+
+
+
+if [[ "$1" != -*qq* ]]
+then
+    # wird (fast) immer angezeigt:
+    echo -e $txtKOPF
+    # version, GPL, autor...
+
+    if ( [ "$1" == "-h" ] ) 
+    then
+        echo -e $benutzung
+        echo -e "|- Optionen:"
+        echo -e "|- -h     Diesen Hilfetext anzeigen. Andere Optionen werden ignoriert."
+        echo -e "|- -k     Alles kopieren. Standard ist Update, d.h. nur kopieren wenn die Quelldatei neuer"
+        echo -e "|-        als die Zieldatei ist."
+        echo -e "|- -v     Ausführliche Befehlsausgabe (verbose) aktivieren."
+        echo -e "|- -l     Nur die Liste der zu sichernden Quellen anzeigen und das Skript beenden."
+        echo -e "|- -lc    Die Liste der Quellen anzeigen, deren Gültigkeit überprüfen und das Skript beenden."
+        echo -e "|- -t     Den Testmodus starten. Dabei wird das Skript normal abgearbeitet, aber anstatt die"
+        echo -e "|-        einzelnen Befehle auszuführen, werden diese nur angezeigt."
+        echo -e "|- -q     Das Skript startet ohne die Sicherheitsfrage."
+        echo -e "|- -qq    Das Skript startet ohne die Sicherheitsfrage und es werden keine Kopfzeilen oder"
+        echo -e "|-        sonstige Hinweise des Programms angezeigt. (Fehlermeldungen werden immer angezeigt.)"
+        echo -e "|- Manche Optionen können miteinander kombiniert werden."
+        echo -e "|-"
+        echo -e "|- Befehlsvarianten:"
+        echo -e "|- -BEFEHL (ohne Argumente):"
+        echo -e "|-  Alle Verzeichnisse (Siehe Liste.) als Update sichern. Erfordert teilweise root Rechte!"
+        echo -e "|-"
+        echo -e "|-"
+        exit 0;
+    else
+        if ( [ "$1" == "-s" ] ) 
+        then
+            echo -e "|- Sonder- und Leerzeichen müssen teilweise maskiert werden! Nähere Infos dazu finden Sie"
+            echo -e "|- in der Hilfe (-h) unter dem Punkt 'Tipps zur Suche'."
+            echo -e "|-"
+            if ( [ "$2" == "" ] ) 
+            then
+                echo -e "|- FEHLER: Die Suchoption wurde gesetzt (-s), aber kein Suchbegriff eingegeben!"
+                echo -e "|-         Nähere Infos finden Sie in der Hilfe. (-h)"
+                echo -e "|-"
+                exit 0;
+            fi
+        fi
+    fi
+    echo -e $benutzung
+else
+    # $1 enthält -q
+    # d.h. der Quiet-Modus wurde gesetzt!
+    flagQUIETmode=true
+    if [[ "$1" == -*h* ]]
+    then
+        echo -e $benutzung
+        echo -e "|- FEHLER: Im Quiet-Modus (-qq) kann die Hilfe nicht angezeigt werden!"
+        echo -e "|-         Nähere Infos finden Sie in der Hilfe. (-h)"
+        exit 0;
+    fi
+    nix=0
+fi
+
+
+
+
+
+
+# -um Benutzer über die Ausführung des Skripts zu informieren:
+beep -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100
+
+# -Falls vorhanden die (alte) temporäre Logs Datei löschen:
+[[ -f "$dateiLOGStmp" ]] && rm "$dateiLOGStmp"
+
+# DEBUG-INFOS:
+#echo $1
+if [[ "$1" == -*q* ]]
+then
+    nix=0
+    strg1=$1
+    #echo -e "|- $datei - QUIET-MODE"
+else
+    strg1=$1
+fi
+#exit 0;
+
+
+
+# -Die Logdatei füllen, aber nur wenn auch tatsächlich etwas kopiert wird:
+if ( [[ "$strg1" != -*l* ]] )
+then
+    #touch $dateiLOGS
+    echo -e $txtKOPFlogs > $dateiLOGS
+    echo -e $txtKOPFlogs >> $dateiLOGSarchiv
+fi
+
+#nutzer=`ps --pid $$ -o user=`
+
+
+
+
+function fncBAKPaketeInstalliert {
+    # -Die Liste der installierten Pakete erstellen und speichern:
+    dateiBAKPaketeInstalliert="/aa_daten/bak/system/aa_installierte-pakete.txt"
+    dateiBAK2PaketeInstalliert="$dateiBAKPaketeInstalliert"".bak"
+    if ( [[ -f "$dateiBAKPaketeInstalliert" ]] )
+    then
+        cp "$dateiBAKPaketeInstalliert" "$dateiBAK2PaketeInstalliert"
+        #rm "$dateiBAKPaketeInstalliert"
+    fi
+    dpkg --get-selections | awk '{print $1}' > $dateiBAKPaketeInstalliert
+}
+fncBAKPaketeInstalliert
+
+
+
+
+
+
+function fncAusgabeQuelleTar {
+    # -Das zu prüfende Verzeichnis: $1
+    [[ "$1" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    strCheckVerzeichnis="$1"
+    strCheckAusgabeQuelleTar=${strCheckVerzeichnis//exclude:/}
+    strCheckAusgabeQuelleTar=${strCheckAusgabeQuelleTar//*:/}
+    #[[ "$strCheckVerzeichnis" == *.*.* ]]
+    echo -e "$strCheckAusgabeQuelleTar"
+}
+
+function fncAusgabeQuelleTarExclude {
+    # -Das zu prüfende Verzeichnis: $1
+    [[ "$1" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    strCheckVerzeichnis="$1"
+    [[ "$strCheckVerzeichnis" != exclude:* ]] && echo -e "" && return
+    strCheckAusgabeQuelleTarExclude=${strCheckVerzeichnis//exclude:/}
+    strCheckAusgabeQuelleTarExclude=${strCheckAusgabeQuelleTarExclude//:*/}
+    #[[ "$strCheckVerzeichnis" == *.*.* ]]
+    echo -e "$strCheckAusgabeQuelleTarExclude"
+}
+
+
+function fncAusgabeZielZiel {
+    # -Das zu prüfende Verzeichnis: $1
+    [[ "$1" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    strCheckVerzeichnis="$1"
+    strCheckVerzeichnisZielZeit=${strCheckVerzeichnis//\/*/}
+    strCheckVerzeichnisZielZiel=${strCheckVerzeichnis//$strCheckVerzeichnisZielZeit/}
+    #[[ "$strCheckVerzeichnis" == *.*.* ]]
+    echo -e "$strCheckVerzeichnisZielZiel"
+}
+
+function fncAusgabeZielZeit {
+    # -Das zu prüfende Verzeichnis: $1
+    [[ "$1" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    strCheckVerzeichnis="$1"
+    strCheckVerzeichnisZielZeit=${strCheckVerzeichnis//\/*/}
+    #strCheckVerzeichnisZielZiel=${strCheckVerzeichnis//$strCheckVerzeichnisZielZeit/}
+    #[[ "$strCheckVerzeichnis" == *.*.* ]]
+    echo -e "$strCheckVerzeichnisZielZeit"
+}
+
+
+flagCheckQuelleTar="false"
+function fncCheckQuelleTar {
+    flagCheckQuelleTar="false"
+    for ArrayQuelleWert in "${ArrayQuelle[@]}"
+    do
+        [[ "$ArrayQuelleWert" == tar:* ]] && flagCheckQuelleTar="true" && break
+    done
+    echo -e "$flagCheckQuelleTar"
+}
+flagCheckQuelleTar="`fncCheckQuelleTar`"
+
+
+flag_fncCheckVerzeichnis_AUSGABE="quelle-1.ergebnis-1.logs-1"
+function fncCheckVerzeichnis {
+    # -Das zu prüfende Verzeichnis: $1
+    [[ "$1" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    strCheckVerzeichnis="$1"
+    # -Den Zähler xAnzeige erhöhen: $2 - Standard: true
+    [[ "$2" == "" ]] && flagxAnzeigePlus="true" || flagxAnzeigePlus="$2"
+    # -Ist das Verzeichnis Quelle oder Ziel: $3 - Standard: Quelle
+    [[ "$3" == "" ]] && txtVerzeichnisTyp="Quelle" || txtVerzeichnisTyp="$3"
+    # -Die Anzahl der Master Durchläufe: $4
+    [[ "$4" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    txtAnzMaster="$4"
+    # -Den ZielZeit Code (0.0.0) auslesen: $5
+    [[ "$5" == "" ]] && strZielZeitCode="" || strZielZeitCode="$5"
+    txtZielZeitCode=""
+    [[ "$strZielZeitCode" != "" ]] && txtZielZeitCode=" - Zeitcode: $strZielZeitCode"
+    #echo -e "--- DEBUG Zeitcode txt: $txtZielZeitCode"
+    
+    # -Wegen $txtTarQuelleZusatz muss ein Platzhalter eingefügt bzw entfernt werden:
+    flagCheckQuelleTar="`fncCheckQuelleTar`"
+    #echo -e "--- DEBUG flagCheckQuelleTar: $flagCheckQuelleTar"
+    txtVerzeichnisTypPlatzhalter=""
+    if ( [[ "$flagCheckQuelleTar" == "true" ]] )
+    then
+        [[ "$txtVerzeichnisTyp" == "Quelle-Tar" ]] && txtVerzeichnisTypPlatzhalter="\\t"
+        [[ "$txtVerzeichnisTyp" == "Quelle" ]] && txtVerzeichnisTypPlatzhalter="\\t\\t"
+    fi
+    
+    # -Die Logs Variablen zurück setzen:
+    txtCHECKquelle_LOGSquelle=""
+    txtCHECKquelle_LOGSergebnis=""
+
+    # -AUSGABE: die aktuelle Quelle, zusätzlich in Logs Variable speichern
+    #typeset -i xAnzeige=0
+    typeset -i zZieleEnde=$zZiele
+    zZieleEnde=zZieleEnde+1
+    [[ "$flagxAnzeigePlus" == "true" ]] && x=x+1
+    xAnzeige="$x"
+    if ( [[ "$flag_fncCheckVerzeichnis_AUSGABE" == *quelle-1* ]] )
+    then
+        txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+        [[ "$xAnzeige" -lt 10 ]] && xAnzeige="0$xAnzeige"
+        [[ "$zZiele" -lt 10 ]] && zZieleAnzeige="0$zZiele"
+        [[ "$zZieleEnde" -lt 10 ]] && zZieleAnzeigeEnde="0$zZieleEnde"
+        [[ "$zZieleAnzeige" == "0" ]] && zZieleAnzeige="00"
+        xAnzeigeEnde="$txtAnzMaster""$xAnzeige"".""$zZieleAnzeigeEnde"
+        xAnzeige="$txtAnzMaster""$xAnzeige"".""$zZieleAnzeige"
+        echo -e "|- $txtZEITSTEMPEL $icoLIstart ${fmtFETT}$xAnzeige: $txtVerzeichnisTyp: $txtVerzeichnisTypPlatzhalter""$strCheckVerzeichnis""$txtZielZeitCode""${fmtRESET}"
+        txtCHECKquelle_LOGSquelle="|- $txtZEITSTEMPEL $icoLIstart ${fmtFETT}$xAnzeige: $txtVerzeichnisTyp: $txtVerzeichnisTypPlatzhalter""$strCheckVerzeichnis""$txtZielZeitCode""${fmtRESET}"
+    fi
+
+    # -AUSGABE: das Ergebnis der Quellenprüfung, zusätzlich in Logs Variable speichern
+    if ( [[ "$flag_fncCheckVerzeichnis_AUSGABE" == *ergebnis-1* ]] )
+    then
+        txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+        txtCHECKquelle_LOGSergebnisSTART="|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Das Verzeichnis wird überprüft..."
+        # -Prüfen ob die Quelle existiert (Verzeichnis oder Datei) und ob sie lesbar ist:
+        # --Ist kein Verzeichnis und keine Datei: FEHLER
+        # --Ist Verzeichnis, aber nicht lesbar: FEHLER
+        # --Ist Datei, aber nicht lesbar: FEHLER
+        if ( ( [[ ! -d "$strCheckVerzeichnis" ]] && [[ ! -f "$strCheckVerzeichnis" ]] ) || ( [[ -d "$strCheckVerzeichnis" ]] && [[ ! -r "$strCheckVerzeichnis" ]] ) || ( [[ -f "$strCheckVerzeichnis" ]] && [[ ! -r "$strCheckVerzeichnis" ]] ) )
+        then
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            txtCHECKquelle_LOGSergebnis="|- $txtZEITSTEMPEL EE ${fmtFETT}$xAnzeige:${fmtRESET} FEHLER: Verzeichnis: \"$strCheckVerzeichnis\""
+            txtCHECKquelle_LOGSergebnis_NICHTexistent="|- $txtZEITSTEMPEL EE ${fmtFETT}$xAnzeige:${fmtRESET} FEHLER: Das Verzeichnis existiert nicht."
+            txtCHECKquelle_LOGSergebnis_NICHTlesbar="|- $txtZEITSTEMPEL EE ${fmtFETT}$xAnzeige:${fmtRESET} FEHLER: Das Verzeichnis ist nicht lesbar."
+            if ( [[ ! -e "$strCheckVerzeichnis" ]] )
+            then
+                txtCHECKquelle_LOGSergebnis=$txtCHECKquelle_LOGSergebnis\\n$txtCHECKquelle_LOGSergebnis_NICHTexistent
+            else
+                txtCHECKquelle_LOGSergebnis=$txtCHECKquelle_LOGSergebnis\\n$txtCHECKquelle_LOGSergebnis_NICHTlesbar
+            fi
+        else
+            # -Kein FEHLER: Quelle ist gültig!
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            txtCHECKquelle_LOGSergebnis="|- $txtZEITSTEMPEL -! ${fmtFETT}$xAnzeige:${fmtRESET} Erfolgreich abgeschlossen: Das Verzeichnis ist gültig!"
+        fi
+        txtCHECKquelle_LOGSergebnis=$txtCHECKquelle_LOGSergebnisSTART\\n$txtCHECKquelle_LOGSergebnis
+        echo -e $txtCHECKquelle_LOGSergebnis
+    fi
+
+    # -AUSGABE: die Inhalte der Logs Variablen in die Logdateien schreiben
+    if ( [[ "$flag_fncCheckVerzeichnis_AUSGABE" == *logs-1* ]] )
+    then
+        if ( [[ "$flag_fncCheckVerzeichnis_AUSGABE" == *quelle-1* ]] )
+        then
+            echo -e $txtCHECKquelle_LOGSquelle >> $dateiLOGS
+            echo -e $txtCHECKquelle_LOGSquelle >> $dateiLOGSarchiv
+        fi
+        if ( [[ "$flag_fncCheckVerzeichnis_AUSGABE" == *ergebnis-1* ]] )
+        then
+            echo -e $txtCHECKquelle_LOGSergebnis >> $dateiLOGS
+            echo -e $txtCHECKquelle_LOGSergebnis >> $dateiLOGSarchiv
+        fi
+    fi
+}
+
+
+txtBEFEHLstatus=""
+flagFERTIG="false"
+function fncAusfuehrenBefehl {
+    txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+    echo -e "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Vorgang läuft..."
+    echo -e "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Vorgang läuft..." >> $dateiLOGS
+    echo -e "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Vorgang läuft..." >> $dateiLOGSarchiv
+    # -Befehl ausführen und beide Ausgaben in temporäre Datei umleiten:
+    #actionBefehl="echo -e $txtBEFEHL"
+    #`$actionBefehl` >> $dateiLOGStmp 2>> $dateiLOGStmp
+    #
+    #`echo -e $txtBEFEHL` >> $dateiLOGStmp 2>> $dateiLOGStmp
+    #echo -e "$txtBEFEHL" >> $dateiLOGStmp 2>> $dateiLOGStmp
+    
+    actionBefehl="echo -e $txtBEFEHL"
+    # -TESTDRIVE einbauen:
+    [[ "$flagTESTDRIVE" == "false" ]] && `$actionBefehl` >> $dateiLOGStmp 2>> $dateiLOGStmp
+    checkBEFEHLreturn=$?
+    #[[ "$flagTESTDRIVE" == "true" ]] && echo -e "$txtBEFEHL" >> $dateiLOGStmp 2>> $dateiLOGStmp
+    txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+    [[ "$flagTESTDRIVE" == "true" ]] && fncECHOlx "|- $txtZEITSTEMPEL -- $txtInfoTESTDRIVE: '$txtBEFEHL'" && checkBEFEHLreturn=0
+    
+    if ( [[ -f "$dateiLOGStmp" ]] )
+    then
+        # -Den Inhalt der temporären Datei an die beiden Logdateien anhängen:
+        while read txtINHALT
+        do
+            echo -e $txtINHALT >> $dateiLOGS
+            echo -e $txtINHALT >> $dateiLOGSarchiv
+            txtBEFEHLstatusBAK="|- EE $txtINHALT"
+            if ( [[ "$txtBEFEHLstatus" == "" ]] )
+            then
+                txtBEFEHLstatus=$txtBEFEHLstatusBAK
+            else
+                txtBEFEHLstatus="$txtBEFEHLstatus\\n$txtBEFEHLstatusBAK"
+            fi
+        done < $dateiLOGStmp
+        # -Die temporäre Datei löschen:
+        rm $dateiLOGStmp
+    fi
+    
+    checkBEFEHLreturnKOMPLETT=checkBEFEHLreturnKOMPLETT+checkBEFEHLreturn
+    if ( [[ "$checkBEFEHLreturn" == "0" ]] )
+    then
+        if ( [[ "$flagFERTIG" == "true" ]] )
+        then
+            txtBEFEHLreturn="!! ${fmtFETT}$xAnzeige: Erfolgreich abgeschlossen: $ArrayQuelleWert -> $ArrayZielWert${fmtRESET}"
+        elif ( [[ "$flagFERTIG" == "superfalse" ]] )
+        then
+            txtBEFEHLreturn=""
+        else
+            txtBEFEHLreturn="-! ${fmtFETT}$xAnzeige:${fmtRESET} Erfolgreich abgeschlossen!"
+        fi
+        txtBEFEHLreturnARCHIV=$txtBEFEHLreturn
+    else
+        txtBEFEHLreturn="EE ${fmtFETT}$xAnzeige:${fmtRESET} FEHLER: Status: $checkBEFEHLreturn - Nähere Infos: $dateiLOGS"
+        txtBEFEHLreturnARCHIV="EE ${fmtFETT}$xAnzeige:${fmtRESET} FEHLER: Status: $checkBEFEHLreturn - Nähere Infos: $dateiLOGSarchiv"
+    fi
+    txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+    [[ "$txtBEFEHLreturn" != "" ]] && fncECHOlx "|- $txtZEITSTEMPEL $txtBEFEHLreturn"
+}
+
+
+typeset -i intAnzahlQuellen=0
+typeset -i intAnzahlZiele=0
+function fncAnzahlVerzeichnisse {
+    intAnzahlQuellen=${#ArrayQuelle[@]}
+    intAnzahlZiele=${#ArrayZiel[@]}
+}
+
+
+function fncTarErstellen {
+    # -Der Name des Verzeichnises das archiviert werden soll (ohne Pfad): $1
+    [[ "$1" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    strTarVerzeichnisName="$1"
+    # -Der Pfad zu dem Verzeichnis das archiviert werden soll (ohne Verzeichnisname): $2
+    [[ "$2" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    strTarVerzeichnisPfad="$2"
+    # -Der relative Pfad zu einem Verzeichnis das NICHT archiviert werden soll: $3
+    [[ "$3" == "" ]] && strTarVerzeichnisExclude="" || strTarVerzeichnisExclude="--exclude $3 "
+    
+    strArbeitsverzeichnis="`pwd`"
+    txtBefehlTarErstellen="tar -""$argOptionen""czf $strTarTmpVerzeichnis/$strTarVerzeichnisName.tar.gz $strTarVerzeichnisExclude""$strTarVerzeichnisName"
+    #txtBEFEHL="cd $strTarVerzeichnisPfad && $txtBefehlTarErstellen && cd $strArbeitsverzeichnis"
+    txtBEFEHL="$txtBefehlTarErstellen"
+    
+    strBefehlTarOptionen=""
+    [[ "$argOptionen" != "" ]] && strBefehlTarOptionen="-$argOptionen "
+    txtBefehlTarEntfernen="rm ""$strBefehlTarOptionen""$strTarTmpVerzeichnis/$strTarVerzeichnisName.tar.gz"
+    strTarQuelleDatei="$strTarTmpVerzeichnis/$strTarVerzeichnisName.tar.gz"
+    strTarQuelleDateiName="$strTarVerzeichnisName.tar.gz"
+    
+    txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+    fncECHOlx "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Quellverzeichnis wird mittels tar archiviert und komprimiert."
+    txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+    fncECHOlx "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} '$txtBefehlTarErstellen'"
+    
+    cd $strTarVerzeichnisPfad
+    flagFERTIG="false" && fncAusfuehrenBefehl
+    cd $strArbeitsverzeichnis
+}
+
+
+flagCheckNetzlaufwerk="false"
+function fncCheckNetzlaufwerk {
+    # -Das zu prüfende Verzeichnis: $1
+    [[ "$1" == "" ]] && echo -e "FEHLER: ${FUNCNAME[0]} - Kein Argument übergeben!" && return
+    strCheckVerzeichnis="$1"
+    # -Das gesuchte Dateisystem: $2
+    [[ "$2" == "" ]] && strCheckDateisystem="cifs" || strCheckDateisystem="$2"
+    flagCheckNetzlaufwerk="false"
+    
+    strCheckNetzlaufwerkDateisystem="`df --output=fstype $strCheckVerzeichnis`"
+    # -Steuerzeichen und Teilstring 'Typ ' entfernen:
+    txtCheckDateisystem=${strCheckNetzlaufwerkDateisystem//[$'\t\n\r'Typ ]}
+    # -$txtCheckDateisystem mit gesuchtem Dateisystem vergleichen:
+    [[ "$txtCheckDateisystem" == "$strCheckDateisystem" ]] && flagCheckNetzlaufwerk="true"
+    
+    # -Ausgabe des Wertes:
+    echo -e "$flagCheckNetzlaufwerk"
+}
+
+
+function fncChownChgrpChmod {
+    # ----------------------------------------------------------------------------------------
+    # -Benutzer und Gruppe neu setzen:
+    #txtBEFEHL="chown -R $nutzer $zielSICHERUNG"
+    txtBEFEHL="chown -""$argOptionen""R $nutzer:$nutzer $zielSicherungVerzeichnis"
+    txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+    fncECHOlx "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Ändere Benutzer.Gruppe:\\t'$txtBEFEHL'"
+    flagFERTIG="false" && fncAusfuehrenBefehl
+    # ----------------------------------------------------------------------------------------
+#     # -Gruppe neu setzen:
+#     #txtBEFEHL="chgrp -R $nutzer $zielSICHERUNG"
+#     txtBEFEHL="chgrp -""$argOptionen""R $nutzer $zielSicherungVerzeichnis"
+#     txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+#     fncECHOlxL "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Korrigiere Gruppe:\\t\\t'$txtBEFEHL'"
+#     flagFERTIG="false" && fncAusfuehrenBefehl
+    # ----------------------------------------------------------------------------------------
+    # -Datei Berechtigungen neu setzen:
+    #txtBEFEHL="chmod -R u+rw $zielSICHERUNG"
+    txtBEFEHL="chmod -""$argOptionen""R u+rw $zielSicherungVerzeichnis"
+    txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+    fncECHOlx "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Korrigiere Zugriffsrechte:\\t'$txtBEFEHL'"
+    flagFERTIG="true" && fncAusfuehrenBefehl
+    flagFERTIG="false"
+}
+
+
+
+
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++ START fncArrayBackup ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+typeset -i intAnzMaster=0
+txtAnzMaster=""
+txtAnzMasterTrenner="-"
+function fncArrayBackup {
+    # -Die Anzahl der Master Backup Durchläufe:
+    intAnzMaster=intAnzMaster+1
+    [[ "$intAnzMaster" -lt 10 ]] && txtAnzMaster="0$intAnzMaster""$txtAnzMasterTrenner" || txtAnzMaster="$intAnzMaster""$txtAnzMasterTrenner"
+    fncAnzahlVerzeichnisse
+    
+    if ( [[ "$strg1" == -*l* ]] )
+    then
+        if ( [[ "$strg1" == -*lc* ]] )
+        then
+            # $1 -lc
+            # -Eine Auflistung der Verzeichnisse anzeigen:
+            # --Die Verzeichnisse gleichzeitig auf Ihre Gültigkeit prüfen:
+            echo -e "|- Die zu sichernden Quellen werden angezeigt und überprüft:"
+            #echo -e "|-"
+            flag_fncCheckVerzeichnis_AUSGABE="quelle-1.ergebnis-1.logs-0"
+        elif ( [[ "$strg1" == -*l* ]] )
+        then
+            # $1 -l
+            # -Eine Auflistung der Verzeichnisse anzeigen:
+            echo -e "|- Die zu sichernden Quellen werden angezeigt:"
+            #echo -e "|-"
+            flag_fncCheckVerzeichnis_AUSGABE="quelle-1.ergebnis-0.logs-0"
+        fi
+        typeset -i x=0
+        for ArrayQuelleWert in "${ArrayQuelle[@]}"
+        do
+            txtTarQuelleZusatz=""
+            [[ "$ArrayQuelleWert" == tar:* ]] && ArrayQuelleWert=${ArrayQuelleWert//tar:/} && txtTarQuelleZusatz="-Tar"
+            
+            strCheckVerzeichnis="`fncAusgabeQuelleTar \"$ArrayQuelleWert\"`"
+            
+            [[ "$txtBefehlByteVerzeichnisse" == "" ]] && txtBefehlByteVerzeichnisse="$strCheckVerzeichnis" || txtBefehlByteVerzeichnisse="$txtBefehlByteVerzeichnisse $strCheckVerzeichnis"
+            
+            #[[ ! -d "$strCheckVerzeichnis" ]] && continue
+            fncCheckVerzeichnis "$strCheckVerzeichnis" "true" "Quelle$txtTarQuelleZusatz" "$txtAnzMaster"
+        done
+        txtBefehlByteVerzeichnisseQuelle="$txtBefehlByteVerzeichnisse"
+        txtBefehlByteVerzeichnisse=""
+        echo -e "|-"
+        
+        if ( [[ "$strg1" == -*lc* ]] )
+        then
+            # $1 -lc
+            # -Eine Auflistung der Verzeichnisse anzeigen:
+            # --Die Verzeichnisse gleichzeitig auf Ihre Gültigkeit prüfen:
+            echo -e "|- Die Zielverzeichnisse werden angezeigt und überprüft:"
+            #echo -e "|-"
+            flag_fncCheckVerzeichnis_AUSGABE="quelle-1.ergebnis-1.logs-0"
+        elif ( [[ "$strg1" == -*l* ]] )
+        then
+            # $1 -l
+            # -Eine Auflistung der Verzeichnisse anzeigen:
+            echo -e "|- Die Zielverzeichnisse werden angezeigt:"
+            #echo -e "|-"
+            flag_fncCheckVerzeichnis_AUSGABE="quelle-1.ergebnis-0.logs-0"
+        fi
+        typeset -i x=0
+        for ArrayZielWert in "${ArrayZiel[@]}"
+        do
+            #strCheckVerzeichnis="$ArrayZielWert"
+            strCheckVerzeichnis="`fncAusgabeZielZiel \"$ArrayZielWert\"`"
+            strCheckVerzeichnisZeitcode="`fncAusgabeZielZeit \"$ArrayZielWert\"`"
+            #echo -e "--- DEBUG Zeitcode: $strCheckVerzeichnisZeitcode"
+            
+            [[ "$txtBefehlByteVerzeichnisse" == "" ]] && txtBefehlByteVerzeichnisse="$strCheckVerzeichnis" || txtBefehlByteVerzeichnisse="$txtBefehlByteVerzeichnisse $strCheckVerzeichnis"
+            
+            #[[ ! -d "$strCheckVerzeichnis" ]] && continue
+            fncCheckVerzeichnis "$strCheckVerzeichnis" "true" "Ziel" "$txtAnzMaster" "$strCheckVerzeichnisZeitcode"
+        done
+        txtBefehlByteVerzeichnisseZiel="$txtBefehlByteVerzeichnisse"
+        txtBefehlByteVerzeichnisse=""
+        echo -e "|-"
+        
+        if [[ "$flagQUIETmode" == "false" ]]
+        then
+            #echo -e "|-"
+            echo -e "|- HINWEIS: Es wurde noch keine Sicherung erstellt! Nähere Infos dazu"
+            echo -e "|-          finden Sie in der Hilfe. '$datei -h'"
+            echo -e "|-"
+            #echo -e "$txtBefehlByteAufruf""$txtBefehlByteVerzeichnisseQuelle"
+            #echo -e "$txtBefehlByteAufruf""$txtBefehlByteVerzeichnisseZiel"
+            echo -e "|-"
+        fi
+        
+        return
+    fi
+    
+    
+    
+    typeset -i x=0
+    typeset -i zZiele=0
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    # +++++ START for-ArrayQuelle +++++++++++++++++++++++++++++
+    for ArrayQuelleWert in "${ArrayQuelle[@]}"
+    do
+        # -Check auf Tar Funktion:
+        flagTarQuelle="false"
+        [[ "$ArrayQuelleWert" == tar:* ]] && flagTarQuelle="true" && ArrayQuelleWert=${ArrayQuelleWert//tar:/}
+        strCheckAusgabeQuelleTarExclude=""
+        strCheckAusgabeQuelleTarExclude="`fncAusgabeQuelleTarExclude \"$ArrayQuelleWert\"`"
+        ArrayQuelleWert="`fncAusgabeQuelleTar \"$ArrayQuelleWert\"`"
+        ArrayQuelleWertOriginal="$ArrayQuelleWert"
+        
+        # -Tar Variable setzen: $txtTarQuelleZusatz
+        txtTarQuelleZusatz=""
+        [[ "$flagTarQuelle" == "true" ]] && txtTarQuelleZusatz="-Tar"
+        
+        typeset -i zZiele=0
+        # -Die Quelle anzeigen und prüfen:
+        # --Die Ausgabe der fncCheckVerzeichnis anpassen:
+        flag_fncCheckVerzeichnis_AUSGABE="quelle-1.ergebnis-1.logs-1"
+        fncCheckVerzeichnis "$ArrayQuelleWert" "true" "Quelle$txtTarQuelleZusatz" "$txtAnzMaster"
+        # -Wenn das Verzeichnis fehlerhaft ist, wird continue aufgerufen:
+        [[ "$txtCHECKquelle_LOGSergebnis" == *FEHLER* ]] && continue
+        # -quelleVERZEICHNIS: nur das zu sichernde Verzeichnis ohne Pfad
+        quelleVERZEICHNIS=${ArrayQuelleWert//*\//}
+        # -quellePFAD: nur der Pfad zu dem zu sichernden Verzeichnis
+        quellePFAD=${ArrayQuelleWert//$quelleVERZEICHNIS/}
+        
+        # -Tar wird gestartet:
+        [[ "$flagTarQuelle" == "true" ]] && fncTarErstellen "$quelleVERZEICHNIS" "$quellePFAD" "$strCheckAusgabeQuelleTarExclude"
+        
+        txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+        fncECHOlx "|- $txtZEITSTEMPEL"
+        
+        fncAnzahlVerzeichnisse
+        # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        # +++++ START for-ArrayZiel +++++++++++++++++++++++++++++++
+        for ArrayZielWert in "${ArrayZiel[@]}"
+        do
+            flagZielZeitSicherung="truetruetrue"
+            
+            # -Das Ziel bzgl Zeitangabe für Sicherung prüfen und ggf Ziel und Zeit auslesen:
+            strZielZeitAktuellTagDesMonats="`date '+%-d'`"
+            strZielZeitAktuellMonat="`date '+%-m'`"
+            strZielZeitAktuellTagDerWoche="`date '+%u'`"
+            
+            ArrayZielWertZeit="`fncAusgabeZielZeit \"$ArrayZielWert\"`"
+            ArrayZielWertZiel="`fncAusgabeZielZiel \"$ArrayZielWert\"`"
+            strZielWertOriginal="$ArrayZielWert"
+            ArrayZielWert="$ArrayZielWertZiel"
+            
+            #echo -e "--- DEBUG Aktuell: $strZielZeitAktuellTagDesMonats $strZielZeitAktuellMonat $strZielZeitAktuellTagDerWoche"
+            #echo -e "--- DEBUG Array: $strZielZeitArrayTagDesMonats $strZielZeitArrayMonat $strZielZeitArrayTagDerWoche - $ArrayZielWertZeit"
+            
+            if ( [[ "$ArrayZielWertZeit" != "" ]] )
+            then
+                strZielZeitArrayTagDesMonats=`echo -e "$ArrayZielWertZeit" | cut -d. -f1`
+                strZielZeitArrayMonat=`echo -e "$ArrayZielWertZeit" | cut -d. -f2`
+                strZielZeitArrayTagDerWoche=`echo -e "$ArrayZielWertZeit" | cut -d. -f3`
+                
+                # -Tag des Monats prüfen:
+                [[ "$strZielZeitArrayTagDesMonats" == "$strZielZeitAktuellTagDesMonats" ]] || [[ "$strZielZeitArrayTagDesMonats" == "0" ]] && flagZielZeitSicherungTdM="true" || flagZielZeitSicherungTdM="false"
+                
+                # -Monat prüfen:
+                [[ "$strZielZeitArrayMonat" == "$strZielZeitAktuellMonat" ]] || [[ "$strZielZeitArrayMonat" == "0" ]] && flagZielZeitSicherungM="true" || flagZielZeitSicherungM="false"
+                
+                # -Tag der Woche prüfen:
+                [[ "$strZielZeitArrayTagDerWoche" == "$strZielZeitAktuellTagDerWoche" ]] || [[ "$strZielZeitArrayTagDerWoche" == "0" ]] && flagZielZeitSicherungTdW="true" || flagZielZeitSicherungTdW="false"
+                
+                # -flagZielZeitSicherung zusammenbauen:
+                flagZielZeitSicherung="$flagZielZeitSicherungTdM""$flagZielZeitSicherungM""$flagZielZeitSicherungTdW"
+            fi
+            
+            # -Wenn TESTDRIVE wird das $flagZielZeitSicherung ignoriert, bzw auf truetruetrue gesetzt.
+            [[ "$flagTESTDRIVE" == "true" ]] && flagZielZeitSicherung="truetruetrue"
+            [[ "$flagZielZeitSicherung" != "truetruetrue" ]] && intAnzahlZiele=intAnzahlZiele-1 && continue
+            
+            # -Das Ziel prüfen:
+            [[ ! -d "$ArrayZielWert" ]] && intAnzahlZiele=intAnzahlZiele-1 && continue
+            
+            zZiele=zZiele+1
+            
+            # -Das Ziel bzgl Netzlaufwerk prüfen:
+            #echo -e "----- DEBUG fncCheckNetzlaufwerk: `fncCheckNetzlaufwerk "$ArrayZielWert" "cifs"`"
+            flagCheckNetzlaufwerk="`fncCheckNetzlaufwerk "$ArrayZielWert" "cifs"`"
+            #echo -e "----- DEBUG flagCheckNetzlaufwerk: $flagCheckNetzlaufwerk"
+            
+            # --Die Ausgabe der fncCheckVerzeichnis anpassen:
+            flag_fncCheckVerzeichnis_AUSGABE="quelle-1.ergebnis-1.logs-1"
+            #echo -e "--- DEBUG Zeitcode: $ArrayZielWertZeit"
+            fncCheckVerzeichnis "$ArrayZielWert" "false" "Ziel" "$txtAnzMaster" "$ArrayZielWertZeit"
+            # -Wenn das Verzeichnis fehlerhaft ist, wird continue aufgerufen:
+            [[ "$txtCHECKquelle_LOGSergebnis" == *FEHLER* ]] && continue
+            # -zielSICHERUNG: der komplette Pfad zu dem Verzeichnis in das die Quelle hinein kopiert wird
+            [[ "$flagZielParentQuellpfad" == "true" ]] && zielSICHERUNG="$ArrayZielWert""$quellePFAD"
+            [[ "$flagZielParentQuellpfad" == "false" ]] && zielSICHERUNG="$ArrayZielWert"
+            [[ "$zielSICHERUNG" != */ ]] && zielSICHERUNG="$zielSICHERUNG""/"
+            # -zielSicherungVerzeichnis: das neu angelegte Quellen Verzeichnis mit Pfad
+            zielSicherungVerzeichnis="$zielSICHERUNG""$quelleVERZEICHNIS"
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            [[ ! -d "$zielSICHERUNG" ]] && `su $nutzer -c "mkdir -p $zielSICHERUNG"`
+            
+            # -Wenn Tar Funktion gewählt wurde: $ArrayQuelleWert muss durch die neu erstellte
+            #  Tar Datei $strTarQuelleDatei ersetzt werden!
+            [[ "$flagTarQuelle" == "true" ]] && ArrayQuelleWert="$strTarQuelleDatei"
+            
+            # -Wenn Tar Funktion gewählt wurde: $zielSicherungVerzeichnis muss anstatt auf ein Verzeichnis,
+            #  auf den Namen der Tar Datei $strTarQuelleDateiName verweisen!
+            [[ "$flagTarQuelle" == "true" ]] && zielSicherungVerzeichnis="$zielSICHERUNG""$strTarQuelleDateiName"
+            
+            #if ( [[ "$strg1" == "" ]] || [[ "$strg1" == -*q* ]] )
+            if ( [[ "$strg1" == "" ]] || [[ "$strg1" != -*k* ]] )
+            then
+                # ----------------------------------------------------------------------------------------
+                # -Kopieren starten: ---UPDATE--- (Update oder Komplett)
+                # --Mittels cp: -r rekursiv, -u Update
+                # ---Update: "cp -ru quelle ziel"
+                # ---Komplett: "cp -r quelle ziel"
+                # --Mittels rsync: -a Archivoptionen, -u Update
+                # ---Update: "rsync -au quelle ziel"
+                # ---Komplett: "rsync -a quelle ziel"
+                #txtBEFEHL="cp -ru $ArrayQuelleWert $zielSICHERUNG"
+                #txtBEFEHL="rsync -au $ArrayQuelleWert $zielSICHERUNG"
+                txtBEFEHL="rsync -""$argOptionen""au $ArrayQuelleWert $zielSICHERUNG"
+                txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+                echo -e "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Starte Sicherung (Update):\\t'$txtBEFEHL'"
+                echo -e "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Starte Sicherung (Update):\\t'$txtBEFEHL'" >> $dateiLOGS
+                echo -e "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Starte Sicherung (Update):\\t'$txtBEFEHL'" >> $dateiLOGSarchiv
+                flagFERTIG="false"
+                [[ "$flagCheckNetzlaufwerk" == "true" ]] && [[ "$flagTarQuelle" == "false" ]] && flagFERTIG="true"
+                fncAusfuehrenBefehl
+                flagFERTIG="false"
+            elif ( [[ "$strg1" == -*k* ]] )
+            then
+                # ----------------------------------------------------------------------------------------
+                # -Kopieren starten: ---KOMPLETT--- (Update oder Komplett)
+                # --Mittels cp: -r rekursiv, -u Update
+                # ---Update: "cp -ru quelle ziel"
+                # ---Komplett: "cp -r quelle ziel"
+                # --Mittels rsync: -a Archivoptionen, -u Update
+                # ---Update: "rsync -au quelle ziel"
+                # ---Komplett: "rsync -a quelle ziel"
+                #txtBEFEHL="cp -ru $ArrayQuelleWert $zielSICHERUNG"
+                #txtBEFEHL="rsync -au $ArrayQuelleWert $zielSICHERUNG"
+                txtBEFEHL="rsync -""$argOptionen""a $ArrayQuelleWert $zielSICHERUNG"
+                txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+                echo -e "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Starte Sicherung (Komplett):\\t'$txtBEFEHL'"
+                echo -e "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Starte Sicherung (Komplett):\\t'$txtBEFEHL'" >> $dateiLOGS
+                echo -e "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Starte Sicherung (Komplett):\\t'$txtBEFEHL'" >> $dateiLOGSarchiv
+                flagFERTIG="false"
+                [[ "$flagCheckNetzlaufwerk" == "true" ]] && [[ "$flagTarQuelle" == "false" ]] && flagFERTIG="true"
+                fncAusfuehrenBefehl
+                flagFERTIG="false"
+            fi
+            
+            # -Wegen schlechter SMB Netzwerk Performance werden die fncChownChgrpChmod Befehle
+            #  nicht ausgeführt. Wenn das Laufwerk wieder direkt angeschlossen ist, werden die
+            #  Befehle wieder ausgeführt.
+            # --Falls eine einzelne Tar Datei übertragen wurde, kann fncChownChgrpChmod ohne
+            #   Bedenken gestartet werden:
+            if ( [[ "$flagCheckNetzlaufwerk" == "false" ]] )
+            then
+                fncChownChgrpChmod
+            elif ( [[ "$flagTarQuelle" == "true" ]] )
+            then
+                fncChownChgrpChmod
+            fi
+            
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            [[ "$intAnzahlZiele" -gt "$zZiele" ]] && fncECHOlx "|- $txtZEITSTEMPEL"
+            if ( [[ "$intAnzahlQuellen" -eq "$x" ]] ) 
+            then
+                txtZEITSTEMPEL=""
+            fi
+        done
+        # +++++ ENDE for-ArrayZiel ++++++++++++++++++++++++++++++++
+        # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        
+        # -Wenn Tar Funktion gewählt wurde: Die Tar Datei $strTarQuelleDatei löschen!
+        if ( [[ "$flagTarQuelle" == "true" ]] )
+        then
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            fncECHOlx "|- $txtZEITSTEMPEL"
+            xAnzeige="$xAnzeigeEnde"
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            fncECHOlx "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige: Quelle-Tar: $ArrayQuelleWert${fmtRESET}"
+            txtBEFEHL="$txtBefehlTarEntfernen"
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            fncECHOlx "|- $txtZEITSTEMPEL -- ${fmtFETT}$xAnzeige:${fmtRESET} Die Tar Datei löschen:\\t'$txtBEFEHL'"
+            flagFERTIG="superfalse"
+            [[ -f "$ArrayQuelleWert" ]] && fncAusfuehrenBefehl
+            [[ "$flagTESTDRIVE" == "true" ]] && txtInfoTESTDRIVEfertig="$txtInfoTESTDRIVE: "
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            fncECHOlx "|- $txtZEITSTEMPEL !! ${fmtFETT}$xAnzeige: $txtInfoTESTDRIVEfertig""Erfolgreich abgeschlossen: Quelle-Tar: $ArrayQuelleWertOriginal${fmtRESET}"
+        else
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            fncECHOlx "|- $txtZEITSTEMPEL"
+            xAnzeige="$xAnzeigeEnde"
+            [[ "$flagTESTDRIVE" == "true" ]] && txtInfoTESTDRIVEfertig="$txtInfoTESTDRIVE: "
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            fncECHOlx "|- $txtZEITSTEMPEL !! ${fmtFETT}$xAnzeige: $txtInfoTESTDRIVEfertig""Erfolgreich abgeschlossen: Quelle: $ArrayQuelleWertOriginal${fmtRESET}"
+        fi
+        fncECHOlx "|-"
+    done
+    # +++++ ENDE for-ArrayQuelle ++++++++++++++++++++++++++++++
+    # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    fncECHOlx "|-"
+    
+    
+    
+    
+    
+    
+    
+    return
+    
+    
+    
+    
+
+
+
+
+
+        # -Fehlerkontrolle:
+        fncAnzahlVerzeichnisse
+        typeset -i checkBEFEHLreturn=0
+        typeset -i checkBEFEHLreturnKOMPLETT=0
+
+        if ( [[ "$strg1" != -*l* ]] && [[ "$checkBEFEHLreturnKOMPLETT" == "0" ]] )
+        then
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            beep -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 350 -f 392 -D 100 --new -l 250 -f 311.1 -D 100 --new -l 25 -f 466.2 -D 100 --new -l 700 -f 392 -D 100 &
+            echo -e "|- $txtZEITSTEMPEL !! $datei - Erfolgreich abgeschlossen: $zielGLOBAL"
+            echo -e "|- $txtZEITSTEMPEL !! $datei - Erfolgreich abgeschlossen: $zielGLOBAL" >> $dateiLOGS
+            echo -e "|- $txtZEITSTEMPEL !! $datei - Erfolgreich abgeschlossen: $zielGLOBAL" >> $dateiLOGSarchiv
+            echo -e "|-"
+            echo -e "|-" >> $dateiLOGS
+            echo -e "|-" >> $dateiLOGSarchiv
+        elif ( [[ "$strg1" != -*l* ]] && [[ "$checkBEFEHLreturnKOMPLETT" != "0" ]] )
+        then
+            txtZEITSTEMPEL=`fncYEAR1231 'nurZAHLEN' && echo -en " " && fncHHMMSS 'norm.mS3'`
+            beep -l 300 -f 390 -D 100 --new -l 300 -f 360 -D 100 --new -l 500 -f 330 -D 100 &
+            txtBEFEHLreturn="EE FEHLER: $datei - Status: $checkBEFEHLreturnKOMPLETT"
+            txtBEFEHLreturn2="EE FEHLER: $datei - Nähere Infos: $dateiLOGS"
+            txtBEFEHLreturn3="EE FEHLER: $datei - Fehlermeldungen:"
+            txtBEFEHLreturnARCHIV="EE FEHLER: $datei - Status: $checkBEFEHLreturnKOMPLETT"
+            txtBEFEHLreturnARCHIV2="EE FEHLER: $datei - Nähere Infos: $dateiLOGSarchiv"
+            txtBEFEHLreturnARCHIV3="EE FEHLER: $datei - Fehlermeldungen:"
+            echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn"
+            echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn2"
+            echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn3"
+            echo -e $txtBEFEHLstatus
+            
+            echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn" >> $dateiLOGS
+            echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn2" >> $dateiLOGS
+            echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturn3" >> $dateiLOGS
+            echo -e $txtBEFEHLstatus >> $dateiLOGS
+            
+            echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturnARCHIV" >> $dateiLOGSarchiv
+            echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturnARCHIV2" >> $dateiLOGSarchiv
+            echo -e "|- $txtZEITSTEMPEL $txtBEFEHLreturnARCHIV3" >> $dateiLOGSarchiv
+            echo -e $txtBEFEHLstatus >> $dateiLOGSarchiv
+            
+            echo -e "|-"
+            echo -e "|-" >> $dateiLOGS
+            echo -e "|-" >> $dateiLOGSarchiv
+        fi
+
+        fncECHOlx "|--------------------------------------------------------------------------------"\\n"|-"
+
+        txtZEITSTEMPEL=`date '+%F %T:%N'`
+        txtLOGinfo="$txtZEITSTEMPEL - $datei"
+
+        # allgemeine Cron Daten loggen:
+        #txtLOGcron=" - Backup ($zielGLOBAL) erfolgreich abgeschlossen!"
+        txtLOGcron=" - Erfolgreich abgeschlossen: $zielGLOBAL"
+        echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
+
+}
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++ ENDE fncArrayBackup +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+# ---------------------------------------------------------
+#
+# -ArrayQuelle: Die zu sichernden Verzeichnisse
+#  Um das Verzeichnis mittels Tar zu sichern, muss der Pfad mit 'tar:' anfangen.
+#  Mit der zusätzlichen 'exclude:' Funktion kann ein Verzeichnis angegeben werden, dass nicht
+#  in die Tar Datei aufgenommen werden soll!
+#
+# -ArrayZiel: Die Verzeichnisse in denen die Sicherungen gespeichert werden.
+#
+# -Wenn Ziel nur an bestimmten Tagen gesichert werden soll, muss 3 stelliger numerischer
+#  Code vor die Zieladresse gesetzt werden: TagDesMonats 1-31 . Monat 1-12 . TagDerWoche 1-7
+#  Eine Null als Wert bedeutet immer: 0.0.0/pfad/zum/ziel - täglich, Standard, Dies kann auch
+#  weg gelassen werden!
+#   /pfad/zum/ziel - wird täglich gesichert
+#   11.0.1/pfad/zum/ziel - wird am 11. jedes Monats gesichert, wenn es ein Montag ist
+#   0.12.3/pfad/zum/ziel - wird nur im Dezember immer Mittwochs gesichert
+#   0.0.1/pfad/zum/ziel - wird immer Montags gesichert
+#
+# ---------------------------------------------------------
+#
+# -Soll das Zielverzeichnis den kompletten Pfad der Quelle enthalten?
+#  $flagZielParentQuellpfad - Beispiel:
+# -Quelle: /etc/network/devices
+# -Ziel: /backup/system
+# --true: /backup/system/etc/network/devices
+# --false: /backup/system/devices
+#
+# ---------------------------------------------------------
+#
+# -Speicherort für die temporär erstellten Tar Dateien:
+#  $strTarTmpVerzeichnis
+#
+# ---------------------------------------------------------
+#
+# -Aufruf um Speicherplatz bzw Größe in Byte zu ermitteln
+txtBefehlByteAufruf="du -hc --max-depth=0 "
+
+
+strTarTmpVerzeichnis="/home/$nutzer"
+flagZielParentQuellpfad="true"
+
+ArrayZiel=(/aa_backup/to1000/bak/backup /aa_media/usb-disc-bak/bak/backup /aa_media/wd1_bak/bak/backup /aa_network/fritz/wd1_bak/bak/backup)
+ArrayQuelle=(/home/$nutzer/bin /home/$nutzer/bin-bak)
+fncArrayBackup
+
+# -----------------------------------------------------------------------------
+
+strTarTmpVerzeichnis="/home/$nutzer"
+flagZielParentQuellpfad="true"
+
+ArrayZiel=(/aa_backup/to1000/bak/backup /aa_media/usb-disc-bak/bak/backup /aa_media/wd1_bak/bak/backup 0.0.2/aa_network/fritz/wd1_bak/bak/backup)
+ArrayQuelle=(tar:/etc tar:/home/$nutzer/.config tar:/home/$nutzer/.kde tar:/home/$nutzer/.local/share/Steam tar:exclude:share/Steam:/home/$nutzer/.local tar:/home/$nutzer/.mozilla tar:/home/$nutzer/.icedove /home/$nutzer/Desktop /home/$nutzer/Dokumente/bak /home/$nutzer/Dokumente/downloads /home/$nutzer/Dokumente/knowledge /home/$nutzer/Dokumente/software /aa_daten/zz_privat /aa_daten/zz_work /aa_daten/bak /aa_daten/bilder)
+fncArrayBackup
+
+# -----------------------------------------------------------------------------
+
+strTarTmpVerzeichnis="/home/$nutzer"
+flagZielParentQuellpfad="false"
+
+ArrayZiel=(/aa_media/wd1_dlna/aa_daten 0.0.2/aa_network/fritz/wd1_dlna/aa_daten)
+#ArrayQuelle=(/aa_backup/to1000/daten/musik /aa_backup/to1000/daten/musik_tmp /aa_backup/to1000/daten/video /aa_backup/to1000/daten/video_dlna)
+ArrayQuelle=(/aa_daten/musik /aa_backup/to1000/daten/video /aa_backup/to1000/daten/video_dlna)
+fncArrayBackup
+
+
+
+
+# # -TestConfig:
+# strTarTmpVerzeichnis="/home/$nutzer"
+# flagZielParentQuellpfad="true"
+# 
+# ArrayZiel=(/aa_backup/to1000/bak/backup2 /aa_backup/sg250/bak/backup2 /aa_media/wd1_bak/bak/backup2 /aa_network/fritz/wd1_bak/bak/backup2)
+# ArrayQuelle=(tar:/etc tar:/home/$nutzer/.config /home/$nutzer/bin tar:/aa_daten/bak/log)
+# fncArrayBackup
+
+
+
+
+
+
+
+
+if ( [[ "$strg1" != -*l* ]] )
+then
+    # -Damit das Backup der Logdateien funktioniert, werden die Benutzerrechte
+    #  der beiden Logdateien erweitert:
+    chmod a+w $dateiLOGS
+    chmod a+w $dateiLOGSarchiv
+fi
+
+
+
+if ( [[ `tty` == *dev* ]] && [[ "$strg1" != -*l* ]] )
+then
+    #[[ `tty` == *dev* ]] && kdialog --title "$datei.Ende `fncHHMMSS 'norm.mS2'`:" --msgbox " --- <b>$datei:</b> --- <br><br>$datei wurde beendet!<br>" --geometry=500x300 >/dev/null 2>&1 &
+    kdialog --title "$datei.Info" --msgbox " --- <b>$datei.Info:</b> --- <br><br>$datei wurde beendet!<br><br>Zeit: `fncHHMMSS 'norm.mS2'` - PID: $$" >/dev/null 2>&1 &
+fi
+
+
+
+# if ( [[ "$strg1" != -*l* ]] )
+# then
+#     # -Den Inhalt der aktuellen Logdatei an die Archivlogdatei anhängen:
+#     while read txtINHALT
+#     do
+#         echo -e $txtINHALT >> $dateiLOGSarchiv
+#     done < $dateiLOGS
+# fi
+
+
+
+
+exit 0;
+
+
+
+

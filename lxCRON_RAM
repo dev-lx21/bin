@@ -1,0 +1,333 @@
+#!/bin/bash 
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Standard Parameter setzen ----------------------------------------------
+datei=${0//*\//}
+txtTITEL="lxCRON: RAM Auslastung loggen!"
+
+txtKOPF=\
+"|--------------------------------------------------------------------------------"\\n\
+"|- $datei -| $txtTITEL"\\n\
+"|--------------------------------------------------------------------------------"\\n\
+"|- "`date`\\n\
+"|-"
+
+txtBENUTZUNG=\\n\
+"|- Benutzung:"\\n\
+"|- '$datei [OPTIONEN]'"\\n\
+"|- Skript zum Mitloggen der RAM Auslastung (minütlich, 5minütlich, 15minütlich)."\\n\
+"|- Sollte als minütlicher Cronjob laufen!"\\n\
+"|-"
+
+txtHILFE=$txtBENUTZUNG\\n\
+"|- Optionen:"\\n\
+"|- -h\\tDiesen Hilfetext anzeigen."\\n\
+"|- -s\\tNichts Aufräumen, nur die HD Belegung und die RAM Auslastung anzeigen."\\n\
+"|-"
+
+txtFEHLERargument=\\n\
+"|- FEHLER:\\tKein zulässiges Argument übergeben. - Es könnte Panik entstehen!"\\n\
+"|-\\t\\tWeitere Hilfe erhalten Sie mit '-h'!"\\n\
+"|-"
+
+flagLOGGEN5="false"
+flagLOGGEN15="false"
+
+dateiLOGminuetlich="/aa_daten/bak/log/RAMminuetlich.log"
+dateiLOG5minuetlich="/aa_daten/bak/log/RAM5minuetlich.log"
+dateiLOG15minuetlich="/aa_daten/bak/log/RAM15minuetlich.log"
+
+
+# --------------------------------------------------------------------------------------
+# ----- START Cronjob Kontrolle -------------------------------------------------
+# -Display testen:
+if [[ `tty` == *dev* ]]
+then
+    #echo -e "kein Cronjob, weil Display"
+    echo -e $txtKOPF$txtBENUTZUNG
+    echo -e "|- FEHLER: Skript Aufruf nicht mittels eines Cronjobs erfolgt. Rufen Sie"
+    echo -e "|-         \"man crontab\" auf um mehr über Cronjobs zu erfahren. Das Skript"
+    echo -e "|-         wird beendet."
+    echo -e "|-"
+    exit 0;
+fi
+# ----- ENDE Cronjob Kontrolle --------------------------------------------------
+# --------------------------------------------------------------------------------------
+
+
+# -Pause um ggf die Ausführung des Aufräum Cronjobs abzuwarten
+sleep 14 
+
+# -jetzt erst die Zeitdaten für den Logeintrag ermitteln:
+txtZEITSTEMPEL=`date '+%F %T:%N'`
+txtLOGinfo="$txtZEITSTEMPEL - $datei"
+# ----- ENDE  Standard Parameter setzen ----------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+typeset -i intLayoutMaxSpalten=0
+typeset -i intLayoutMaxSpaltenVorgabe=120
+function fncLayoutMaxSpalten {
+    # -Den Anzeigebereich des eigenen Layouts auf 80% der vorhandenen Bildschirmbreite
+    #  begrenzen: ($zSPALTEN/10)*8
+    
+    typeset -i zZEILEN=$LINES
+    typeset -i zSPALTEN=$COLUMNS
+
+    intLayoutMaxSpaltenSCALE1=`echo -e "scale=1 ; ($zSPALTEN/10)*8" | bc -l`
+    intLayoutMaxSpalten=${intLayoutMaxSpaltenSCALE1//\.*/}
+    [ "$intLayoutMaxSpalten" -le 0 ] && intLayoutMaxSpalten=$intLayoutMaxSpaltenVorgabe
+}
+fncLayoutMaxSpalten
+
+
+
+
+function fncAusgabeHRMaxSpalten {
+    # -HRMaxSpalten erstellen und ausgeben!
+    # -Argumente:
+    # --$1: Die Zeichen mit denen die Linie anfangen soll.
+    # --$2: Das Zeichen mit dem die Linie gefüllt wird.
+    # -Werden keine Argumente übergeben, wird Standard genutzt:
+    txtHRAnfang="|"
+    txtHRFuellen="-"
+    
+    typeset -i zHRAnfang=0
+    typeset -i zHRFuellen=0
+    typeset -i zHRMaxSpalten=0
+    
+    [ $1 ] && txtHRAnfang="$1"
+    zHRAnfang=${#txtHRAnfang}
+    [ $2 ] && txtHRFuellen="$2"
+    zHRFuellen=${#txtHRFuellen}
+    
+    txtHRMaxSpalten="$txtHRAnfang""$txtHRFuellen"
+    zHRMaxSpalten=intLayoutMaxSpalten-zHRAnfang-zHRFuellen
+    for ((zHR=0; zHR<$zHRMaxSpalten; zHR++))
+    do
+        #echo -en "$zzHR - "
+        txtHRMaxSpalten="$txtHRMaxSpalten""$txtHRFuellen"
+    done
+    echo -e "\\r$txtHRMaxSpalten"
+}
+
+
+
+function fncLayoutHRFullScreen {
+    # -Fullscreen HR erstellen und in $txtHRFullScreen speichern.
+    # -Argumente:
+    # --$1: txtHRFullScreenANFANG
+    # --$2: txtHRFullScreenENDE
+    
+    typeset -i zZEILEN=$LINES
+    typeset -i zSPALTEN=$COLUMNS
+    typeset -i zHRanfang=0
+    typeset -i zHRmitte=0
+    typeset -i zHRende=0
+    typeset -i zzHR=0
+    
+    txtHRFullScreenANFANG="|- $datei "
+    #txtHRFullScreenANFANG="|"
+    [ $1 ] && txtHRFullScreenANFANG="$1"
+    zHRanfang=${#txtHRFullScreenANFANG}
+    
+    #txtHRFullScreenENDE=" $datei -|"
+    txtHRFullScreenENDE="|"
+    [ $2 ] && txtHRFullScreenENDE="$2"
+    zHRende=${#txtHRFullScreenENDE}
+    
+    txtHRFullScreenMITTE=""
+    zHRmitte=zSPALTEN-zHRanfang-zHRende
+    for ((zzHR=0; zzHR<$zHRmitte; zzHR++))
+    do
+        #echo -en "$zzHR - "
+        txtHRFullScreenMITTE="$txtHRFullScreenMITTE""-"
+    done
+    txtHRFullScreen="$txtHRFullScreenANFANG""$txtHRFullScreenMITTE""$txtHRFullScreenENDE"
+    #echo -e "\\r$txtHRFullScreen"
+}
+fncLayoutHRFullScreen
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# ----- START Wert visualisieren ------------------------------------------------------------------
+function wertVISUALISIEREN {
+    RAMfreiVISUELL=${RAMfrei//M/}
+    RAMfreiVISUELL=`expr $RAMfreiVISUELL \/ 10`
+    RAMfreiVISUELL=`expr $RAMfreiVISUELL \/ 2`
+    RAMfreiVISUELLz=$RAMfreiVISUELL
+    RAMbalken=""
+    while ( [[ $RAMfreiVISUELLz -gt 0 ]] )
+    do
+        RAMbalken=$RAMbalken"_"
+        RAMfreiVISUELLz=`expr $RAMfreiVISUELLz - 1`
+    done
+    #echo -e "wert $RAMfrei $RAMfreiVISUELL $RAMbalken"
+}
+# ----- ENDE Wert visualisieren -------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+
+#arrWERTE=(`free -m`)
+#RAMfrei=${arrWERTE[9]}
+#wertVISUALISIEREN
+
+
+# -Zeit auslesen: Stunden und Minuten
+intSTUNDEN=`date '+%H'`
+intMINUTEN=`date '+%M'`
+
+
+# 24 Uhr Test
+if ( [[ "$intSTUNDEN" == "00" ]] && [[ "$intMINUTEN" == "00" ]] )
+then
+    # -die Logdateien kopieren und die Originale löschen:
+    # -wird inzwischen von der lxBACKUPlogs geregelt, daher:
+    nix=1
+    #cp $dateiLOGminuetlich $dateiLOGminuetlich".1"
+    #rm $dateiLOGminuetlich
+    #cp $dateiLOG5minuetlich $dateiLOG5minuetlich".1"
+    #rm $dateiLOG5minuetlich
+    #cp $dateiLOG15minuetlich $dateiLOG15minuetlich".1"
+    #rm $dateiLOG15minuetlich
+fi
+
+
+
+
+# 5 Minuten Test
+intMINUTEN5=`echo -e "scale=2 ; $intMINUTEN/5" | bc`
+intMINUTEN5=${intMINUTEN5//*\./}
+if ( [[ "$intMINUTEN5" == "00" ]] )
+then
+    #echo -e "5 min flag"
+    flagLOGGEN5="true"
+fi
+
+# 15 Minuten Test
+intMINUTEN15=`echo -e "scale=2 ; $intMINUTEN/15" | bc`
+intMINUTEN15=${intMINUTEN15//*\./}
+if ( [[ "$intMINUTEN15" == "00" ]] )
+then
+    #echo -e "15 min flag"
+    flagLOGGEN15="true"
+fi
+
+# volle Stunde Test
+if ( [[ "$intMINUTEN" == "00" ]] )
+then
+    flagLOGGEN5="true"
+    flagLOGGEN15="true"
+fi
+
+
+
+
+# -kein Display, also Cronjob, also loggen!
+arrWERTE=(`free -m`)
+txtLOGram=" - ${arrWERTE[0]}: ${arrWERTE[7]} ${arrWERTE[2]}: ${arrWERTE[9]}"
+RAMfrei=${arrWERTE[9]}
+wertVISUALISIEREN
+txtLOGram=$txtLOGram" \n"$RAMbalken
+# -Infos in die Logdatei schreiben: minütlich
+echo -e $txtLOGinfo$txtLOGram >> $dateiLOGminuetlich
+txtLOGcron=" - minütlich: true"
+
+if ( [[ "$flagLOGGEN5" == "true" ]] )
+then
+    # -Infos in die Logdatei schreiben: 5 minütlich
+    echo -e $txtLOGinfo$txtLOGram >> $dateiLOG5minuetlich
+    txtLOGcron=$txtLOGcron" - 5 minütlich: $flagLOGGEN5"
+fi
+
+if ( [[ "$flagLOGGEN15" == "true" ]] )
+then
+    # -Infos in die Logdatei schreiben: 15 minütlich
+    echo -e $txtLOGinfo$txtLOGram >> $dateiLOG15minuetlich
+    txtLOGcron=$txtLOGcron" - 15 minütlich: $flagLOGGEN15"
+fi
+
+txtLOGcron=$txtLOGcron"\t-- $RAMfrei"
+# allgemeine Cron Daten loggen:
+echo -e $txtLOGinfo$txtLOGcron >> /aa_daten/bak/log/cronjobs.log
+
+
+
+exit 0;
+
+# -----------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+echo -e "|-------------------------------------------------------------" 
+echo -e "|- $txtZEITSTEMPEL --- "`tty`
+
+
+if ( [ "$1" == "" ] ) 
+    then
+    echo -e "|- HD Belegung:"
+    df -m
+    echo -e "|- RAM Auslastung:"
+    free -m
+    echo -e "|- RAM aufräumen:"
+	echo -e "sync ; sync ; sync ; echo 3 > /proc/sys/vm/drop_caches"
+	sync ; sync ; sync ; echo 3 > /proc/sys/vm/drop_caches	
+    echo -e "|- RAM Auslastung:"
+    free -m
+
+elif ( [ "$1" == "-s" ] ) 
+    then
+    echo -e "|- HD Belegung:"
+    df -m
+    echo -e "|- RAM Auslastung:"
+    free -m
+elif ( [ "$1" == "-h" ] ) 
+    then
+    echo -e $txtKOPF
+	echo -e $txtHILFE	
+else
+	echo -e $txtFEHLERargument 
+fi 
+
+
+exit 0;
+
+
+
+

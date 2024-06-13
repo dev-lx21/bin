@@ -1,0 +1,354 @@
+#!/bin/bash
+# mp3 split script von -lx-
+
+clear
+datei=${0//*\//}
+titel="MP3 Dateien aufsplitten!"
+beschreibung="|- Beschreibung: \\n|- $datei teilt lange MP3 Dateien in mehrere kleine auf. Dabei
+\\n|- können die gewünschte Länge der Teil-Dateien und die Mindestlänge ab\\n|- der eine Aufteilung erfolgt, angegeben werden.\\n|- Die neuen Dateien werden automatisch in einem Unterverzeichnis\\n|- mit entsprechenden Meta-Infos gespeichert. Von der Originaldatei\\n|- wird zusätzlich noch eine Sicherheitskopie (.bak) erstellt.\\n|-"
+
+benutzung="|- Benutzung: \\n|- '$datei Zielverzeichnis'\\n|- Wenn kein Verzeichnis angegeben wird, sucht das Skript im\\n|- aktuellen Pfad nach passenden Dateien.\\n|-"
+
+if ( [ "$1" != "-q" ] ) 
+then
+    # wird (fast) immer angezeigt:
+    echo -e "|-"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|- $datei -| $titel"
+    echo -e "|--------------------------------------------------------------------------------"
+    echo -e "|-"
+fi
+
+if ( [ "$1" == "-h" ] ) 
+then
+    # version, GPL, autor...
+    echo -e $beschreibung
+    echo -e "|-"
+    echo -e $benutzung
+    echo -e "|-"
+fi
+
+
+
+
+
+# echo -e "***************************************************************"
+# echo -e "****************** mp3 split script von -lx- ******************"
+# echo -e "***************************************************************"
+
+pfad=$1
+flag_update=$2
+flag_aufruf_intern=$3
+
+flag_rename="false"
+if ( [ "$flag_update" == "rename" ] )
+    then
+    flag_rename="true"
+    flag_update=$2
+fi
+
+# START pfad-kontrolle -----------------------------------
+# den pfad pruefen, ggf korrigieren, ggf FEHLER ausgeben!
+# -ist bei internem aufruf nicht erforderlich:
+if ( [ "$flag_aufruf_intern" != "true" ] )
+  then
+  if ( [ "$pfad" != "" ] )
+  then
+  #echo -e "--- pfad-nicht-leer ---"
+  if [[ "$pfad" != */ ]]
+    then
+    #echo -e "--- pfad-hat-kein-slash ---"
+    pfad=$pfad"/"
+  fi
+  else
+  #echo -e "--- pfad-ist-leer ---"
+  # aktueller ort wird als pfad angenommen:
+  pfad=`pwd`
+  pfad=$pfad"/"
+  #kdialog --msgbox="Pfad: $pfad"
+  fi
+  # pfad pruefen und ggf FEHLER ausgeben:
+  if ( [ -d "$pfad" ] )
+    then
+    fehler=0
+    else
+    fehler=1
+    kdialog --title="FEHLER" --error="FEHLER:\nDas Verzeichnis lässt sich nicht öffnen. Bitte überprüfen Sie Ihre Eingabe! Vielleicht ein Tippfehler oder ungenügende Zugriffsrechte.\n\nVerzeichnis:\n$pfad\n\n\nDas Script wird beendet."
+    exit 0;
+  fi
+fi
+# ENDE pfad-kontrolle -----------------------------------
+
+
+
+# eventuelle sonder- und leerzeichen aus den dateinamen loeschen:
+if ( [ "$flag_aufruf_intern" != "true" ] && [ "$flag_rename" == "true" ] )
+ then
+ /home/lx21/bin/lxRENAME $pfad "false" "true"
+fi
+
+
+
+
+extension=".mp3"
+# gewuenschte laenge der teilstuecke in sekunden, der wert
+# muss glatt durch 60 teilbar sein!!!
+#splitlaenge="180"
+splitlaenge_eingabe="z"
+str_vorgabe=5
+#while ( ( "$splitlaenge_eingabe" != [0-9] ) )
+#i=${i//[^0-9]/}
+#while ( [ $splitlaenge_eingabe -lt 3 ] || [ $splitlaenge_eingabe -gt 10 ] \
+#|| [ "$splitlaenge_eingabe" == [^0-9] ] )
+#while ( [[ "$splitlaenge_eingabe" != [3-9] ]] || [[ "$splitlaenge_eingabe" != "10" ]] )
+while ( [[ "$splitlaenge_eingabe" != [3-9] ]] && [[ "$splitlaenge_eingabe" != [0][3-9] ]] && [[ "$splitlaenge_eingabe" != "10" ]] )
+#while ( [ $splitlaenge_eingabe -lt 3 ] || [ $splitlaenge_eingabe -gt 10 ] \
+#|| [ ${splitlaenge_eingabe//[^0-9]/} ] )
+do
+    splitlaenge_eingabe=$(kdialog --title="$datei" --caption="$titel" --inputbox="<nobr>===== "$datei" ======================</nobr><br><br>Bitte die maximale Länge der gewünschten Teilstücke in Minuten(!) angeben!<br><br>&nbsp;&nbsp;&nbsp;<b>-</b> Gilt für alle Dateien im aktuellen Verzeichnis.<br>&nbsp;&nbsp;&nbsp;<b>-</b> Mindestens: 3 - Maximal: 10 - Norm: 5 min<br>&nbsp;&nbsp;&nbsp;<b>-</b> Der Wert gilt für alle weiteren Aufteilungen.<br>" "$str_vorgabe" 400 400)
+
+#    if ( [ "$splitlaenge_eingabe" != [0-9] ] )
+#        then
+#        splitlaenge_eingabe=0
+#        txt_vorgabe="Nur Zahlen als Eingabe erlaubt!"
+#    fi
+done
+read -n 1 -t 1 -s eingabe
+if [[ "$splitlaenge_eingabe" == [0][3-9] ]]
+then
+    #splitlaenge_eingabe=`sed -e 's/^0*//'`
+    splitlaenge_eingabe=${splitlaenge_eingabe#0*}
+fi
+
+splitlaenge_in_minuten=$splitlaenge_eingabe
+splitlaenge=$[splitlaenge_eingabe*60]
+grenze_vor_60min=$[60-splitlaenge_in_minuten]
+#echo -e "$extension"
+
+echo -e "---splitlaenge: sec: $splitlaenge - min: $splitlaenge_in_minuten --- Grenze 60 min: $grenze_vor_60min"
+#exit 0;
+
+
+# gewuenschte mindestdauer ab der dateien aufgeteilt werden:
+mindestdauer_vorgabe=$[splitlaenge_in_minuten*2]
+while ( [[ "$mindestdauer_eingabe" -lt "$splitlaenge_in_minuten" ]] )
+do
+    mindestdauer_eingabe=$(kdialog --title="$datei" --caption="$titel" --inputbox="<nobr>===== "$datei" ======================</nobr><br><br>
+    Bitte die Mindestlänge, ab der die Datei aufgeteilt werden soll angeben! Als Voreinstellung wird die doppelte Länge eines Teilstücks gesetzt.<br> Falls Sie nicht wissen, was Sie angeben sollen, lassen Sie einfach die Vorgabe stehen und drücken RETURN.<br><br>
+    &nbsp;&nbsp;&nbsp;<b>-</b>Beispiel:<br>
+    &nbsp;&nbsp;&nbsp;<b></b> Teilstücke=3min - Mindestlänge=10min<br>
+    &nbsp;&nbsp;&nbsp;<b></b> Dateilänge=8min - Datei wird nicht aufgeteilt.<br>
+    &nbsp;&nbsp;&nbsp;<b></b> Dateilänge=11min - Datei wird aufgeteilt.<br>
+    &nbsp;&nbsp;&nbsp;<b> </b> 1.mp3=3min 2.mp3=3min<br>
+    &nbsp;&nbsp;&nbsp;<b> </b> 3.mp3=3min 4.mp3=2min<br><br>" "$mindestdauer_vorgabe" 400 400)
+done
+# mindestdauer von min in sek umrechnen und zuweisen:
+mindestdauer=$[mindestdauer_eingabe*60]
+
+echo -e "|- DEBUG-Infos:"
+echo -e "|- Splittlänge=$splitlaenge_in_minuten"
+echo -e "|- Mindestdauer Vorgabe=$mindestdauer_vorgabe"
+echo -e "|- Mindestdauer Eingabe=$mindestdauer_eingabe"
+echo -e "|- Mindestdauer=$mindestdauer_eingabe"
+
+
+#mkdir split; X=0; while( [ $X -lt 5 ] ); do echo $X; ffmpeg -i big_audio_file.mp3 -acodec copy -t 00:30:00 -ss 0$X:00:00 split/${X}a.mp3; ffmpeg -i big_audio_file.mp3 -acodec copy -t 00:30:00 -ss 0$X:30:00 split/${X}b.mp3;  X=$((X+1)); done;
+
+
+echo -e "---"
+echo -e "*** mp3 Datei splitten: ***"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =======================================================================
+# === START haupt-such-schleife =========================================
+# =======================================================================
+zINSGESAMT=0
+zSPLIT=0
+zBAKdateien=0
+strBAKdateien=""
+
+for i in $(ls --group-directories-first $pfad)
+ do
+ zINSGESAMT=$[zINSGESAMT+1]
+
+ # bei verzeichnis oder wenn extension nicht korrekt ist
+ # wird direkt zum naechsten datensatz gesprungen:
+ if ( [ -d $i ] || [[ "$i" != *$extension ]] )
+   then
+   continue
+ fi
+
+ echo -e "---SPLIT $i"
+ outfile_1=${i%$extension}
+ 
+ # verzeichnis namen erstellen:
+ # -entweder auf 10 zeichen beschneiden und nummerieren
+ # -oder dateinamen komplett als verzeichnis nutzen
+ #verzeichnis=${outfile_1:0:10}
+ #verzeichnis=$verzeichnis`printf _%03d`
+ #verzeichnis=$outfile_1
+ verzeichnis=$outfile_1
+ verzeichnis=$verzeichnis"/"
+ 
+ # wenn pfad uebergeben wurde muss outfile_1 an das erstellte
+ # verzeichnis angepasst werden:
+ if [[ "$outfile_1" == */* ]]
+  then
+  echo -e "--- outfile_1 enthaelt pfad"
+  outfile_datei=$(ls $outfile_1*)
+  outfile_datei=${outfile_datei%$extension}
+  outfile_datei=${outfile_datei##*/}
+  else
+  outfile_datei=$outfile_1
+ fi
+ 
+ #outfile=$outfile`printf _%03d$extension`
+ #dauer=do ffprobe -i $i -show_entries format=duration -v quiet -of csv="p=0"
+ dauer=$(ffprobe -v quiet $i -show_format 2>&1 | sed -n 's/duration=//p')
+ dauer=${dauer%.*}
+ echo -e "---"
+ echo -e "--- $outfile_1 - $dauer - $outfile_datei"
+ #exit 0;
+  #if ( [ $dauer -gt $mindestdauer ] )
+  if ( [[ "$dauer" -gt "$mindestdauer" ]] )
+  then
+   echo -e "laenger als mindestdauer"
+   mkdir $verzeichnis
+   cp $i "$verzeichnis$i.bak"
+   
+    zBAKdateien=$[zBAKdateien+1]
+    if [[ "$strBAKdateien" == "" ]]
+    then
+        strBAKdateien="|- --- ID: \t --- BAK-Datei: \t\t\t --- Verzeichnis:"
+    fi
+    strBAKdateien=$strBAKdateien"\n|- --- $zBAKdateien \t --- $i.bak --- $verzeichnis"
+    # strBAKdateien=$strBAKdateien."  --- Verzeichnis für Teildateien::".verzeichnis
+   
+   startzeit_h=0;
+   startzeit_m=0;
+   a=0
+    while( [ $dauer -gt 0 ] ); do
+     #outfile=$outfile_1`printf _%03d$extension` $a
+     # anzahl aller vorgänge und aller SPLIT dateien:
+     zINSGESAMT=$[zINSGESAMT+1]
+     zSPLIT=$[zSPLIT+1]
+     a=$[a+1]
+     #ffmpeg -i $i -acodec copy -t 00:05:00 -ss $startzeit_h:$startzeit_m:00 $outfile_1`printf _%03d$extension $a`
+     #
+     # WICHTIG: -t wert anpassen!
+     #
+     ffmpeg -v quiet -i $i -acodec copy -t 00:0$splitlaenge_in_minuten:00 -ss $startzeit_h:$startzeit_m:00 \
+     -metadata track=$a $verzeichnis$outfile_datei`printf _%03d$extension $a`
+     startzeit_m=$[startzeit_m+($splitlaenge/60)]
+     #
+     # WICHTIG: -gt vergleichswert ist 60 minus splitlaenge_in_minuten
+     #
+     if ( [ $startzeit_m -gt $grenze_vor_60min ] )
+      then
+      startzeit_m=0;
+      startzeit_h=$[startzeit_h+1]
+     fi
+     dauer=$[dauer-$splitlaenge]
+     #echo -e "--- startzeit_h: $startzeit_h"
+     #echo -e "--- startzeit_m: $startzeit_m"
+     #echo -e "--- dauer:       $dauer"
+     echo -e "--- startzeit h m: $startzeit_h:$startzeit_m - dauer: $dauer \c"
+     #echo -e "------"
+    done
+  fi
+
+ echo -e "---"
+ #ffmpeg -i $i -acodec copy -f segment -segment_time 300 $outfile
+ #ffmpeg -i $i -acodec copy -t 00:30:00 -ss 00:00:00 $outfile
+ echo -e "...done"
+ echo -e "---"
+ 
+done
+# =======================================================================
+# === ENDE haupt-such-schleife ==========================================
+# =======================================================================
+
+
+
+
+
+
+
+
+
+# echo -e "****************************************************"
+# echo -e "BAKs : $strBAKdateien"
+# echo -e "datei: $datei --- titel: $titel"
+# echo -e "****************************************************"
+
+
+txtINSGESAMT="Anzahl der Prüfvorgänge (Dateien und Ordner)"
+txtBAKdateien="Anzahl der Sicherheitskopien"
+txtSPLIT="Anzahl der neu erstellten Dateien"
+
+trennerC="\t - "
+trennerX="`echo -e "\t"`"
+trennerX2="\`echo -e "\t"\`"
+
+# fuer ausgabe in der konsole: $trennerC
+statusANZAHLinsgesamt=$zINSGESAMT$trennerC$txtINSGESAMT
+statusANZAHLbak=$zBAKdateien$trennerC$txtBAKdateien
+statusANZAHiLsplitt=$zSPLIT$trennerC$txtSPLIT
+
+# fuer ausgabe im Xserver: $trennerX
+XstatusANZAHLinsgesamt=$zINSGESAMT"$trennerX"$txtINSGESAMT
+XstatusANZAHLbak=$zBAKdateien"`echo -e "\t"`"$txtBAKdateien
+XstatusANZAHiLsplitt=$zSPLIT`echo -e "\t"`$txtSPLIT
+
+# statusANZAHLinsgesamt=$zINSGESAMT"\t - Anzahl der Prüfvorgänge (Dateien und Ordner)"
+# statusANZAHLbak=$zBAKdateien"\t - Anzahl der Sicherheitskopien (.bak)"
+# statusANZAHiLsplitt=$zSPLIT"\t - Anzahl der neu erstellten Dateien"
+
+
+# zahlen und namen auch auf der Konsole ausgeben, VORTEIL:
+# -kurzzeitig gespeichert, Infos lassen sich leichter kopieren als in einem normalen dialogfenster
+echo -e "|- $statusANZAHLinsgesamt"
+echo -e "|- $statusANZAHLbak"
+echo -e "|- $statusANZAHiLsplitt"
+echo -e "|- "
+echo -e "|- Die Sicherheitskopie und das dazu gehörige Verzeichnis:"
+echo -e "$strBAKdateien"
+echo -e "|- "
+
+
+if [[ "$zSPLIT" -gt "0" ]]
+then
+    kdialog --title="$datei" --caption="$titel" --msgbox="<nobr>===== $datei ======================</nobr><br><br>Alle Dateien`echo -e "\n"` und Ordner$trennerX am aktuellen Ort"`echo -e "\n"`" wurden erfolgreich überprüft.<br><br>-Status:<br>$XstatusANZAHLinsgesamt<br>$XstatusANZAHLbak<br>$XstatusANZAHiLsplitt<br><br>-Speicherort der neuen Unterverzeichnisse:<br>"$pfad"<br><br>Die komplette Liste der Sicherheitskopien und Unterverzeichnisse wird in der Konsole angezeigt."
+    
+    #kdialog --title="$datei" --caption="$titel" --msgbox="<nobr>===== "$datei" ======================</nobr><br><br>Alle Dateien und Ordner am aktuellen Ort wurden erfolgreich überprüft.<br><br>-Status:<br>"$statusANZAHLinsgesamt"<br>"$statusANZAHLbak"<br>"$statusANZAHiLsplitt"<br><br>-Speicherort der .bak Dateien und der neuen Unterverzeichnisse:<br>"$pfad"<br><br>Die komplette Liste der Sicherheitskopien und Unterverzeichnisse wird in der Konsole angezeigt."
+else
+    kdialog --title="$datei" --caption="$titel" --msgbox="<nobr>===== "$datei" ======================</nobr><br><br>Es wurde keine passende Datei unter<br>$pfad<br>gefunden. Bitte überprüfen Sie die Adresse,<br>die Bentzerrechte und die Ausgabe in der Konsole.<br>Hinweise zum Debug Modus finden Sie in der Hilfe (-h).<br>"
+fi
+
+
+
+
+exit 0;
+
+
+
+
+
+/home/lx21/bin/lxMP3split: Zeile 304: Syntaxfehler beim unerwarteten Wort `('
+/home/lx21/bin/lxMP3split: Zeile 304: `    Bei $zBAKdateien Dateien wurden Sicherheitskopien und alle entsprechenden Teildateien ($zSPLIT) erstellt. <br><br>Sppeicherort der Sicherheitskopien:<brpfad werden der Datei(en) wurden hier gespeichert:<br>$pfad<br><br>$strBAKdateien"'
+
+
+
+
