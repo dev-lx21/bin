@@ -246,20 +246,29 @@ txtTITEL="Video-, Audiodateien oder komplette HTML-Seiten herunterladen!"
 
 
 
+# ***** Cache des Downloaders leeren: *************************************************************
 # -Nur Starten wenn NICHT:
-#  Logs, Hilfe, ShortcutCD (Verzeichniswechsel)
-#  aufgerufen wurden!
-#if ( [[ "$1" != -*l* ]] && [[ "$1" != -*h* ]] )
+#  Logs, Hilfe, ShortcutCD (Verzeichniswechsel) aufgerufen wurden!
+#
 if ( [[ "$1" != -*PS* ]] && [[ "$1" != -*l* ]] && [[ "$1" != -*h* ]] && [[ "$1" != -*scl* ]] && [[ "$1" != -*sccd* ]] && [[ "$1" != -*conf* ]] )
 then
-    # -Cache des Downloaders leeren bzw. löschen:
     echo -e "|-"
-    echo -e "|- $datei: Download Cache leeren: Gestartet..."
-    $strBefehlName -i -v --rm-cache-dir
+    echo -e "|- $datei: Download Cache leeren: START!"
+    echo -e "|-"
+    sleep 0.2
+    echo -e "|- $datei: $strBefehlName "`$strBefehlName --version`
+    echo -e "|-"
+    sleep 0.2
+    # -Cache leeren:
+    echo -e "|- $datei: $strBefehlName "`$strBefehlName -i -v --rm-cache-dir`
     #echo -e "--- Cache NICHT leeren! ---" && sleep 2
-    sleep 1
-    echo -e "|- $datei: Download Cache leeren: Fertig!"\\n"|-"
-    sleep 1
+    sleep 0.2
+    echo -e "|-"
+    sleep 0.2
+    echo -e "|- $datei: Download Cache leeren: FERTIG!"
+    sleep 0.2
+    echo -e "|-"
+    sleep 2
 fi
 
 
